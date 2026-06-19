@@ -36,3 +36,6 @@ htmlcov/
 
 # Generated solver output
 out/
+
+# Source data — contains PII (lecturer names, staff IDs, student grade stats); not tracked
+data/

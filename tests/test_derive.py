@@ -10,9 +10,9 @@ def test_course_level():
 
 
 def test_blocks_from_tpl_theory_only():
-    blocks = derive.blocks_from_tpl("S_01", 3, 0, 0, 3)
-    assert len(blocks) == 1
-    assert blocks[0].kind == "theory" and blocks[0].length == 3 and not blocks[0].needs_lab
+    blocks = derive.blocks_from_tpl("S_01", 3, 0, 0, 3)   # 3h theory -> 2 + 1
+    assert len(blocks) == 2 and sorted(b.length for b in blocks) == [1, 2]
+    assert all(b.kind == "theory" and not b.needs_lab for b in blocks)
 
 
 def test_blocks_from_tpl_theory_plus_lab():
@@ -23,13 +23,14 @@ def test_blocks_from_tpl_theory_plus_lab():
 
 
 def test_blocks_practice_folds_into_theory():
-    blocks = derive.blocks_from_tpl("S_01", 2, 2, 0, 3)
-    assert len(blocks) == 1 and blocks[0].length == 4   # T+P
+    blocks = derive.blocks_from_tpl("S_01", 2, 2, 0, 3)   # T+P = 4h -> 2 + 2
+    assert len(blocks) == 2 and sorted(b.length for b in blocks) == [2, 2]
+    assert all(b.kind == "theory" for b in blocks)
 
 
 def test_blocks_zero_defaults_to_three():
-    blocks = derive.blocks_from_tpl("S_01", 0, 0, 0, 3)
-    assert len(blocks) == 1 and blocks[0].length == 3
+    blocks = derive.blocks_from_tpl("S_01", 0, 0, 0, 3)   # defaults to Cr=3 -> 2 + 1
+    assert len(blocks) == 2 and sorted(b.length for b in blocks) == [1, 2]
 
 
 def test_build_sections_excludes_grad_and_internship():

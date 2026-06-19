@@ -33,17 +33,17 @@ def _make_blocks(section_id, kind, tag, total, max_len, needs_lab) -> List[Block
 
 
 def blocks_from_tpl(section_id: str, T: int, P: int, L: int, Cr: int,
-                    max_block_len: int = 4) -> List[Block]:
+                    max_block_len: int = 4, max_theory_session: int = 2) -> List[Block]:
     blocks: List[Block] = []
     theory_len = (T or 0) + (P or 0)
     lab_len = L or 0
     if theory_len > 0:
-        blocks += _make_blocks(section_id, "theory", "T", theory_len, max_block_len, False)
+        blocks += _make_blocks(section_id, "theory", "T", theory_len, max_theory_session, False)
     if lab_len > 0:
         blocks += _make_blocks(section_id, "lab", "L", lab_len, max_block_len, True)
     if not blocks:
         default_len = Cr if (Cr and Cr > 0) else 3
-        blocks += _make_blocks(section_id, "theory", "T", default_len, max_block_len, False)
+        blocks += _make_blocks(section_id, "theory", "T", default_len, max_theory_session, False)
     return blocks
 
 
@@ -91,7 +91,7 @@ def build_sections(frame, cfg: Config) -> Tuple[List[Section], Dict]:
             faculty=r.get("faculty", "").strip(), cohort_key=cohort,
             instructor_ids=normalize_staff_ids(r.get("staff_id", "")), students=_students(r),
             T=T, P=P, L=L, Cr=Cr, category=category,
-            blocks=blocks_from_tpl(sid, T, P, L, Cr, cfg.max_block_len),
+            blocks=blocks_from_tpl(sid, T, P, L, Cr, cfg.max_block_len, cfg.max_theory_session),
             plan_room=r.get("plan_room", "").strip(),
         )
         sections.append(s)

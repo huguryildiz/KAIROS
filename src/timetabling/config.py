@@ -29,6 +29,9 @@ class Config:
     max_rooms_per_block: int = 12   # best-fit: only the K smallest fitting rooms per block
     # phase 2: block splitting
     max_block_len: int = 4
+    # undergrad theory distributes into sessions of at most this many hours,
+    # each forced onto a different day (T:3 -> 2+1 on two days)
+    max_theory_session: int = 2
     # phase 2: oversize -> synthetic large halls, list of (cap, count)
     extra_rooms: tuple = ()
     # phase 2: cohort daily-compactness applies to these year levels

@@ -4,16 +4,17 @@ from timetabling import derive, model_cpsat, validate
 
 
 def test_single_block_keeps_plain_id():
-    bs = derive.blocks_from_tpl("S_01", 3, 0, 0, 3, max_block_len=4)
-    assert [b.block_id for b in bs] == ["S_01#T"]
+    bs = derive.blocks_from_tpl("S_01", 2, 0, 0, 2, max_block_len=4)
+    assert [b.block_id for b in bs] == ["S_01#T"]   # T<=2 stays one session
 
 
-def test_long_theory_splits_evenly():
-    bs = derive.blocks_from_tpl("S_01", 10, 0, 0, 0, max_block_len=4)
-    lens = sorted(b.length for b in bs)
-    assert lens == [3, 3, 4]                      # 10 over 3 blocks
-    assert all(b.kind == "theory" and not b.needs_lab for b in bs)
+def test_theory_splits_into_two_hour_sessions():
+    assert sorted(b.length for b in derive.blocks_from_tpl("S_01", 3, 0, 0, 3)) == [1, 2]
+    assert sorted(b.length for b in derive.blocks_from_tpl("S_01", 4, 0, 0, 4)) == [2, 2]
+    bs = derive.blocks_from_tpl("S_01", 5, 0, 0, 5)
+    assert sorted(b.length for b in bs) == [1, 2, 2]
     assert [b.block_id for b in bs] == ["S_01#T1", "S_01#T2", "S_01#T3"]
+    assert all(b.kind == "theory" and not b.needs_lab for b in bs)
 
 
 def test_long_lab_splits_and_marks_lab():

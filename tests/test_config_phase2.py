@@ -3,6 +3,7 @@ from timetabling.config import Config
 def test_phase2_defaults():
     c = Config()
     assert c.max_block_len == 4
+    assert c.max_theory_session == 2
     assert c.extra_rooms == ()
     assert c.compact_cohort_years == (2, 3, 4)
     assert c.w_cohort_gap == 3

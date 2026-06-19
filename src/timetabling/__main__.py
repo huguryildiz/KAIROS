@@ -8,6 +8,7 @@ from .io_csv import load_classrooms, load_lecturers
 from .join import build_section_frame
 from .derive import build_sections
 from .clean import build_rooms, build_instructors
+from .route import mark_virtual
 from .model_cpsat import build_and_solve as _cpsat_solve, split_roomable
 from .decompose import solve_decomposed
 from .validate import validate
@@ -49,6 +50,7 @@ def main():
     instructors = build_instructors(load_lecturers())
     frame = _apply_scope(build_section_frame(args.period, cfg.include_plan_only), args.scope)
     all_sections, derive_rep = build_sections(frame, cfg)
+    mark_virtual(all_sections, rooms, cfg)
     room_list = list(rooms.values())
 
     sections, unschedulable = split_roomable(all_sections, room_list, cfg, instructors)

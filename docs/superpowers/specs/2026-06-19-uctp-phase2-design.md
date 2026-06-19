@@ -217,7 +217,8 @@ attributes (course level vs cohort year). Weights are calibrated together in 5.6
 | `extra_rooms` | `((500,2),(250,3),(150,4))` | 5.4 large halls |
 | `compact_cohort_years` | `(2,3,4)` | 5.5 which cohorts get gap penalty |
 | `w_cohort_gap` | `3` (tune) | 5.5 weight |
-| `w_nonadjacent`, `w_day_balance`, `w_daily_load`, `w_instr_freeday`, `w_practicum_buffer` | `0` (tune) | 5.6 staged softs |
+| `w_nonadjacent` | `0` (tune) | 5.6 / #2 non-adjacent split days (shipped) |
+| `w_day_balance`, `w_daily_load`, `w_instr_freeday`, `w_practicum_buffer` | `0` (tune) | 5.6 staged softs — **added during calibration only if a benchmark gap warrants** (YAGNI) |
 | `w_order` | `1` (tune) | 5.7 S-Order level→start-hour |
 | `w_englab` | `1` (tune) | 5.7 S-EngLab Thu/Fri lab pref. |
 | `eng_lab_days` | `("Th","Fr")` | 5.7 preferred lab days |

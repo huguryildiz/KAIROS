@@ -3,8 +3,8 @@ from timetabling.model import Section, Block, Room, Instructor, Assignment
 from timetabling import validate
 
 
-def _sec(sid, level, students, blocks, instr="i1", cohort="D-1"):
-    s = Section(sid, "001", "D 101", "n", level, "D", "Fac", cohort, [instr],
+def _sec(sid, level, students, blocks, instr="i1", cohort="D-1", code="D 101"):
+    s = Section(sid, "001", code, "n", level, "D", "Fac", cohort, [instr],
                 students, 0, 0, 0, 0, "Course")
     s.blocks = blocks
     return s
@@ -37,8 +37,10 @@ def test_detects_capacity_and_lab_and_window_and_blackout():
 
 
 def test_detects_instructor_and_cohort_conflict():
-    s1 = _sec("S1_01", 1, 10, [Block("S1_01#T", "S1_01", "theory", 1, False)], instr="i1", cohort="D-1")
-    s2 = _sec("S2_01", 1, 10, [Block("S2_01#T", "S2_01", "theory", 1, False)], instr="i1", cohort="D-1")
+    s1 = _sec("S1_01", 1, 10, [Block("S1_01#T", "S1_01", "theory", 1, False)],
+              instr="i1", cohort="D-1", code="D 101")
+    s2 = _sec("S2_01", 1, 10, [Block("S2_01#T", "S2_01", "theory", 1, False)],
+              instr="i1", cohort="D-1", code="D 202")
     a = [Assignment("S1_01#T", "S1_01", "theory", "R1", "Mo", 9, 10),
          Assignment("S2_01#T", "S2_01", "theory", "LAB-L", "Mo", 9, 10)]
     kinds = {v.kind for v in validate.validate(a, [s1, s2], ROOMS, INSTR, Config())}

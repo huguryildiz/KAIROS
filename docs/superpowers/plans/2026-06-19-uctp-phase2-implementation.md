@@ -1594,3 +1594,19 @@ the `build_sections` call site; kind detection `"#L" in bid` (Task 6) matches th
 **Placeholder scan:** no TBD/TODO/"handle edge cases"; every code step shows complete code.
 Task 12 Step 5 and Task 13 are measurement/documentation tasks by nature — their actions are
 explicit commands with target numbers, not code placeholders.
+
+---
+
+## Addendum — Task 14 (added during execution): soften cohort to a penalty
+
+After Tasks 1–11 landed, calibration (Task 12) revealed the course-level cohort constraint is still
+**hard-infeasible** at faculty/full scale (Computer Engineering: INFEASIBLE with cohort hard,
+OPTIMAL with cohort coupling removed — proof in spec §5.1-R). The `(Dept_Code, Year_Level)` proxy
+over-counts conflict because students split across electives (4XX are mostly electives, 2–3 per
+student/term). Per the user's decision, the cohort constraint becomes **soft**: a weighted penalty
+the solver minimizes, with rooms/instructors/window/etc. staying hard. Full task text and TDD steps:
+[.superpowers/sdd/task-14-brief.md](../../../.superpowers/sdd/task-14-brief.md) (kept in the SDD
+workspace). It modifies `config.py` (`w_cohort_conflict`), `model_cpsat.py` (hard `<=1` → penalty),
+`validate.py` (cohort no longer a hard violation), `report.py` (`cohort_conflicts` soft metric),
+and the cohort tests. Task 12 calibration and Task 13 full-period results are run **after** Task 14,
+since they depend on full-period feasibility.

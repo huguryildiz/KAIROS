@@ -44,6 +44,12 @@ Mode C warm-start, `rules.pdf` Article 1 (ignored).
   should be consecutive, minimizing student idle gaps. Applied to cohorts with `year_level ∈
   {2,3,4}`. Soft, weighted, tunable (§5.5).
 - **Article 1 still ignored** → free block splitting is allowed (enables 2.2).
+- **Cohort conflict is SOFT, not hard (revised after implementation).** A hard course-level cohort
+  constraint proved still infeasible at scale (Computer Engineering: INFEASIBLE hard / OPTIMAL with
+  cohort removed). The `(Dept_Code, Year_Level)` proxy over-counts conflict because students split
+  across electives (4XX are mostly electives, 2–3 per student per term). Cohort overlap is therefore
+  a weighted penalty the solver minimizes, not a prohibition — see §5.1-R. Rooms/instructors/window
+  stay hard, so every period yields a valid timetable.
 - **Two previously-approved soft rules are folded in** from
   [2026-06-19-soft-ordering-and-eng-labs-design.md](2026-06-19-soft-ordering-and-eng-labs-design.md):
   **S-Order** (within a cohort, course level rises with start-hour) and **S-EngLab**
@@ -104,6 +110,37 @@ courses in the same cohort may not overlap.
 
 **Expected effect:** service/elective faculties and multi-section courses (CMPE 113 _01–_04, ENG-1)
 become feasible.
+
+#### 5.1-R Revision (post-implementation): the cohort constraint is **SOFT**, not hard
+
+Implementing 5.1 as a **hard** constraint and then solving real faculties proved it is still
+infeasible at scale. Evidence (period 001, Computer Engineering, 61 sections, soft objective off):
+
+| Configuration | Result |
+|---|---|
+| course-level cohort **hard** (as above) | **INFEASIBLE** — proven in ~8 s |
+| same instance, cohort coupling **removed** (each section its own cohort) | **OPTIMAL** in ~2.5 s |
+
+So rooms, instructors, the day window, blackouts and halls are all satisfiable; the **sole**
+binding constraint is the cohort proxy. No single cohort overflows the ~44 h weekly window (CMPE-4
+is the worst at 8 courses / 39 h), so the infeasibility is a *combinatorial coupling*: the
+`(Dept_Code, Year_Level)` proxy treats a whole year-group as one monolithic student body that can
+never have two **different** courses at once. In reality students split across **electives** — and
+**4XX courses are mostly electives, of which a student takes only 2–3 per term** — so two same-cohort
+courses genuinely do run in parallel for disjoint student subsets. The data carries no
+elective/mandatory flag or per-student course set to recover the true sub-groups.
+
+**Decision (user-approved):** make the cohort constraint **soft**. Replace the hard
+`Σ_course busy ≤ 1` with a penalty `cfg.w_cohort_conflict * Σ_{(cohort,day,hour)} max(0, (#distinct
+courses) − 1)`. Rooms / instructors / capacity / lab / window / blackout / H_self stay **hard**, so
+every period now yields a physically valid timetable; the solver **minimizes** student
+course-conflicts rather than being forbidden from producing any. `w_cohort_conflict` is weighted
+high (student conflict is "almost hard") and calibrated in 2.6.
+
+**Validator / reporting:** cohort overlap is **no longer a hard `Violation`**. `validate.py` keeps
+only the genuinely-hard checks (room, instructor, capacity, lab, window, blackout, self, placement);
+the cohort course-conflict count is reported as a **soft metric** (`cohort_conflicts`, surfaced in
+`mode_b_<period>.json` and `unmet_soft`). "0 hard violations" therefore remains the feasibility bar.
 
 ### 5.2 Split long blocks across days (TODO 2.2)
 

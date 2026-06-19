@@ -1,116 +1,119 @@
-# Course Timetabling — Üniversite Ders Çizelgeleme (UCTP)
+# Course Timetabling — University Course Timetabling (UCTP)
 
-Gerçek üniversite verisinden **çakışmasız haftalık ders programı** üreten bir
-OR-Tools **CP-SAT** modeli. Her section'a **gün + saat + oda** atar; section/hoca/
-büyüklük/T-P-L sabit girdidir (karar değişkenleri yalnızca **zaman ve oda**).
+An OR-Tools **CP-SAT** model that produces a **conflict-free weekly schedule** from
+real university data. It assigns each section a **day + time + room**; section/
+instructor/size/T-P-L are fixed inputs (the only decision variables are **time and
+room**).
 
-> **Bu faz (Faz 1):** uçtan uca çalışan pipeline + departman/fakülte dilimlerinde
-> kanıtlanmış feasibility. Tam dönem (~800 section) çözümü ve web arayüzü
-> sonraki fazlarda — bkz. [TODO.md](TODO.md).
+> **This phase (Phase 1):** a working end-to-end pipeline with feasibility proven on
+> department/faculty slices. Full-period solving (~800 sections) and the web UI are
+> later phases — see [TODO.md](TODO.md).
 
-İlgili dokümanlar:
-- Tasarım spec'i: [docs/superpowers/specs/2026-06-19-course-timetabling-cpsat-design.md](docs/superpowers/specs/2026-06-19-course-timetabling-cpsat-design.md)
-- Uygulama planı: [docs/superpowers/plans/2026-06-19-uctp-cpsat-pipeline.md](docs/superpowers/plans/2026-06-19-uctp-cpsat-pipeline.md)
-- Problem spesifikasyonu: [prompts/university_course_timetabling_prompt.md](prompts/university_course_timetabling_prompt.md)
+Related documents:
+
+- Design spec: [docs/superpowers/specs/2026-06-19-course-timetabling-cpsat-design.md](docs/superpowers/specs/2026-06-19-course-timetabling-cpsat-design.md)
+- Implementation plan: [docs/superpowers/plans/2026-06-19-uctp-cpsat-pipeline.md](docs/superpowers/plans/2026-06-19-uctp-cpsat-pipeline.md)
+- Problem specification: [prompts/university_course_timetabling_prompt.md](prompts/university_course_timetabling_prompt.md)
 
 ---
 
-## Kurulum
+## Setup
 
 ```bash
 python3 -m pip install -r requirements.txt   # pandas, ortools, pytest
 ```
 
-## Çalıştırma
+## Running
 
 ```bash
 PYTHONPATH=src python3 -m timetabling --period 001 \
     --scope faculty="Department of Psychology" --mode A,B --time-limit 60
 ```
 
-**Parametreler:**
+**Parameters:**
 
-| Bayrak | Değerler | Açıklama |
+| Flag | Values | Description |
 |---|---|---|
-| `--period` | `001` (Güz) \| `002` (Bahar) | Çizelgelenecek dönem (bağımsız) |
-| `--scope` | `all` \| `faculty=<metin>` \| `dept=<KOD>` | Çözülecek dilim. `faculty` Grades `Dept.` kolonunu, `dept` cohort dept kodunu eşler |
-| `--mode` | `A,B` (varsayılan) \| `A` \| `B` | A = sıfırdan çöz, B = mevcut programla benchmark |
-| `--time-limit` | saniye (varsayılan 60) | CP-SAT çözüm süre sınırı |
-| `--out` | dizin (varsayılan `out/`) | Çıktı klasörü |
+| `--period` | `001` (Fall) \| `002` (Spring) | Term to schedule (independent) |
+| `--scope` | `all` \| `faculty=<text>` \| `dept=<CODE>` | Slice to solve. `faculty` matches the Grades `Dept.` column; `dept` matches the cohort dept code |
+| `--mode` | `A,B` (default) \| `A` \| `B` | A = solve from scratch, B = benchmark against the existing program |
+| `--time-limit` | seconds (default 60) | CP-SAT solve time limit |
+| `--out` | dir (default `out/`) | Output folder |
 
-Tüm diğer parametreler (blackout saatleri, zaman pencereleri, objective ağırlıkları,
-`max_rooms_per_block`, toggle'lar) [src/timetabling/config.py](src/timetabling/config.py)
-içindeki `Config` dataclass'ında.
+All other parameters (blackout hours, time windows, objective weights,
+`max_rooms_per_block`, toggles) live in the `Config` dataclass in
+[src/timetabling/config.py](src/timetabling/config.py).
 
-## Çıktılar (`out/`)
+## Outputs (`out/`)
 
-- **`schedule_<period>.json`** — arayüzün tüketeceği şema. Her atama:
+- **`schedule_<period>.json`** — the UI-consumable schema. Each assignment:
   `section_id, course_code, course_name, block_kind, instructor_id, instructor_name,
   cohort, dept, students, day, start, end, room, room_cap, is_lab_room, flags`;
-  ayrıca `period`, `meta`, `unmet_soft`, `conflicts`.
-- **`schedule_<period>.csv`** — aynı atamaların düz tablo hâli.
-- **`data_quality_<period>.json`** — parse/oda/cohort/join sağlaması, lab-oda tablosu,
-  çizelgelenemeyen (oversize / blok > gün penceresi) section listesi.
-- **`mode_b_<period>.json`** — üretilen program ↔ mevcut program (çakışma sayıları,
-  oda kullanımı, akşam oranı).
+  plus `period`, `meta`, `unmet_soft`, `conflicts`.
+- **`schedule_<period>.csv`** — the same assignments as a flat table.
+- **`data_quality_<period>.json`** — parse/room/cohort/join checks, lab-room table,
+  and the list of unschedulable sections (oversize / block longer than the day window).
+- **`mode_b_<period>.json`** — generated vs. existing program (conflict counts, room
+  usage, evening ratio).
 
-## Test
+## Tests
 
 ```bash
-python3 -m pytest -q        # 39 test
+python3 -m pytest -q        # 39 tests
 ```
 
 ---
 
-## Mimari
+## Architecture
 
 ```
 src/timetabling/
-  config.py         Config dataclass + tüm parametreler, DAYS
+  config.py         Config dataclass + all parameters, DAYS
   model.py          Room, Instructor, Block, Section, Candidate, Assignment, Violation
-  textnorm.py       Staff ID / isim / int normalizasyonu
-  schedule_parse.py SCHEDULE grameri (birim / zincir / X/Y / kirli→flag)
-  io_csv.py         quote-aware CSV yükleyiciler (period eklemeli)
-  clean.py          oda sınıflama (lab/online/fiziksel), hoca master nesneleri
-  join.py           Grades ⨝ enrollment ⨝ Plan birleşik tablosu
-  derive.py         Section+Block türetme (level, cohort, T+P/L blokları, hariç tutma)
-  model_cpsat.py    aday üretimi + pruning + CP-SAT model + çözüm
-  validate.py       çözücüden bağımsız hard-constraint doğrulayıcı
-  report.py         veri kalitesi + Mode-B benchmark
+  textnorm.py       Staff ID / name / int normalization
+  schedule_parse.py SCHEDULE grammar (unit / chain / X/Y / dirty -> flag)
+  io_csv.py         quote-aware CSV loaders (with period attachment)
+  clean.py          room classification (lab/online/physical), instructor master objects
+  join.py           Grades join enrollment join Plan combined frame
+  derive.py         Section+Block derivation (level, cohort, T+P/L blocks, exclusions)
+  model_cpsat.py    candidate generation + pruning + CP-SAT model + solve
+  validate.py       solver-independent hard-constraint validator
+  report.py         data quality + Mode-B benchmark
   export.py         schedule.json + CSV
-  __main__.py       CLI / pipeline orkestrasyonu
+  __main__.py       CLI / pipeline orchestration
 ```
 
-Hard kısıtların çoğu **aday üretiminde** uygulanır (yalnızca legal `(oda, gün, saat)`
-yerleşimleri üretilir): kapasite, lab-odası, lisans <18:00 penceresi, Cuma 13–14 ve
-Perşembe 14–16 (tam zamanlı) blackout'lar. Modelde yalnızca **H1 yerleşim** ve
-**H2–H4 oda/hoca/cohort çakışmazlığı** açık kısıt olarak yer alır. `validate.py`
-çözümü modelden **bağımsız** yeniden denetler — çözücü hatası sessizce geçemez.
+Most hard constraints are enforced during **candidate generation** (only legal
+`(room, day, start)` placements are produced): capacity, lab-room, the undergraduate
+<18:00 window, and the Friday 13–14 and Thursday 14–16 (full-time) blackouts. Only
+**H1 placement** and **H2–H4 room/instructor/cohort no-overlap** are explicit model
+constraints. `validate.py` re-checks the solution **independently** of the model, so a
+solver bug cannot pass silently.
 
 ---
 
-## Doğrulanmış sonuçlar (dönem 001)
+## Verified results (period 001)
 
-Her dilim mevcut programı çakışma / oda sayısı / akşam oranında geçer:
+Each slice beats the existing program on conflicts / room count / evening ratio:
 
-| Dilim | Section | Durum | Hard ihlal | Mode A vs mevcut |
+| Slice | Sections | Status | Hard violations | Mode A vs existing |
 |---|---|---|---|---|
-| ADA bölümü | 5 | OPTIMAL | 0 | 1 oda vs 4 |
-| Econ fakültesi | 16 | OPTIMAL | 0 | 5 oda vs 13, 0 vs 9 çakışma |
-| Psychology | 35 | FEASIBLE | 0 | 6 oda vs 19, 0 vs 36 çakışma |
-| Architecture | 12 (+5 studio hariç) | OPTIMAL | 0 | 3 oda vs 10 |
+| ADA dept | 5 | OPTIMAL | 0 | 1 room vs 4 |
+| Econ faculty | 16 | OPTIMAL | 0 | 5 rooms vs 13, 0 vs 9 conflicts |
+| Psychology | 35 | FEASIBLE | 0 | 6 rooms vs 19, 0 vs 36 conflicts |
+| Architecture | 12 (+5 studios excluded) | OPTIMAL | 0 | 3 rooms vs 10 |
 
 ---
 
-## Bilinen sınırlamalar (bu fazda kabul edilen — detay: [TODO.md](TODO.md))
+## Known limitations (accepted in this phase — details in [TODO.md](TODO.md))
 
-1. **Cohort proxy `(Dept_Code, Year_Level)`** servis/seçmeli derslerde ve *aynı dersin
-   birden çok section'ında* fazla kısıtlayıcı → bu fakültelerde infeasible
-   (örn. ENG-1: 47 section / 188 saat, haftada ~45 saatlik pencereye sığmaz).
-2. **Uzun bloklar** (studio; T+P ≥ 10 saat tek blok) gün penceresine sığmaz →
-   çok-güne bölme gerekir; şu an hariç tutulup raporlanır.
-3. **Oversize section'lar** (öğr. sayısı > en büyük oda 100) → hariç tutulup raporlanır.
-4. **Çok-hocalı section'lar** (Grades `Staff ID`'de virgülle iki kimlik) tek sentetik
-   hoca olarak ele alınır; isim eşleşmesi boş kalır.
-5. **Tam dönem (~800 section)** çözümü #1–#2 nedeniyle olduğu gibi çözülmez —
-   sonraki faz işidir.
+1. **Cohort proxy `(Dept_Code, Year_Level)`** is too restrictive for service/elective
+   courses and for *multiple sections of the same course* → infeasible on those faculties
+   (e.g. ENG-1: 47 sections / 188 hours, which cannot fit a ~45-hour weekly window).
+2. **Long blocks** (studios; T+P ≥ 10h as a single block) do not fit the day window →
+   need multi-day splitting; currently excluded and reported.
+3. **Oversize sections** (students > the largest room, 100) → excluded and reported.
+4. **Team-taught sections** (two comma-joined IDs in Grades `Staff ID`) are treated as
+   one synthetic instructor; the name lookup is left blank.
+5. **The full period (~800 sections)** does not solve as-is because of #1–#2 — that is
+   later-phase work.

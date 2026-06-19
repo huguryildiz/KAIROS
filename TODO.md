@@ -1,77 +1,85 @@
-# TODO — İleri Fazlar
+# TODO — Future Phases
 
-Faz 1 (uçtan uca pipeline + dilim bazlı feasibility kanıtı) tamamlandı.
-Bkz. [README.md](README.md). Aşağıdakiler sonraki fazların iş listesidir.
-
----
-
-## Faz 2 — Model doğruluğu ve tam-ölçek çözüm
-
-### 2.1 Cohort kısıtı düzeltmesi (yüksek öncelik, spec'e sadık)
-- **Sorun:** Şu an aynı cohort'un *herhangi* iki section'ı aynı anda olamıyor. Ama
-  spec hard-kısıt #3 "aynı anda iki **derste**" diyor → aynı **dersin** farklı
-  section'ları (farklı öğrenci grupları için paralel açılan) çakışmamalı sayılıyor.
-- **Yapılacak:** Cohort çakışmazlığını **ders kodu düzeyinde** kur: bir (cohort, slot)
-  içinde en fazla bir *distinct ders kodu* aktif olsun; aynı dersin section'ları paralel
-  olabilsin. CP kodlaması: `course_busy[cohort, course, day, hour]` gösterge değişkeni +
-  `(cohort, slot)` başına `sum(course_busy) <= 1`.
-- **Beklenen etki:** CMPE 113 _01–_04 gibi durumlar ve servis dersleri feasible olur.
-- **Test:** aynı dersin iki section'ı paralel olabilmeli; iki *farklı* dersin section'ı
-  olamamalı.
-
-### 2.2 Uzun blokları çok-güne bölme
-- **Sorun:** T+P ≥ ~10 saat tek blok 09–18 penceresine sığmaz (studio dersleri).
-- **Yapılacak:** `blocks_from_tpl`'i, uzun teorik yükü birden çok güne yayılan daha küçük
-  bloklara bölecek şekilde genişlet (Madde 1 zaten IGNORE; serbest bölme). Aynı section'ın
-  blokları cohort/hoca üzerinden zaten çakışmaz; ek olarak "ardışık günlere yayma" (soft #2)
-  ödüllendirilebilir. Bölme stratejisi parametrik olsun (ör. maks blok uzunluğu).
-- **Test:** 10 saatlik bir section ≥2 bloğa bölünüp yerleşmeli.
-
-### 2.3 Çok-hocalı (team-taught) section'lar
-- **Sorun:** Grades `Staff ID` bazı section'larda virgülle iki kimlik içeriyor
-  (`"00003893,00002022"`) → tek sentetik hoca gibi ele alınıyor, isim boş kalıyor.
-- **Yapılacak:** Kimlikleri ayır; section'ı *tüm* listelenen hocalara ait say
-  (her biri için hoca-çakışmazlığına dahil et); arayüz için isimleri birleşik göster.
-
-### 2.4 Oversize section'lar
-- **Sorun:** 16 section (en büyük TEDU 101 = 497 öğr.) en büyük odayı (100) aşıyor.
-- **Seçenekler:** (a) büyük amfileri oda master'ına ekle; (b) section'ı paralel
-  alt-gruplara böl; (c) kapasite kısıtını "taşma cezası" olan soft'a çevir (opsiyonel).
-  Şu an: hariç tutulup raporlanıyor — karar verilince uygula.
-
-### 2.5 Tam dönem çözümü ve decomposition
-- 2.1–2.2 sonrası `--scope all` ile **tüm 001 (~793 section)** çözümünü dene; süre/kalite
-  ölç. Gerekirse:
-  - Oda havuzunu paylaşan **fakülte-bazlı decomposition** + ortak oda rezervasyon şeması.
-  - Sıcak başlatma (mevcut programdan hint) — Mode C.
-- **002 (Bahar) dönemini** de çalıştır ve raporla (pipeline period-parametrik).
-
-### 2.6 Soft objective kalibrasyonu
-- Ağırlıkları benchmark'lara göre ayarla: oda doluluğu ~0.53, akşam oranı ~%7.
-- Soft #2/#4/#5/#7/#8/#14'ü (ardışık gün, gün dengesi, günlük yük, hoca boş günü,
-  yarı-zamanlı kümeleme, uygulama dersi tamponu) kademeli ekle ve etkisini ölç.
+Phase 1 (end-to-end pipeline + slice-level feasibility proof) is complete.
+See [README.md](README.md). The items below are the backlog for later phases.
 
 ---
 
-## Faz 3 — Web arayüzü (salt-okunur)
+## Phase 2 — Model fidelity and full-scale solving
 
-- React + shadcn/ui; çözücüyü çalıştırmaz, yalnızca `schedule_<period>.json` okur.
-- Haftalık ızgara (Pzt–Cuma × 09:00–21:00); oda / hoca / cohort / bölüm filtreleri.
-- Çakışma ve sağlanamayan soft-constraint vurgusu; Mode-B karşılaştırma özeti.
-- JSON sözleşmesi `export.py`'de sabit — arayüz ona göre tüketir.
+### 2.1 Cohort constraint fix (high priority, spec-faithful)
+
+- **Problem:** Currently *any* two sections of the same cohort cannot overlap. But spec
+  hard-constraint #3 says "in two **courses** at the same time" → different **sections**
+  of the same course (opened in parallel for different student groups) should be allowed
+  to overlap.
+- **To do:** Enforce cohort no-overlap at the **course-code level**: at most one *distinct
+  course code* active per `(cohort, slot)`; sections of the same course may run in parallel.
+  CP encoding: a `course_busy[cohort, course, day, hour]` indicator variable +
+  `sum(course_busy) <= 1` per `(cohort, slot)`.
+- **Expected effect:** Cases like CMPE 113 _01–_04 and service courses become feasible.
+- **Test:** two sections of the same course may run in parallel; two sections of
+  *different* courses may not.
+
+### 2.2 Split long blocks across multiple days
+
+- **Problem:** A single block of T+P ≥ ~10h does not fit the 09–18 window (studio courses).
+- **To do:** Extend `blocks_from_tpl` to split a long theory load into smaller blocks spread
+  across multiple days (Article 1 is already IGNORED; free splitting is allowed). A section's
+  blocks already cannot overlap via the cohort/instructor constraints; additionally reward
+  "spread across non-adjacent days" (soft #2). Make the split strategy parametric (e.g. a max
+  block length).
+- **Test:** a 10-hour section is split into ≥2 blocks and placed.
+
+### 2.3 Team-taught sections
+
+- **Problem:** Grades `Staff ID` carries two comma-joined IDs for some sections
+  (`"00003893,00002022"`) → treated as one synthetic instructor, name left blank.
+- **To do:** Split the IDs; treat the section as belonging to *all* listed instructors
+  (include each in instructor no-overlap); show joined names for the UI.
+
+### 2.4 Oversize sections
+
+- **Problem:** 16 sections (largest TEDU 101 = 497 students) exceed the largest room (100).
+- **Options:** (a) add large lecture halls to the room master; (b) split the section into
+  parallel sub-groups; (c) turn the capacity constraint into a soft "overflow penalty"
+  (optional). Currently excluded and reported — apply once decided.
+
+### 2.5 Full-period solve and decomposition
+
+- After 2.1–2.2, attempt the **full 001 period (~793 sections)** with `--scope all`; measure
+  time/quality. If needed:
+  - **Faculty-based decomposition** sharing the room pool + a shared-room reservation scheme.
+  - Warm start (hint from the existing program) — Mode C.
+- Also run the **002 (Spring) period** and report (the pipeline is period-parametric).
+
+### 2.6 Soft objective calibration
+
+- Tune weights against benchmarks: room fill ~0.53, evening ratio ~7%.
+- Incrementally add soft #2/#4/#5/#7/#8/#14 (non-adjacent days, day balance, daily load,
+  instructor free days, part-time clustering, practicum buffer) and measure their effect.
 
 ---
 
-## Opsiyonel / kapsam dışı (talep gelirse)
+## Phase 3 — Web UI (read-only)
 
-- **Lisansüstü (5XX/6XX)** dahil etme toggle'ı (`include_grad`) + akşam 18–21 tercihi.
-- **Cumartesi** toggle'ı (`saturday_enabled`) — Dekan onaylı istisnalar.
-- **Plan-only ~225 section** dahil etme (`include_plan_only`) ve saat tahmini.
-- Sınav dönemi çizelgeleme (haftalık timetable dışı — Madde 13).
+- React + shadcn/ui; does not run the solver, only reads `schedule_<period>.json`.
+- Weekly grid (Mon–Fri × 09:00–21:00); room / instructor / cohort / department filters.
+- Highlight conflicts and unmet soft constraints; Mode-B comparison summary.
+- The JSON contract is fixed in `export.py` — the UI consumes that.
 
-## Veri kalitesi takibi
+---
 
-- Lab-oda eşlemesini gözden geçir (13 oda bulundu; spec ~14 diyordu).
-- Grades `Schedule` kolonundaki kirli satırları da raporla (şu an Plan üzerinden bakılıyor;
-  Plan 001'de 0 kirli bulundu).
-- `enrollment_summary` ile bölüm×sınıf toplamlarının çapraz doğrulamasını rapora ekle.
+## Optional / out of scope (if requested)
+
+- **Graduate (5XX/6XX)** inclusion toggle (`include_grad`) + 18–21 evening preference.
+- **Saturday** toggle (`saturday_enabled`) — Dean-approved exceptions.
+- **Plan-only ~225 sections** inclusion (`include_plan_only`) with hour estimation.
+- Exam-period scheduling (outside the weekly timetable — Article 13).
+
+## Data-quality follow-ups
+
+- Review the lab-room mapping (13 rooms found; the spec said ~14).
+- Also report dirty rows in the Grades `Schedule` column (currently checked via Plan;
+  Plan 001 had 0 dirty rows).
+- Add the `enrollment_summary` cross-check of department×year totals to the report.

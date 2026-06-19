@@ -8,17 +8,15 @@ from .config import Config
 from .model import Section, Block, Room, Instructor, Candidate, Assignment
 
 
-def _blackout_hours(instructor: Instructor, cfg: Config):
+def _blackout_hours(instructors, cfg: Config):
     closed = set(cfg.friday_blackout)
-    if instructor.is_staff:
+    if any(ins.is_staff for ins in instructors):
         closed |= set(cfg.seminar_blackout)
     return closed
 
 
 def feasible_rooms_for(block: Block, section: Section, rooms: List[Room],
                        cfg: Config) -> List[Room]:
-    """Best-fit room candidates: the K smallest rooms that fit the section
-    (and are lab rooms when the block needs a lab)."""
     fr = [
         r for r in rooms
         if r.is_physical and r.cap >= section.students and (r.is_lab if block.needs_lab else True)
@@ -27,41 +25,36 @@ def feasible_rooms_for(block: Block, section: Section, rooms: List[Room],
     return fr[:cfg.max_rooms_per_block]
 
 
-def split_roomable(sections: List[Section], rooms: List[Room], cfg: Config,
-                   instructors: Dict[str, Instructor] = None
-                   ) -> Tuple[List[Section], List[dict]]:
-    """Partition sections into schedulable ones (every block has >=1 candidate
-    placement) and unschedulable ones (reported, not solved). A block is
-    unschedulable if no room fits its size, or it is longer than the daily
-    time window."""
-    instructors = instructors or {}
+def _instructors_of(section: Section, instructors: Dict[str, Instructor]) -> List[Instructor]:
     default = Instructor("", "", False, "")
-    roomable: List[Section] = []
-    excluded: List[dict] = []
+    return [instructors.get(i, default) for i in section.instructor_ids] or [default]
+
+
+def split_roomable(sections, rooms, cfg, instructors=None):
+    instructors = instructors or {}
+    roomable, excluded = [], []
     for s in sections:
-        ins = instructors.get(s.instructor_id, default)
+        ins_list = _instructors_of(s, instructors)
         issues = []
         for b in s.blocks:
-            if gen_candidates(b, s, ins, rooms, cfg):
+            if gen_candidates(b, s, ins_list, rooms, cfg):
                 continue
             if not feasible_rooms_for(b, s, rooms, cfg):
                 issues.append([b.block_id, "no room with sufficient capacity"])
             else:
                 issues.append([b.block_id, "block longer than daily time window"])
         if issues:
-            excluded.append({"section_id": s.section_id, "students": s.students,
-                             "issues": issues})
+            excluded.append({"section_id": s.section_id, "students": s.students, "issues": issues})
         else:
             roomable.append(s)
     return roomable, excluded
 
 
-def gen_candidates(block: Block, section: Section, instructor: Instructor,
+def gen_candidates(block: Block, section: Section, instructors: List[Instructor],
                    rooms: List[Room], cfg: Config) -> List[Candidate]:
     end_cap = cfg.undergrad_end if section.level <= 4 else cfg.grad_end
     start_lo = cfg.horizon_start if section.level <= 4 else cfg.grad_start
-    closed = _blackout_hours(instructor, cfg)
-
+    closed = _blackout_hours(instructors, cfg)
     feasible_rooms = feasible_rooms_for(block, section, rooms, cfg)
     cands: List[Candidate] = []
     for r in feasible_rooms:
@@ -93,8 +86,8 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
     evening_vars = []
 
     for b, s in blocks:
-        ins = instructors.get(s.instructor_id, default_instr)
-        cands = gen_candidates(b, s, ins, rooms, cfg)
+        ins_list = _instructors_of(s, instructors)
+        cands = gen_candidates(b, s, ins_list, rooms, cfg)
         cand_by_block[b.block_id] = cands
         if not cands:
             unplaced.append(b.block_id)
@@ -106,12 +99,14 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
             bvars.append(v)
             for hh in range(c.start, c.start + c.length):
                 room_occ[(c.room, c.day, hh)].append(v)
-                instr_occ[(s.instructor_id, c.day, hh)].append(v)
+                for iid in s.instructor_ids:
+                    instr_occ[(iid, c.day, hh)].append(v)
                 cohort_occ[(s.cohort_key, c.day, hh)].append(v)
                 if hh >= cfg.evening_from_hour:
                     evening_vars.append(v)
             room_used_vars[c.room].append(v)
-            instr_day_vars[(s.instructor_id, c.day)].append(v)
+            for iid in s.instructor_ids:
+                instr_day_vars[(iid, c.day)].append(v)
         model.AddExactlyOne(bvars)   # H1
 
     # H2/H3/H4: at most one occupant per resource-slot

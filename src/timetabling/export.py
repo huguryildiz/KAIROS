@@ -14,14 +14,15 @@ def build_schedule_dict(period, assignments: List[Assignment], sections: List[Se
     for a in assignments:
         s = sec_by_id.get(a.section_id)
         room = rooms.get(a.room)
-        ins = instructors.get(s.instructor_id) if s else None
+        ids = s.instructor_ids if s else []
+        names = [instructors[i].name for i in ids if i in instructors and instructors[i].name]
         items.append({
             "section_id": a.section_id,
             "course_code": s.code if s else "",
             "course_name": s.name if s else "",
             "block_kind": a.kind,
-            "instructor_id": s.instructor_id if s else "",
-            "instructor_name": ins.name if ins else "",
+            "instructor_id": ",".join(ids),
+            "instructor_name": " & ".join(names),
             "cohort": s.cohort_key if s else "",
             "dept": s.dept_code if s else "",
             "students": s.students if s else 0,

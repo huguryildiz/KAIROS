@@ -4,7 +4,7 @@ from timetabling import validate
 
 
 def _sec(sid, level, students, blocks, instr="i1", cohort="D-1"):
-    s = Section(sid, "001", "D 101", "n", level, "D", "Fac", cohort, instr,
+    s = Section(sid, "001", "D 101", "n", level, "D", "Fac", cohort, [instr],
                 students, 0, 0, 0, 0, "Course")
     s.blocks = blocks
     return s

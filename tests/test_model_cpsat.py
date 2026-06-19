@@ -4,7 +4,7 @@ from timetabling import model_cpsat
 
 
 def _sec(sid, level, students, blocks, instr="i1", cohort="D-1"):
-    s = Section(sid, "001", "D 101", "n", level, "D", "Fac", cohort, instr,
+    s = Section(sid, "001", "D 101", "n", level, "D", "Fac", cohort, [instr],
                 students, 0, 0, 0, 0, "Course")
     s.blocks = blocks
     return s
@@ -16,7 +16,7 @@ def test_gen_candidates_respects_capacity_and_window():
     instr = Instructor("i1", "n", False, "D")
     b = Block("S_01#T", "S_01", "theory", 3, False)
     s = _sec("S_01", 1, 25, [b])
-    cands = model_cpsat.gen_candidates(b, s, instr, rooms, cfg)
+    cands = model_cpsat.gen_candidates(b, s, [instr], rooms, cfg)
     assert all(c.room == "R1" for c in cands)
     assert all(c.start + b.length <= cfg.undergrad_end for c in cands)
     assert not any(c.day == "Fr" and c.start <= 13 < c.start + b.length for c in cands)
@@ -28,7 +28,7 @@ def test_gen_candidates_lab_requires_lab_room():
     instr = Instructor("i1", "n", False, "D")
     b = Block("S_01#L", "S_01", "lab", 2, True)
     s = _sec("S_01", 1, 20, [b])
-    cands = model_cpsat.gen_candidates(b, s, instr, rooms, cfg)
+    cands = model_cpsat.gen_candidates(b, s, [instr], rooms, cfg)
     assert cands and all(c.room == "LAB-L" for c in cands)
 
 
@@ -39,8 +39,8 @@ def test_gen_candidates_seminar_blackout_fulltime_only():
     s = _sec("S_01", 1, 10, [b])
     full = Instructor("i1", "n", True, "D")
     part = Instructor("i2", "n", False, "D")
-    c_full = model_cpsat.gen_candidates(b, s, full, rooms, cfg)
-    c_part = model_cpsat.gen_candidates(b, s, part, rooms, cfg)
+    c_full = model_cpsat.gen_candidates(b, s, [full], rooms, cfg)
+    c_part = model_cpsat.gen_candidates(b, s, [part], rooms, cfg)
     assert not any(x.day == "Th" and x.start in (14, 15) for x in c_full)
     assert any(x.day == "Th" and x.start in (14, 15) for x in c_part)
 

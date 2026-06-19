@@ -14,6 +14,6 @@ def test_config_defaults():
 def test_model_dataclasses():
     r = Room("A216", 25, False, True)
     assert r.cap == 25 and not r.is_lab
-    s = Section("X_01", "001", "X 101", "n", 1, "X", "Fac", "X-1", "id", 30,
+    s = Section("X_01", "001", "X 101", "n", 1, "X", "Fac", "X-1", ["id"], 30,
                 3, 0, 0, 3, "Course")
     assert s.blocks == []

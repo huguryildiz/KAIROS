@@ -44,9 +44,9 @@ def validate(assignments: List[Assignment], sections: List[Section],
         if a.end > end_cap:
             viol.append(Violation("window",
                         f"{a.block_id} ends {a.end} > allowed {end_cap} (level {s.level})"))
-        ins = instructors.get(s.instructor_id, Instructor("", "", False, ""))
+        ins_list = [instructors.get(i, Instructor("", "", False, "")) for i in s.instructor_ids]
         closed = set(closed_all)
-        if ins.is_staff:
+        if any(ins.is_staff for ins in ins_list):
             closed |= set(cfg.seminar_blackout)
         for hh in range(a.start, a.end):
             if (a.day, hh) in closed:
@@ -54,7 +54,8 @@ def validate(assignments: List[Assignment], sections: List[Section],
                 break
         for hh in range(a.start, a.end):
             room_occ[(a.room, a.day, hh)].append(a.block_id)
-            instr_occ[(s.instructor_id, a.day, hh)].append(a.block_id)
+            for iid in s.instructor_ids:
+                instr_occ[(iid, a.day, hh)].append(a.block_id)
             cohort_occ[(s.cohort_key, a.day, hh)].append(a.block_id)
 
     for (room, day, hh), bids in room_occ.items():

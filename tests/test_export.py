@@ -5,7 +5,7 @@ from timetabling import export
 
 def test_build_schedule_dict_schema(tmp_path):
     s = Section("ADA 403_01", "001", "ADA 403", "EDA", 4, "ADA", "Fac", "ADA-4",
-                "i1", 24, 3, 0, 0, 3, "Course")
+                ["i1"], 24, 3, 0, 0, 3, "Course")
     s.blocks = [Block("ADA 403_01#T", "ADA 403_01", "theory", 3, False)]
     rooms = {"G005": Room("G005", 60, False, True)}
     instr = {"i1": Instructor("i1", "Mustafa Kerem Yüksel", True, "ADA")}

@@ -4,7 +4,7 @@ from typing import List, Tuple, Dict
 
 from .config import Config
 from .model import Section, Block
-from .textnorm import parse_int
+from .textnorm import parse_int, normalize_staff_ids
 
 _NUM = re.compile(r"(\d{3})")
 
@@ -72,7 +72,7 @@ def build_sections(frame, cfg: Config) -> Tuple[List[Section], Dict]:
             section_id=sid, period=r.get("period", "").strip(), code=code,
             name=r.get("name", "").strip(), level=level, dept_code=dept_code,
             faculty=r.get("faculty", "").strip(), cohort_key=cohort,
-            instructor_id=r.get("staff_id", "").strip(), students=_students(r),
+            instructor_ids=normalize_staff_ids(r.get("staff_id", "")), students=_students(r),
             T=T, P=P, L=L, Cr=Cr, category=category,
             blocks=blocks_from_tpl(sid, T, P, L, Cr),
         )

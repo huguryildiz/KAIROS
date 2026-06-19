@@ -24,3 +24,16 @@ def parse_int(s, default=None):
         return int(str(s).strip())
     except (ValueError, TypeError):
         return default
+
+
+def normalize_staff_ids(s) -> list:
+    """Split a comma-joined Staff ID cell into a list of normalized ids.
+    Drops blanks; reuses normalize_staff_id for (S)/whitespace handling."""
+    if s is None:
+        return []
+    out = []
+    for part in str(s).split(","):
+        sid = normalize_staff_id(part)
+        if sid:
+            out.append(sid)
+    return out

@@ -19,14 +19,19 @@ def solve_decomposed(sections: List[Section], rooms: List[Room],
         groups[group_key(s)].append(s)
     order = sorted(groups, key=lambda g: -len(groups[g]))
 
-    reserved = set()
+    reserved: set = set()
+    reserved_instr: set = set()
+    sec_instr = {s.section_id: s.instructor_ids for s in sections}
     all_assigns: List[Assignment] = []
     per_group = []
     for g in order:
-        a, st = build_and_solve(groups[g], rooms, instructors, cfg, reserved=reserved)
+        a, st = build_and_solve(groups[g], rooms, instructors, cfg,
+                                reserved=reserved, reserved_instr=reserved_instr)
         for x in a:
             for hh in range(x.start, x.end):
                 reserved.add((x.room, x.day, hh))
+                for iid in sec_instr.get(x.section_id, []):
+                    reserved_instr.add((iid, x.day, hh))
         all_assigns.extend(a)
         # st always carries status_name/unplaced/wall_time: each group is solved by
         # build_and_solve (never the decomposed path), so these keys are guaranteed.

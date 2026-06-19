@@ -178,3 +178,57 @@ def repair_round(state: State, batch, cand_by_block) -> int:
     for bid, c in new_assign.items():
         state.occupy(bid, c)
     return len(new_assign) - old_count
+
+
+def solve_repair(sections, rooms, instructors, cfg):
+    room_list = list(rooms.values())
+    virtual_names = {r.room for r in room_list if r.is_virtual}
+    blocks = [(b, s) for s in sections for b in s.blocks]
+    total = len(blocks)
+    sec_of = {b.block_id: s for b, s in blocks}
+    sec_instr = {s.section_id: s.instructor_ids for s in sections}
+
+    cand_by_block = {}
+    for b, s in blocks:
+        ins_list = _instructors_of(s, instructors)
+        cand_by_block[b.block_id] = gen_candidates(b, s, ins_list, room_list, cfg)
+
+    order = sorted((b.block_id for b, _ in blocks),
+                   key=lambda bid: (len(cand_by_block[bid]), -sec_of[bid].students))
+
+    state = State(sec_of, sec_instr, virtual_names)
+    greedy_construct(state, order, cand_by_block)
+
+    sweep = 0
+    while True:
+        sweep += 1
+        unplaced = [bid for bid, _ in [(b.block_id, s) for b, s in blocks]
+                    if bid not in state.placed]
+        if not unplaced:
+            break
+        unplaced.sort(key=lambda bid: (len(cand_by_block[bid]), -sec_of[bid].students))
+        gained = 0
+        for i in range(0, len(unplaced), BATCH):
+            batch = [bid for bid in unplaced[i:i + BATCH] if bid not in state.placed]
+            if batch:
+                gained += repair_round(state, batch, cand_by_block)
+        if gained == 0 or sweep >= 25:
+            break
+
+    assignments = []
+    for bid, c in state.placed.items():
+        s = sec_of[bid]
+        kind = "lab" if "#L" in bid else "theory"
+        assignments.append(Assignment(bid, s.section_id, kind, c.room, c.day, c.start,
+                                       c.start + c.length))
+    unplaced_ids = [b.block_id for b, _ in blocks if b.block_id not in state.placed]
+    stats = {
+        "status_name": "REPAIR",
+        "n_blocks": total,
+        "n_vars": 0,
+        "unplaced": unplaced_ids,
+        "wall_time": 0.0,
+        "placed": len(state.placed),
+        "total": total,
+    }
+    return assignments, stats

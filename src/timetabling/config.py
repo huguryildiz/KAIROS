@@ -27,6 +27,19 @@ class Config:
     # solver
     solve_time_limit_s: float = 60.0
     max_rooms_per_block: int = 12   # best-fit: only the K smallest fitting rooms per block
+    # phase 2: block splitting
+    max_block_len: int = 4
+    # phase 2: oversize -> synthetic large halls, list of (cap, count)
+    extra_rooms: tuple = ((500, 2), (250, 3), (150, 4))
+    # phase 2: cohort daily-compactness applies to these year levels
+    compact_cohort_years: tuple = (2, 3, 4)
+    # phase 2 soft weights
+    w_cohort_gap: int = 3
+    w_order: int = 1
+    w_englab: int = 1
+    eng_lab_days: tuple = ("Th", "Fr")
+    eng_faculty_match: str = "Engineering"
+    w_nonadjacent: int = 0
     # objective weights (light)
     w_evening: int = 4
     w_room_count: int = 2

@@ -30,7 +30,7 @@ class Config:
     # phase 2: block splitting
     max_block_len: int = 4
     # phase 2: oversize -> synthetic large halls, list of (cap, count)
-    extra_rooms: tuple = ((500, 2), (250, 3), (150, 4))
+    extra_rooms: tuple = ()
     # phase 2: cohort daily-compactness applies to these year levels
     compact_cohort_years: tuple = (2, 3, 4)
     # phase 2 soft weights

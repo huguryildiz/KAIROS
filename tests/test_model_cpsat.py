@@ -22,12 +22,13 @@ def test_gen_candidates_respects_capacity_and_window():
     assert not any(c.day == "Fr" and c.start <= 13 < c.start + b.length for c in cands)
 
 
-def test_gen_candidates_lab_requires_lab_room():
+def test_gen_candidates_lab_pinned_to_lab_room():
     cfg = Config()
     rooms = [Room("R1", 50, False, True), Room("LAB-L", 50, True, True)]
     instr = Instructor("i1", "n", False, "D")
     b = Block("S_01#L", "S_01", "lab", 2, True)
     s = _sec("S_01", 1, 20, [b])
+    s.lab_room = "LAB-L"                         # pinned -> candidates only in LAB-L
     cands = model_cpsat.gen_candidates(b, s, [instr], rooms, cfg)
     assert cands and all(c.room == "LAB-L" for c in cands)
 

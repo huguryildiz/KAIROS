@@ -39,8 +39,9 @@ def validate(assignments: List[Assignment], sections: List[Section],
         if not is_virt and room is not None and room.cap < s.students:
             viol.append(Violation("capacity",
                         f"{a.block_id} in {a.room} (cap {room.cap}) < {s.students} students"))
-        if a.kind == "lab" and not is_virt and (room is None or not room.is_lab):
-            viol.append(Violation("lab", f"{a.block_id} lab block in non-lab room {a.room}"))
+        if a.kind == "lab" and not is_virt and s.lab_room and a.room != s.lab_room:
+            viol.append(Violation("lab_room",
+                        f"{a.block_id} lab not in pinned {s.lab_room} (got {a.room})"))
         end_cap = cfg.undergrad_end if s.level <= 4 else cfg.grad_end
         if a.end > end_cap:
             viol.append(Violation("window",

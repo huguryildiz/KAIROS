@@ -34,8 +34,6 @@ class Config:
     max_theory_session: int = 2
     # phase 2: oversize -> synthetic large halls, list of (cap, count)
     extra_rooms: tuple = ()
-    # real lab rooms used in the Plan but absent from classrooms.csv (name, cap)
-    extra_lab_rooms: tuple = (("A317-MF-L", 50), ("A326-MF-L", 50), ("DB102-MF-L", 50))
     # phase 2: cohort daily-compactness applies to these year levels
     compact_cohort_years: tuple = (2, 3, 4)
     # phase 2 soft weights

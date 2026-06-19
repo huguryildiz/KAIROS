@@ -19,10 +19,10 @@ def feasible_rooms_for(block: Block, section: Section, rooms: List[Room],
                        cfg: Config) -> List[Room]:
     if section.is_virtual:
         return [r for r in rooms if r.is_virtual][:1]
-    fr = [
-        r for r in rooms
-        if r.is_physical and r.cap >= section.students and (r.is_lab if block.needs_lab else True)
-    ]
+    if block.needs_lab and section.lab_room:
+        return [r for r in rooms if r.room == section.lab_room]   # pinned lab room
+    # non-lab block, or a lab held in a regular room (no designated lab room)
+    fr = [r for r in rooms if r.is_physical and r.cap >= section.students]
     fr.sort(key=lambda r: (r.cap, r.room))
     return fr[:cfg.max_rooms_per_block]
 

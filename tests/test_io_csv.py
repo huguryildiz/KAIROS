@@ -21,7 +21,7 @@ def test_load_plan_attaches_period_and_has_no_native_period():
 
 
 def test_load_masters():
-    assert len(io_csv.load_classrooms()) == 101
+    assert len(io_csv.load_classrooms()) == 104   # 101 + 3 real lab rooms (A317/A326/DB102-MF-L)
     assert len(io_csv.load_lecturers()) == 340
     assert len(io_csv.load_enrollment()) == 1667
     assert "ROOM_CAP" in io_csv.load_classrooms().columns

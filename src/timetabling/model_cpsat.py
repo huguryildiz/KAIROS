@@ -79,6 +79,7 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
     default_instr = Instructor("", "", False, "")
     order_terms = []
     englab_terms = []
+    sbd = defaultdict(list)  # (section_id, block_id, day) -> vars (multi-block sections)
 
     room_occ = defaultdict(list)          # (room, day, hour) -> vars
     instr_occ = defaultdict(list)         # (instr_id, day, hour) -> vars
@@ -110,6 +111,8 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
             if (cfg.eng_faculty_match in s.faculty and b.needs_lab
                     and c.day not in cfg.eng_lab_days):
                 englab_terms.append(cfg.w_englab * v)
+            if len(s.blocks) >= 2:
+                sbd[(s.section_id, b.block_id, c.day)].append(v)
             for hh in range(c.start, c.start + c.length):
                 room_occ[(c.room, c.day, hh)].append(v)
                 for iid in s.instructor_ids:
@@ -164,6 +167,21 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
         model.Add(gap >= last - first - load)
         gap_terms.append(gap)
 
+    # soft: spread a section's split blocks across days
+    nonadj_terms = []
+    sbd_bool = {}
+    sd_blocks = defaultdict(set)
+    for (sid, bid, day), vs in sbd.items():
+        z = model.NewBoolVar(f"sbd|{sid}|{bid}|{day}")
+        model.AddMaxEquality(z, vs)
+        sbd_bool[(sid, bid, day)] = z
+        sd_blocks[(sid, day)].add(bid)
+    for (sid, day), bids in sd_blocks.items():
+        if len(bids) >= 2:
+            extra = model.NewIntVar(0, len(bids), f"sameday|{sid}|{day}")
+            model.Add(extra >= sum(sbd_bool[(sid, b, day)] for b in bids) - 1)
+            nonadj_terms.append(extra)
+
     # soft: room-used indicators
     room_used = {}
     for room, vs in room_used_vars.items():
@@ -190,6 +208,7 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
     obj += [cfg.w_cohort_gap * g for g in gap_terms]
     obj += order_terms
     obj += englab_terms
+    obj += [cfg.w_nonadjacent * t for t in nonadj_terms]
     if obj:
         model.Minimize(sum(obj))
 

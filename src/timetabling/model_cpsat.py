@@ -78,6 +78,7 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
     unplaced: List[str] = []
     default_instr = Instructor("", "", False, "")
     order_terms = []
+    englab_terms = []
 
     room_occ = defaultdict(list)          # (room, day, hour) -> vars
     instr_occ = defaultdict(list)         # (instr_id, day, hour) -> vars
@@ -106,6 +107,9 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
                 coeff = cfg.w_order * (4 - s.level) * (c.start - cfg.horizon_start)
                 if coeff:
                     order_terms.append(coeff * v)
+            if (cfg.eng_faculty_match in s.faculty and b.needs_lab
+                    and c.day not in cfg.eng_lab_days):
+                englab_terms.append(cfg.w_englab * v)
             for hh in range(c.start, c.start + c.length):
                 room_occ[(c.room, c.day, hh)].append(v)
                 for iid in s.instructor_ids:
@@ -185,6 +189,7 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
         obj.append(w * d)
     obj += [cfg.w_cohort_gap * g for g in gap_terms]
     obj += order_terms
+    obj += englab_terms
     if obj:
         model.Minimize(sum(obj))
 

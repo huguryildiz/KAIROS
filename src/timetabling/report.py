@@ -60,6 +60,14 @@ def _metrics(assignments, sections, rooms, instructors, cfg, check_placement=Tru
     rooms_used = len({a.room for a in assignments if a.room})
     evening = sum(1 for a in assignments
                   if any(h >= cfg.evening_from_hour for h in range(a.start, a.end)))
+    sec_by_id = {s.section_id: s for s in sections}
+    fills = []
+    for a in assignments:
+        s = sec_by_id.get(a.section_id)
+        room = rooms.get(a.room)
+        if s and room and room.cap:
+            fills.append(s.students / room.cap)
+    room_fill = round(sum(fills) / len(fills), 3) if fills else 0.0
     return {
         "n_assignments": len(assignments),
         "conflicts": dict(by_kind),
@@ -67,6 +75,7 @@ def _metrics(assignments, sections, rooms, instructors, cfg, check_placement=Tru
         "rooms_used": rooms_used,
         "evening_blocks": evening,
         "evening_ratio": round(evening / len(assignments), 3) if assignments else 0.0,
+        "room_fill": room_fill,
     }
 
 

@@ -41,7 +41,7 @@ class Config:
     eng_faculty_match: str = "Engineering"
     w_nonadjacent: int = 0
     # objective weights (light)
-    w_evening: int = 4
+    w_evening: int = 10
     w_room_count: int = 2
     w_instr_days: int = 3
     w_parttime_days: int = 5

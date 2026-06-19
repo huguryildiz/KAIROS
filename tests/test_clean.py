@@ -12,8 +12,8 @@ def test_classify_room():
 def test_build_rooms_marks_online_nonphysical_and_lab_count():
     rooms = clean.build_rooms(io_csv.load_classrooms(), Config())
     assert "Online" in rooms and rooms["Online"].is_physical is False
-    physical = [r for r in rooms.values() if r.is_physical]
-    assert len(physical) == 100                      # 101 total - 1 online
+    physical = [r for r in rooms.values() if r.is_physical and not r.room.startswith("AMFI-")]
+    assert len(physical) == 100                      # 101 CSV rooms - 1 online (excl. synthetic halls)
     labs = [r for r in physical if r.is_lab]
     assert 8 <= len(labs) <= 20                       # ~14 lab/PC rooms
     assert rooms["A216"].cap == 25

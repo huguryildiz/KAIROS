@@ -22,6 +22,10 @@ def build_rooms(classrooms_df: pd.DataFrame, cfg: Config) -> Dict[str, Room]:
         is_physical = name != cfg.online_room
         rooms[name] = Room(room=name, cap=cap, is_lab=classify_room(name),
                            is_physical=is_physical)
+    for cap, count in cfg.extra_rooms:
+        for i in range(1, count + 1):
+            name = f"AMFI-{cap}-{i}"
+            rooms[name] = Room(room=name, cap=int(cap), is_lab=False, is_physical=True)
     return rooms
 
 

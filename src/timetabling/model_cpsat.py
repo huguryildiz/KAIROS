@@ -81,6 +81,7 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
     room_occ = defaultdict(list)     # (room, day, hour) -> vars
     instr_occ = defaultdict(list)    # (instr_id, day, hour) -> vars
     cohort_occ = defaultdict(list)   # (cohort, day, hour) -> vars
+    section_occ = defaultdict(list)  # (section_id, day, hour) -> vars
     room_used_vars = defaultdict(list)            # room -> vars
     instr_day_vars = defaultdict(list)            # (instr_id, day) -> vars
     evening_vars = []
@@ -102,6 +103,7 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
                 for iid in s.instructor_ids:
                     instr_occ[(iid, c.day, hh)].append(v)
                 cohort_occ[(s.cohort_key, c.day, hh)].append(v)
+                section_occ[(s.section_id, c.day, hh)].append(v)
                 if hh >= cfg.evening_from_hour:
                     evening_vars.append(v)
             room_used_vars[c.room].append(v)
@@ -109,8 +111,8 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
                 instr_day_vars[(iid, c.day)].append(v)
         model.AddExactlyOne(bvars)   # H1
 
-    # H2/H3/H4: at most one occupant per resource-slot
-    for occ in (room_occ, instr_occ, cohort_occ):
+    # H2/H3/H4/H_self: at most one occupant per resource-slot
+    for occ in (room_occ, instr_occ, cohort_occ, section_occ):
         for key, vs in occ.items():
             if len(vs) > 1:
                 model.Add(sum(vs) <= 1)

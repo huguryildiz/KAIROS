@@ -29,6 +29,7 @@ def validate(assignments: List[Assignment], sections: List[Section],
     room_occ = defaultdict(list)
     instr_occ = defaultdict(list)
     cohort_occ = defaultdict(list)
+    section_occ = defaultdict(list)
 
     for a in assignments:
         s = sec_by_id.get(a.section_id)
@@ -57,6 +58,7 @@ def validate(assignments: List[Assignment], sections: List[Section],
             for iid in s.instructor_ids:
                 instr_occ[(iid, a.day, hh)].append(a.block_id)
             cohort_occ[(s.cohort_key, a.day, hh)].append(a.block_id)
+            section_occ[(a.section_id, a.day, hh)].append(a.block_id)
 
     for (room, day, hh), bids in room_occ.items():
         if len(bids) > 1:
@@ -67,5 +69,8 @@ def validate(assignments: List[Assignment], sections: List[Section],
     for (cohort, day, hh), bids in cohort_occ.items():
         if len(set(b.split('#')[0] for b in bids)) > 1:
             viol.append(Violation("cohort", f"cohort {cohort} double-booked {day} {hh}:00 by {bids}"))
+    for (sid, day, hh), bids in section_occ.items():
+        if len(set(bids)) > 1:
+            viol.append(Violation("self", f"section {sid} self-overlap {day} {hh}:00 by {bids}"))
 
     return viol

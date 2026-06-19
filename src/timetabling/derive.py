@@ -16,17 +16,34 @@ def course_level(code: str) -> int:
     return int(m.group(1)[0])
 
 
-def blocks_from_tpl(section_id: str, T: int, P: int, L: int, Cr: int) -> List[Block]:
+def _split_lengths(total: int, max_len: int) -> List[int]:
+    if total <= max_len:
+        return [total]
+    n = (total + max_len - 1) // max_len          # ceil
+    base, extra = divmod(total, n)
+    return [base + 1] * extra + [base] * (n - extra)
+
+
+def _make_blocks(section_id, kind, tag, total, max_len, needs_lab) -> List[Block]:
+    lens = _split_lengths(total, max_len)
+    if len(lens) == 1:
+        return [Block(f"{section_id}#{tag}", section_id, kind, lens[0], needs_lab)]
+    return [Block(f"{section_id}#{tag}{i+1}", section_id, kind, ln, needs_lab)
+            for i, ln in enumerate(lens)]
+
+
+def blocks_from_tpl(section_id: str, T: int, P: int, L: int, Cr: int,
+                    max_block_len: int = 4) -> List[Block]:
     blocks: List[Block] = []
     theory_len = (T or 0) + (P or 0)
     lab_len = L or 0
     if theory_len > 0:
-        blocks.append(Block(f"{section_id}#T", section_id, "theory", theory_len, False))
+        blocks += _make_blocks(section_id, "theory", "T", theory_len, max_block_len, False)
     if lab_len > 0:
-        blocks.append(Block(f"{section_id}#L", section_id, "lab", lab_len, True))
+        blocks += _make_blocks(section_id, "lab", "L", lab_len, max_block_len, True)
     if not blocks:
         default_len = Cr if (Cr and Cr > 0) else 3
-        blocks.append(Block(f"{section_id}#T", section_id, "theory", default_len, False))
+        blocks += _make_blocks(section_id, "theory", "T", default_len, max_block_len, False)
     return blocks
 
 
@@ -74,7 +91,7 @@ def build_sections(frame, cfg: Config) -> Tuple[List[Section], Dict]:
             faculty=r.get("faculty", "").strip(), cohort_key=cohort,
             instructor_ids=normalize_staff_ids(r.get("staff_id", "")), students=_students(r),
             T=T, P=P, L=L, Cr=Cr, category=category,
-            blocks=blocks_from_tpl(sid, T, P, L, Cr),
+            blocks=blocks_from_tpl(sid, T, P, L, Cr, cfg.max_block_len),
         )
         sections.append(s)
     return sections, report

@@ -167,7 +167,7 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
                 length = next(c.length for c in cand_by_block[bid]
                               if c.room == room and c.day == day and c.start == start)
                 sid = bid.split("#")[0]
-                kind = "lab" if bid.endswith("#L") else "theory"
+                kind = "lab" if "#L" in bid else "theory"
                 assignments.append(Assignment(bid, sid, kind, room, day, start, start + length))
 
     stats = {

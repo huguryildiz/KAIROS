@@ -17,6 +17,8 @@ def _blackout_hours(instructors, cfg: Config):
 
 def feasible_rooms_for(block: Block, section: Section, rooms: List[Room],
                        cfg: Config) -> List[Room]:
+    if section.is_virtual:
+        return [r for r in rooms if r.is_virtual][:1]
     fr = [
         r for r in rooms
         if r.is_physical and r.cap >= section.students and (r.is_lab if block.needs_lab else True)
@@ -91,6 +93,7 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
     evening_vars = []
 
     compact_years = {str(y) for y in cfg.compact_cohort_years}
+    virtual_names = {r.room for r in rooms if r.is_virtual}
 
     for b, s in blocks:
         ins_list = _instructors_of(s, instructors)
@@ -123,7 +126,8 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
             if len(s.blocks) >= 2:
                 sbd[(s.section_id, b.block_id, c.day)].append(v)
             for hh in range(c.start, c.start + c.length):
-                room_occ[(c.room, c.day, hh)].append(v)
+                if c.room not in virtual_names:
+                    room_occ[(c.room, c.day, hh)].append(v)
                 for iid in s.instructor_ids:
                     instr_occ[(iid, c.day, hh)].append(v)
                 cohort_course_occ[(s.cohort_key, s.code, c.day, hh)].append(v)
@@ -132,7 +136,8 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
                 section_occ[(s.section_id, c.day, hh)].append(v)
                 if hh >= cfg.evening_from_hour:
                     evening_vars.append(v)
-            room_used_vars[c.room].append(v)
+            if c.room not in virtual_names:
+                room_used_vars[c.room].append(v)
             for iid in s.instructor_ids:
                 instr_day_vars[(iid, c.day)].append(v)
         model.AddExactlyOne(bvars)   # H1

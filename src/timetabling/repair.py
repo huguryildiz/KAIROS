@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Dict, List
 from collections import defaultdict
 from dataclasses import replace
+from time import perf_counter
 
 from ortools.sat.python import cp_model
 
@@ -223,6 +224,7 @@ def solve_repair(sections, rooms, instructors, cfg):
                    key=lambda bid: (len(cand_by_block[bid]), -sec_of[bid].students))
 
     state = State(sec_of, sec_instr, virtual_names)
+    t0 = perf_counter()
     greedy_construct(state, order, cand_by_block)
 
     sweep = 0
@@ -253,7 +255,8 @@ def solve_repair(sections, rooms, instructors, cfg):
         "n_blocks": total,
         "n_vars": 0,
         "unplaced": unplaced_ids,
-        "wall_time": 0.0,
+        "wall_time": round(perf_counter() - t0, 1),
+        "sweeps": sweep,
         "placed": len(state.placed),
         "total": total,
     }

@@ -84,6 +84,7 @@ def main():
         if "placed" in stats:
             print(f"[mode-A] repair placed={stats['placed']}/{stats['total']} "
                   f"({stats['placed']/stats['total']:.1%}) unplaced={len(stats['unplaced'])} "
+                  f"wall={stats['wall_time']:.1f}s sweeps={stats.get('sweeps', '?')} "
                   f"violations={len(viol)}")
         elif "status_name" in stats:
             print(f"[mode-A] status={stats['status_name']} blocks={stats['n_blocks']} "

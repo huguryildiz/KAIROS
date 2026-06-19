@@ -33,11 +33,16 @@ def main():
     ap.add_argument("--mode", default="A,B")
     ap.add_argument("--out", default="out")
     ap.add_argument("--time-limit", type=float, default=60.0)
+    ap.add_argument("--max-rooms-per-block", type=int, default=None,
+                    help="cap candidate rooms per block (default from Config=12; lower = smaller/faster model)")
     ap.add_argument("--decompose", action="store_true",
                     help="solve faculty-by-faculty sharing the room pool (for full --scope all)")
     args = ap.parse_args()
 
     cfg = Config(solve_time_limit_s=args.time_limit)
+    if args.max_rooms_per_block is not None:
+        cfg = Config(solve_time_limit_s=args.time_limit,
+                     max_rooms_per_block=args.max_rooms_per_block)
     os.makedirs(args.out, exist_ok=True)
 
     rooms = build_rooms(load_classrooms(), cfg)

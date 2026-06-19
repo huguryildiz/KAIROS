@@ -81,10 +81,13 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
     room_occ = defaultdict(list)          # (room, day, hour) -> vars
     instr_occ = defaultdict(list)         # (instr_id, day, hour) -> vars
     cohort_course_occ = defaultdict(list)  # (cohort, course, day, hour) -> vars
+    cohort_hour_occ = defaultdict(list)   # (cohort, day, hour) -> vars (compact cohorts only)
     section_occ = defaultdict(list)       # (section_id, day, hour) -> vars
     room_used_vars = defaultdict(list)            # room -> vars
     instr_day_vars = defaultdict(list)            # (instr_id, day) -> vars
     evening_vars = []
+
+    compact_years = {str(y) for y in cfg.compact_cohort_years}
 
     for b, s in blocks:
         ins_list = _instructors_of(s, instructors)
@@ -103,6 +106,8 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
                 for iid in s.instructor_ids:
                     instr_occ[(iid, c.day, hh)].append(v)
                 cohort_course_occ[(s.cohort_key, s.code, c.day, hh)].append(v)
+                if s.cohort_key.rsplit("-", 1)[-1] in compact_years:
+                    cohort_hour_occ[(s.cohort_key, c.day, hh)].append(v)
                 section_occ[(s.section_id, c.day, hh)].append(v)
                 if hh >= cfg.evening_from_hour:
                     evening_vars.append(v)
@@ -129,6 +134,27 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
         if len(busies) > 1:                        # >=2 distinct courses can contend
             model.Add(sum(busies) <= 1)
 
+    # soft: cohort daily compactness (minimize student idle gaps)
+    gap_terms = []
+    ch_by_cd = defaultdict(dict)  # (cohort, day) -> {hour: active bool}
+    for (cohort, day, hh), vs in cohort_hour_occ.items():
+        a = model.NewBoolVar(f"chact|{cohort}|{day}|{hh}")
+        model.AddMaxEquality(a, vs)
+        ch_by_cd[(cohort, day)][hh] = a
+    BIG = cfg.horizon_end + 1
+    for (cohort, day), hourmap in ch_by_cd.items():
+        hours = sorted(hourmap)
+        if len(hours) < 2:
+            continue
+        load = sum(hourmap[h] for h in hours)
+        first = model.NewIntVar(0, BIG, f"first|{cohort}|{day}")
+        last = model.NewIntVar(0, BIG, f"last|{cohort}|{day}")
+        model.AddMaxEquality(last, [(h + 1) * hourmap[h] for h in hours])
+        model.AddMinEquality(first, [h * hourmap[h] + BIG * (1 - hourmap[h]) for h in hours])
+        gap = model.NewIntVar(0, cfg.horizon_end, f"gap|{cohort}|{day}")
+        model.Add(gap >= last - first - load)
+        gap_terms.append(gap)
+
     # soft: room-used indicators
     room_used = {}
     for room, vs in room_used_vars.items():
@@ -152,6 +178,7 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
         ins = instructors.get(iid, default_instr)
         w = cfg.w_instr_days if ins.is_staff else cfg.w_parttime_days
         obj.append(w * d)
+    obj += [cfg.w_cohort_gap * g for g in gap_terms]
     if obj:
         model.Minimize(sum(obj))
 

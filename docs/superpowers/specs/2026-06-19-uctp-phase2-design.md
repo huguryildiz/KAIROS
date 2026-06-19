@@ -44,6 +44,10 @@ Mode C warm-start, `rules.pdf` Article 1 (ignored).
   should be consecutive, minimizing student idle gaps. Applied to cohorts with `year_level ∈
   {2,3,4}`. Soft, weighted, tunable (§5.5).
 - **Article 1 still ignored** → free block splitting is allowed (enables 2.2).
+- **Two previously-approved soft rules are folded in** from
+  [2026-06-19-soft-ordering-and-eng-labs-design.md](2026-06-19-soft-ordering-and-eng-labs-design.md):
+  **S-Order** (within a cohort, course level rises with start-hour) and **S-EngLab**
+  (Engineering lab blocks prefer Thu/Fri). See §5.7.
 
 ---
 
@@ -171,6 +175,26 @@ department day-balance, #5 cohort daily-load cap, #7 instructor free-days, #8 pa
 `Config` and start at conservative values (several at 0 until calibrated). Targets: room fill
 ~0.53, evening ratio ~7%; do not chase optimality under the time cap.
 
+### 5.7 Imported soft terms: S-Order & S-EngLab (folded-in spec)
+
+From [2026-06-19-soft-ordering-and-eng-labs-design.md](2026-06-19-soft-ordering-and-eng-labs-design.md);
+both are best-effort, per-candidate linear terms added in the existing candidate loop (no aux
+vars, no pruning, can never cause infeasibility).
+
+- **S-Order** — within a cohort, course-code **level rises with start-hour**. For every candidate
+  of a block whose `section.level ∈ {2,3,4}`, add `w_order * (4 − level) * (start − horizon_start)`.
+  Low level → large coefficient → pushed early; high level → ~0 → drifts to the later slots the
+  low levels vacate. Per-placement, so implicitly cohort-local. `w_order` light (e.g. 1).
+- **S-EngLab** — Engineering **lab blocks prefer Thu/Fri**. For every **lab-block** candidate whose
+  `day ∉ cfg.eng_lab_days`, add `w_englab`. "Engineering" = `section.faculty` contains
+  `cfg.eng_faculty_match` (**confirmed `"Engineering"`**, matches all 7 engineering departments:
+  Computer, Software, Civil, Industrial, Mechanical, Electric&Electronics, Faculty of Engineering).
+
+**Relationship to §5.5.** S-Order (orders a cohort's day by level) and §5.5 cohort-gap (packs a
+cohort's day with no holes) are **complementary** and jointly satisfiable (e.g. 2XX 09–11, 4XX
+11–13 is both ordered and gap-free); they target the same year-2/3/4 population by different
+attributes (course level vs cohort year). Weights are calibrated together in 5.6.
+
 ---
 
 ## 6. Full-period solve & decomposition (TODO 2.5)
@@ -194,6 +218,10 @@ department day-balance, #5 cohort daily-load cap, #7 instructor free-days, #8 pa
 | `compact_cohort_years` | `(2,3,4)` | 5.5 which cohorts get gap penalty |
 | `w_cohort_gap` | `3` (tune) | 5.5 weight |
 | `w_nonadjacent`, `w_day_balance`, `w_daily_load`, `w_instr_freeday`, `w_practicum_buffer` | `0` (tune) | 5.6 staged softs |
+| `w_order` | `1` (tune) | 5.7 S-Order level→start-hour |
+| `w_englab` | `1` (tune) | 5.7 S-EngLab Thu/Fri lab pref. |
+| `eng_lab_days` | `("Th","Fr")` | 5.7 preferred lab days |
+| `eng_faculty_match` | `"Engineering"` | 5.7 Engineering faculty substring |
 
 ---
 
@@ -223,6 +251,10 @@ tests:
   unschedulable list.
 - **5.5:** on a small instance with high `w_cohort_gap`, the chosen schedule has no interior gap
   for a year-2/3/4 cohort.
+- **5.7 S-Order:** with high `w_order`, a cohort's level-2 block starts no later than its level-4
+  block; level-1/5+ blocks add no order penalty.
+- **5.7 S-EngLab:** with high `w_englab`, an Engineering lab block lands on Thu/Fr when feasible;
+  a non-Engineering lab block is unaffected.
 
 Evidence at completion: validator output (0 violations), Mode-B tables, and sample `schedule.json`
 for CompEng, Architecture, and full 001/002.

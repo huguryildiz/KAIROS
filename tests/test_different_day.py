@@ -31,3 +31,25 @@ def test_validate_flags_same_day_theory_sessions():
          Assignment("S_01#T2", "S_01", "theory", "R1", "Mo", 14, 15)]   # both Monday
     v = validate(a, [s], rooms, instr, Config())
     assert any(x.kind == "split_day" for x in v)
+
+
+def test_repair_state_rejects_same_day_theory_sibling():
+    from timetabling.model import Candidate
+    from timetabling.repair import State
+    s = _theory_section()
+    st = State({"S_01#T1": s, "S_01#T2": s}, {"S_01": ["i1"]}, set())
+    st.occupy("S_01#T1", Candidate("S_01#T1", "R1", "Mo", 9, 2))
+    assert st.free_to_place(Candidate("S_01#T2", "R1", "Mo", 11, 1), "S_01", ["i1"]) is False
+    assert st.free_to_place(Candidate("S_01#T2", "R1", "Tu", 9, 1), "S_01", ["i1"]) is True
+
+
+def test_solve_repair_theory_on_different_days():
+    from timetabling.repair import solve_repair
+    cfg = Config(solve_time_limit_s=5)
+    rooms = {"R1": Room("R1", 50, False, True)}
+    instr = {"i1": Instructor("i1", "n", True, "D")}
+    s = _theory_section()
+    assigns, stats = solve_repair([s], rooms, instr, cfg)
+    assert stats["placed"] == 2
+    assert len({a.day for a in assigns}) == 2
+    assert validate(assigns, [s], rooms, instr, cfg) == []

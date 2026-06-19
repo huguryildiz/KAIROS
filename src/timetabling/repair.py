@@ -26,6 +26,7 @@ class State:
         self.sect_blocks = defaultdict(set)
         self.instr_slot = defaultdict(set)
         self.sect_slot = defaultdict(set)
+        self.sect_theory_day = defaultdict(set)   # (section_id, day) -> {theory block_ids}
 
     def free_to_place(self, c, sid, iids):
         for hh in range(c.start, c.start + c.length):
@@ -36,12 +37,18 @@ class State:
                     return False
             if self.sect_slot.get((sid, c.day, hh)):
                 return False
+        # a section's theory sessions must each be on a different day
+        if "#L" not in c.block_id and any(b != c.block_id
+                for b in self.sect_theory_day.get((sid, c.day), ())):
+            return False
         return True
 
     def occupy(self, bid, c):
         s = self.sec_of[bid]; iids = self.sec_instr.get(s.section_id, [])
         self.placed[bid] = c
         self.sect_blocks[s.section_id].add(bid)
+        if "#L" not in bid:
+            self.sect_theory_day[(s.section_id, c.day)].add(bid)
         for iid in iids:
             self.instr_blocks[iid].add(bid)
         for hh in range(c.start, c.start + c.length):
@@ -57,6 +64,8 @@ class State:
             return
         s = self.sec_of[bid]; iids = self.sec_instr.get(s.section_id, [])
         self.sect_blocks[s.section_id].discard(bid)
+        if "#L" not in bid:
+            self.sect_theory_day[(s.section_id, c.day)].discard(bid)
         for iid in iids:
             self.instr_blocks[iid].discard(bid)
         for hh in range(c.start, c.start + c.length):
@@ -107,10 +116,13 @@ def repair_round(state: State, batch, cand_by_block) -> int:
     free_set = set(free)
 
     reserved_room, reserved_instr = set(), set()
+    frozen_theory_day = defaultdict(set)
     for bid, c in state.placed.items():
         if bid in free_set:
             continue
         s = state.sec_of[bid]; iids = state.sec_instr.get(s.section_id, [])
+        if "#L" not in bid:
+            frozen_theory_day[s.section_id].add(c.day)
         for hh in range(c.start, c.start + c.length):
             if c.room not in state.virtual:
                 reserved_room.add((c.room, c.day, hh))
@@ -120,12 +132,16 @@ def repair_round(state: State, batch, cand_by_block) -> int:
     m = cp_model.CpModel()
     x = {}
     room_occ = defaultdict(list); instr_occ = defaultdict(list); sect_occ = defaultdict(list)
+    theory_day = defaultdict(list)
     unpl = {}
     cur = {}
     for bid in free:
         s = state.sec_of[bid]; iids = s.instructor_ids
+        is_theory = "#L" not in bid
+        fdays = frozen_theory_day.get(s.section_id, set())
         cands = [c for c in cand_by_block[bid]
-                 if not any(((c.room not in state.virtual and (c.room, c.day, hh) in reserved_room)
+                 if not (is_theory and c.day in fdays)
+                 and not any(((c.room not in state.virtual and (c.room, c.day, hh) in reserved_room)
                              or any((iid, c.day, hh) in reserved_instr for iid in iids))
                             for hh in range(c.start, c.start + c.length))]
         u = m.NewBoolVar(f"u|{bid}")
@@ -135,6 +151,8 @@ def repair_round(state: State, batch, cand_by_block) -> int:
             v = m.NewBoolVar(f"x|{bid}|{c.room}|{c.day}|{c.start}")
             x[(bid, c.room, c.day, c.start)] = v
             bvars.append(v)
+            if is_theory:
+                theory_day[(s.section_id, c.day)].append(v)
             for hh in range(c.start, c.start + c.length):
                 if c.room not in state.virtual:
                     room_occ[(c.room, c.day, hh)].append(v)
@@ -148,6 +166,9 @@ def repair_round(state: State, batch, cand_by_block) -> int:
         for vs in occ.values():
             if len(vs) > 1:
                 m.Add(sum(vs) <= 1)
+    for vs in theory_day.values():           # <=1 theory session per (section, day)
+        if len(vs) > 1:
+            m.Add(sum(vs) <= 1)
     m.Minimize(BIG * sum(unpl.values()))
 
     for bid in free:

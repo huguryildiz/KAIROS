@@ -62,6 +62,11 @@ def test_split_blocks_spread_when_weighted():
     Without the term CP-SAT's default (verified empirically: same day), the
     assertion fails.  With the term the solver prefers the 0-cost split.
     """
+    # NOTE: This is a behavioral demonstration, NOT a strict regression guard.
+    # Whether the solver spreads the two blocks without the term depends on CP-SAT's
+    # default search heuristic, so this test can pass even if the term is removed.
+    # The real regression guard for this feature is test_nonadjacent_objective_guard,
+    # which asserts the term's contribution to the objective directly.
     cfg = Config(w_nonadjacent=100, w_cohort_gap=0, w_evening=0, w_room_count=0,
                  w_instr_days=0, w_parttime_days=0, w_order=0)
     rooms = [Room("R1", 50, False, True)]

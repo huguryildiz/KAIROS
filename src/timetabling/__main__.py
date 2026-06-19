@@ -8,7 +8,7 @@ from .io_csv import load_classrooms, load_lecturers
 from .join import build_section_frame
 from .derive import build_sections
 from .clean import build_rooms, build_instructors
-from .model_cpsat import build_and_solve, split_roomable
+from .model_cpsat import build_and_solve as _cpsat_solve, split_roomable
 from .decompose import solve_decomposed
 from .validate import validate
 from .report import data_quality_report, parse_existing, mode_b_benchmark
@@ -37,6 +37,8 @@ def main():
                     help="cap candidate rooms per block (default from Config=12; lower = smaller/faster model)")
     ap.add_argument("--decompose", action="store_true",
                     help="solve faculty-by-faculty sharing the room pool (for full --scope all)")
+    ap.add_argument("--solver", default="cpsat", choices=["cpsat", "gurobi"],
+                    help="MIP solver backend (default: cpsat)")
     args = ap.parse_args()
 
     cfg = Config(solve_time_limit_s=args.time_limit)
@@ -71,8 +73,11 @@ def main():
     if "A" in modes:
         if args.decompose:
             assignments, stats = solve_decomposed(sections, room_list, instructors, cfg)
+        elif args.solver == "gurobi":
+            from .model_gurobi import build_and_solve as _gurobi_solve
+            assignments, stats = _gurobi_solve(sections, room_list, instructors, cfg)
         else:
-            assignments, stats = build_and_solve(sections, room_list, instructors, cfg)
+            assignments, stats = _cpsat_solve(sections, room_list, instructors, cfg)
         viol = validate(assignments, sections, rooms, instructors, cfg)
         if "status_name" in stats:
             print(f"[mode-A] status={stats['status_name']} blocks={stats['n_blocks']} "

@@ -42,3 +42,6 @@ data/
 
 # Local Claude Code guidance — kept on disk, not tracked
 CLAUDE.md
+
+# Local Claude Code config — kept on disk, not tracked
+.claude/

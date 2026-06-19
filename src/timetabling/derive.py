@@ -92,6 +92,7 @@ def build_sections(frame, cfg: Config) -> Tuple[List[Section], Dict]:
             instructor_ids=normalize_staff_ids(r.get("staff_id", "")), students=_students(r),
             T=T, P=P, L=L, Cr=Cr, category=category,
             blocks=blocks_from_tpl(sid, T, P, L, Cr, cfg.max_block_len),
+            plan_room=r.get("plan_room", "").strip(),
         )
         sections.append(s)
     return sections, report

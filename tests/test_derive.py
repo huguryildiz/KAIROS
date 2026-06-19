@@ -40,3 +40,18 @@ def test_build_sections_excludes_grad_and_internship():
     assert rep["excluded"] >= 0 and "hours_rule" in rep
     s = next(s for s in sections if s.section_id == "ADA 403_01")
     assert s.cohort_key == "ADA-4" and s.students == 24
+
+
+def test_section_carries_plan_room():
+    import pandas as pd
+    from timetabling.derive import build_sections
+    from timetabling.config import Config
+    frame = pd.DataFrame([{
+        "section_id": "HIST 101_01", "period": "001", "code": "HIST 101",
+        "name": "History", "faculty": "Basic Sciences", "T": "2", "P": "0",
+        "L": "0", "Cr": "2", "category": "", "staff_id": "00000001",
+        "grades_students": "148", "dept_code": "HIST", "year_level": "1",
+        "plan_room": "Online",
+    }])
+    secs, _ = build_sections(frame, Config())
+    assert secs[0].plan_room == "Online"

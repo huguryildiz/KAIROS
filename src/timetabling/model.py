@@ -9,6 +9,7 @@ class Room:
     cap: int
     is_lab: bool
     is_physical: bool
+    is_virtual: bool = False
 
 
 @dataclass(frozen=True)
@@ -46,6 +47,8 @@ class Section:
     Cr: int
     category: str
     blocks: List[Block] = field(default_factory=list)
+    is_virtual: bool = False
+    plan_room: str = ""
 
 
 @dataclass(frozen=True)

@@ -138,17 +138,19 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
             if len(vs) > 1:
                 model.Add(sum(vs) <= 1)
 
-    # H4 (course-level): at most one distinct course code per (cohort, day, hour)
-    course_busy = {}
-    slot_courses = defaultdict(list)  # (cohort, day, hour) -> [busy vars]
+    # H4 course-level cohort conflict is SOFT: penalize each distinct course beyond the first
+    # in a (cohort, day, hour) slot. Rooms/instructors/self stay hard, so a schedule always exists.
+    slot_courses = defaultdict(list)
     for (cohort, course, day, hh), vs in cohort_course_occ.items():
         b = model.NewBoolVar(f"busy|{cohort}|{course}|{day}|{hh}")
-        model.AddMaxEquality(b, vs)               # b = OR(vs)
-        course_busy[(cohort, course, day, hh)] = b
+        model.AddMaxEquality(b, vs)
         slot_courses[(cohort, day, hh)].append(b)
+    cohort_conflict_terms = []
     for (cohort, day, hh), busies in slot_courses.items():
-        if len(busies) > 1:                        # >=2 distinct courses can contend
-            model.Add(sum(busies) <= 1)
+        if len(busies) > 1:
+            excess = model.NewIntVar(0, len(busies), f"cohconf|{cohort}|{day}|{hh}")
+            model.Add(excess >= sum(busies) - 1)
+            cohort_conflict_terms.append(excess)
 
     # soft: cohort daily compactness (minimize student idle gaps)
     gap_terms = []
@@ -213,6 +215,7 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
     obj += order_terms
     obj += englab_terms
     obj += [cfg.w_nonadjacent * t for t in nonadj_terms]
+    obj += [cfg.w_cohort_conflict * t for t in cohort_conflict_terms]
     if obj:
         model.Minimize(sum(obj))
 

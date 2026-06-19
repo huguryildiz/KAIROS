@@ -68,6 +68,15 @@ def _metrics(assignments, sections, rooms, instructors, cfg, check_placement=Tru
         if s and room and room.cap:
             fills.append(s.students / room.cap)
     room_fill = round(sum(fills) / len(fills), 3) if fills else 0.0
+    from collections import defaultdict as _dd
+    coh_slot = _dd(set)
+    for a in assignments:
+        s = sec_by_id.get(a.section_id)
+        if not s:
+            continue
+        for hh in range(a.start, a.end):
+            coh_slot[(s.cohort_key, a.day, hh)].add(s.code)
+    cohort_conflicts = sum(max(0, len(codes) - 1) for codes in coh_slot.values())
     return {
         "n_assignments": len(assignments),
         "conflicts": dict(by_kind),
@@ -76,6 +85,7 @@ def _metrics(assignments, sections, rooms, instructors, cfg, check_placement=Tru
         "evening_blocks": evening,
         "evening_ratio": round(evening / len(assignments), 3) if assignments else 0.0,
         "room_fill": room_fill,
+        "cohort_conflicts": cohort_conflicts,
     }
 
 

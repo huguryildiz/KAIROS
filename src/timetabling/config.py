@@ -34,6 +34,7 @@ class Config:
     # phase 2: cohort daily-compactness applies to these year levels
     compact_cohort_years: tuple = (2, 3, 4)
     # phase 2 soft weights
+    w_cohort_conflict: int = 50  # soft cohort (student course-conflict); high but not hard
     w_cohort_gap: int = 3
     w_order: int = 1
     w_englab: int = 1

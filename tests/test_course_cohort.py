@@ -1,6 +1,6 @@
 from timetabling.config import Config
 from timetabling.model import Section, Block, Room, Instructor, Assignment
-from timetabling import model_cpsat, validate
+from timetabling import model_cpsat, validate, report
 
 ROOMS = {"R1": Room("R1", 50, False, True), "R2": Room("R2", 50, False, True)}
 
@@ -25,7 +25,9 @@ def test_different_courses_same_cohort_conflict():
          Assignment("C201_01#T", "C201_01", "theory", "R2", "Mo", 9, 10)]
     instr = {"i1": Instructor("i1", "n", False, "D"), "i2": Instructor("i2", "n", False, "D")}
     kinds = {v.kind for v in validate.validate(a, [s1, s2], ROOMS, instr, Config())}
-    assert "cohort" in kinds
+    assert "cohort" not in kinds                              # cohort is soft now, not a hard violation
+    met = report._metrics(a, [s1, s2], ROOMS, instr, Config())
+    assert met["cohort_conflicts"] >= 1                       # but it IS reported as a soft conflict
 
 def test_solver_allows_same_course_parallel():
     # two sections of the same course, same cohort, different instructors, only 1 free

@@ -28,7 +28,6 @@ def validate(assignments: List[Assignment], sections: List[Section],
     closed_all = set(cfg.friday_blackout)
     room_occ = defaultdict(list)
     instr_occ = defaultdict(list)
-    cohort_occ = defaultdict(list)
     section_occ = defaultdict(list)
 
     for a in assignments:
@@ -57,7 +56,6 @@ def validate(assignments: List[Assignment], sections: List[Section],
             room_occ[(a.room, a.day, hh)].append(a.block_id)
             for iid in s.instructor_ids:
                 instr_occ[(iid, a.day, hh)].append(a.block_id)
-            cohort_occ[(s.cohort_key, a.day, hh)].append(s.code)
             section_occ[(a.section_id, a.day, hh)].append(a.block_id)
 
     for (room, day, hh), bids in room_occ.items():
@@ -66,10 +64,6 @@ def validate(assignments: List[Assignment], sections: List[Section],
     for (iid, day, hh), bids in instr_occ.items():
         if len(set(b.split('#')[0] for b in bids)) > 1:
             viol.append(Violation("instructor", f"instructor {iid} double-booked {day} {hh}:00 by {bids}"))
-    for (cohort, day, hh), codes in cohort_occ.items():
-        if len(set(codes)) > 1:
-            viol.append(Violation("cohort",
-                        f"cohort {cohort} has {sorted(set(codes))} at {day} {hh}:00"))
     for (sid, day, hh), bids in section_occ.items():
         if len(set(bids)) > 1:
             viol.append(Violation("self", f"section {sid} self-overlap {day} {hh}:00 by {bids}"))

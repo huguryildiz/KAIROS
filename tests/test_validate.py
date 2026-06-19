@@ -36,7 +36,7 @@ def test_detects_capacity_and_lab_and_window_and_blackout():
     assert {"capacity", "lab", "blackout"} <= kinds
 
 
-def test_detects_instructor_and_cohort_conflict():
+def test_detects_instructor_conflict():
     s1 = _sec("S1_01", 1, 10, [Block("S1_01#T", "S1_01", "theory", 1, False)],
               instr="i1", cohort="D-1", code="D 101")
     s2 = _sec("S2_01", 1, 10, [Block("S2_01#T", "S2_01", "theory", 1, False)],
@@ -44,4 +44,5 @@ def test_detects_instructor_and_cohort_conflict():
     a = [Assignment("S1_01#T", "S1_01", "theory", "R1", "Mo", 9, 10),
          Assignment("S2_01#T", "S2_01", "theory", "LAB-L", "Mo", 9, 10)]
     kinds = {v.kind for v in validate.validate(a, [s1, s2], ROOMS, INSTR, Config())}
-    assert "instructor" in kinds and "cohort" in kinds
+    assert "instructor" in kinds
+    assert "cohort" not in kinds

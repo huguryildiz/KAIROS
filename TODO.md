@@ -1,7 +1,59 @@
 # TODO — Future Phases
 
-Phase 1 (end-to-end pipeline + slice-level feasibility proof) is complete.
-The full Phase-1 record is below; the items after it are the backlog for later phases.
+Phase 1 (pipeline + slice feasibility) and Phase 2 (model fidelity) are complete; the
+**Current** section below records the full-period repair solver and the fidelity work that
+followed. The Phase 1/2 record and the remaining backlog are kept after it.
+
+---
+
+## Current — Full-period repair solver + model fidelity — ✅ Completed
+
+> **Status.** Full-period schedules are produced by a warm-started repair solver. All rules on,
+> measured: period 001 = 1566/1708 placed (**91.7%**, 297 s, 3 sweeps), period 002 =
+> 1585/1788 (**88.6%**, 628 s, 6 sweeps), both at **0 hard resource conflicts**. 86 tests pass.
+
+### C.1 Warm-started repair solver (`--repair`) — ✅
+`repair.py`: greedy first-fit construction seeds a full solution; CP-SAT then repeatedly frees a
+small **relatedness** neighbourhood (unplaced blocks + the placed blocks competing for their
+slots), re-solves it with a **soft** placement term (never infeasible), warm-started via
+`AddHint`, and commits only non-worsening moves — looping until a sweep places nothing new. Makes
+the ~793-section period tractable on CP-SAT (single global solve = UNKNOWN at ~356k vars). The
+old per-faculty greedy (`--decompose`, ~49%) is kept for comparison. Tests:
+`test_repair_*.py`.
+
+### C.2 Virtual room for online / oversize sections — ✅
+Largest real classroom = 100 seats. Sections the Plan delivers as `Online` or with enrollment
+>100 are routed (`route.mark_virtual`) to a virtual `Online` room: unlimited capacity, **exempt
+from room no-overlap** (instructor/self still apply). Faithful to the data (HIST/TUR online,
+TEDU/ENGR roomless seminars). **Replaces the synthetic AMFI halls** (`extra_rooms` now `()`).
+`validate` exempts the virtual room from capacity / lab / room-overlap. Tests:
+`test_virtual_rooms.py`, `test_route.py`.
+
+### C.3 Theory ≤2h sessions on different days — ✅
+`blocks_from_tpl` splits theory into sessions of at most `cfg.max_theory_session` (2h): T:3→2+1,
+T:4→2+2 (labs keep `max_block_len`). A **hard** different-day constraint (single-shot model +
+repair `State`/`repair_round` + an independent `split_day` validator check) forces a section's
+theory sessions onto different days. Supersedes the soft `w_nonadjacent` term for theory. Tests:
+`test_split_blocks.py`, `test_different_day.py`, `test_nonadjacent.py`.
+
+### C.4 Lab-room pinning — ✅
+`route.mark_lab_rooms` reads each section's designated lab room from the Plan ROOM (the `-L`/`-PC`
+token) and pins the lab block to exactly that room; `feasible_rooms_for` returns only that room;
+`validate` enforces it (`lab_room`). Labs with no designated lab room (regular-room labs, project
+courses) keep no pin and use regular rooms. `-PC` now classifies as a lab (H007/009-PC); the 3
+real lab rooms missing from the inventory (A317/A326/DB102-MF-L, cap 50) were added to
+`data/classrooms.csv`. Tests: `test_lab_rooms.py`.
+
+### C.5 Gurobi backend removed — ✅
+A Gurobi spike confirmed CP-SAT is sufficient (the bottleneck was the decomposition contract,
+not the solver). `model_gurobi.py` and the `--solver` flag are removed.
+
+### C — Deferred
+- **~8–11% placement tail** (mostly Architecture studios in scarce slots). Repair plateaus;
+  a tail-intensification experiment gained <1 pt for ~3× runtime — not worth it. Options: manual
+  placement of the residual, or a smarter neighbourhood / restart strategy later.
+- README + `mode_b_<period>.json` are refreshed for repair; a periodic full benchmark re-run
+  on both periods is the maintenance task.
 
 ---
 

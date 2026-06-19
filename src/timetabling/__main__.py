@@ -37,8 +37,6 @@ def main():
                     help="cap candidate rooms per block (default from Config=12; lower = smaller/faster model)")
     ap.add_argument("--decompose", action="store_true",
                     help="solve faculty-by-faculty sharing the room pool (for full --scope all)")
-    ap.add_argument("--solver", default="cpsat", choices=["cpsat", "gurobi"],
-                    help="MIP solver backend (default: cpsat)")
     args = ap.parse_args()
 
     cfg = Config(solve_time_limit_s=args.time_limit)
@@ -73,9 +71,6 @@ def main():
     if "A" in modes:
         if args.decompose:
             assignments, stats = solve_decomposed(sections, room_list, instructors, cfg)
-        elif args.solver == "gurobi":
-            from .model_gurobi import build_and_solve as _gurobi_solve
-            assignments, stats = _gurobi_solve(sections, room_list, instructors, cfg)
         else:
             assignments, stats = _cpsat_solve(sections, room_list, instructors, cfg)
         viol = validate(assignments, sections, rooms, instructors, cfg)

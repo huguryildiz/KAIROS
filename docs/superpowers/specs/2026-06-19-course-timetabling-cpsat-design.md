@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-19
 **Status:** Approved (design); pending spec review
-**Source prompts:** `prompts/START.md`, `prompts/university_course_timetabling_prompt.md`
+**Source prompts:** `docs/prompts/START.md`, `docs/prompts/university_course_timetabling_prompt.md`
 **Authoritative rules:** `data/rules.pdf` (14 articles; Article 1 explicitly IGNORED by user decision)
 
 ---

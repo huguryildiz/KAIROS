@@ -13,7 +13,7 @@ Related documents:
 
 - Design spec: [docs/superpowers/specs/2026-06-19-course-timetabling-cpsat-design.md](docs/superpowers/specs/2026-06-19-course-timetabling-cpsat-design.md)
 - Implementation plan: [docs/superpowers/plans/2026-06-19-uctp-cpsat-pipeline.md](docs/superpowers/plans/2026-06-19-uctp-cpsat-pipeline.md)
-- Problem specification: [prompts/university_course_timetabling_prompt.md](prompts/university_course_timetabling_prompt.md)
+- Problem specification: [docs/prompts/university_course_timetabling_prompt.md](docs/prompts/university_course_timetabling_prompt.md)
 
 ---
 

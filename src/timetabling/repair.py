@@ -73,3 +73,108 @@ def greedy_construct(state: State, order: List[str], cand_by_block) -> None:
             if state.free_to_place(c, s.section_id, iids):
                 state.occupy(bid, c)
                 break
+
+
+BATCH = 30
+REPAIR_TL = 12.0
+MAX_FREE = 240
+
+
+def competitors(state: State, batch, cand_by_block) -> set:
+    comp = set()
+    for bid in batch:
+        s = state.sec_of[bid]; iids = state.sec_instr.get(s.section_id, [])
+        for c in cand_by_block[bid]:
+            if c.room in state.virtual:
+                continue
+            for hh in range(c.start, c.start + c.length):
+                owner = state.room_owner.get((c.room, c.day, hh))
+                if owner:
+                    comp.add(owner)
+        for iid in iids:
+            comp |= state.instr_blocks.get(iid, set())
+        comp |= state.sect_blocks.get(s.section_id, set())
+    return comp - set(batch)
+
+
+def repair_round(state: State, batch, cand_by_block) -> int:
+    comp = competitors(state, batch, cand_by_block)
+    free = list(dict.fromkeys(list(batch) + list(comp)))[:MAX_FREE]
+    free_set = set(free)
+
+    reserved_room, reserved_instr = set(), set()
+    for bid, c in state.placed.items():
+        if bid in free_set:
+            continue
+        s = state.sec_of[bid]; iids = state.sec_instr.get(s.section_id, [])
+        for hh in range(c.start, c.start + c.length):
+            if c.room not in state.virtual:
+                reserved_room.add((c.room, c.day, hh))
+            for iid in iids:
+                reserved_instr.add((iid, c.day, hh))
+
+    m = cp_model.CpModel()
+    x = {}
+    room_occ = defaultdict(list); instr_occ = defaultdict(list); sect_occ = defaultdict(list)
+    unpl = {}
+    cur = {}
+    for bid in free:
+        s = state.sec_of[bid]; iids = s.instructor_ids
+        cands = [c for c in cand_by_block[bid]
+                 if not any(((c.room not in state.virtual and (c.room, c.day, hh) in reserved_room)
+                             or any((iid, c.day, hh) in reserved_instr for iid in iids))
+                            for hh in range(c.start, c.start + c.length))]
+        u = m.NewBoolVar(f"u|{bid}")
+        unpl[bid] = u
+        bvars = []
+        for c in cands:
+            v = m.NewBoolVar(f"x|{bid}|{c.room}|{c.day}|{c.start}")
+            x[(bid, c.room, c.day, c.start)] = v
+            bvars.append(v)
+            for hh in range(c.start, c.start + c.length):
+                if c.room not in state.virtual:
+                    room_occ[(c.room, c.day, hh)].append(v)
+                for iid in iids:
+                    instr_occ[(iid, c.day, hh)].append(v)
+                sect_occ[(s.section_id, c.day, hh)].append(v)
+        m.AddExactlyOne(bvars + [u])
+        if bid in state.placed:
+            cur[bid] = state.placed[bid]
+    for occ in (room_occ, instr_occ, sect_occ):
+        for vs in occ.values():
+            if len(vs) > 1:
+                m.Add(sum(vs) <= 1)
+    m.Minimize(BIG * sum(unpl.values()))
+
+    for bid in free:
+        if bid in cur:
+            c = cur[bid]
+            key = (bid, c.room, c.day, c.start)
+            if key in x:
+                m.AddHint(x[key], 1)
+                m.AddHint(unpl[bid], 0)
+        else:
+            m.AddHint(unpl[bid], 1)
+
+    solver = cp_model.CpSolver()
+    solver.parameters.max_time_in_seconds = REPAIR_TL
+    solver.parameters.num_search_workers = 8
+    st = solver.Solve(m)
+    if st not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+        return 0
+
+    new_assign = {}
+    for (b, room, day, start), v in x.items():
+        if solver.Value(v) == 1:
+            length = next(c.length for c in cand_by_block[b]
+                          if c.room == room and c.day == day and c.start == start)
+            new_assign[b] = Candidate(b, room, day, start, length)
+
+    old_count = sum(1 for bid in free if bid in state.placed)
+    if len(new_assign) < old_count:
+        return 0
+    for bid in free:
+        state.release(bid)
+    for bid, c in new_assign.items():
+        state.occupy(bid, c)
+    return len(new_assign) - old_count

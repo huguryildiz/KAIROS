@@ -39,3 +39,6 @@ out/
 
 # Source data — contains PII (lecturer names, staff IDs, student grade stats); not tracked
 data/
+
+# Local Claude Code guidance — kept on disk, not tracked
+CLAUDE.md

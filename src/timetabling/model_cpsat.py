@@ -68,8 +68,8 @@ def gen_candidates(block: Block, section: Section, instructors: List[Instructor]
 
 
 def build_and_solve(sections: List[Section], rooms: List[Room],
-                    instructors: Dict[str, Instructor], cfg: Config
-                    ) -> Tuple[List[Assignment], Dict]:
+                    instructors: Dict[str, Instructor], cfg: Config,
+                    reserved=None) -> Tuple[List[Assignment], Dict]:
     model = cp_model.CpModel()
     blocks = [(b, s) for s in sections for b in s.blocks]
 
@@ -95,6 +95,10 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
     for b, s in blocks:
         ins_list = _instructors_of(s, instructors)
         cands = gen_candidates(b, s, ins_list, rooms, cfg)
+        if reserved:
+            cands = [c for c in cands
+                     if not any((c.room, c.day, hh) in reserved
+                                for hh in range(c.start, c.start + c.length))]
         cand_by_block[b.block_id] = cands
         if not cands:
             unplaced.append(b.block_id)

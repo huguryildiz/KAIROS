@@ -9,6 +9,7 @@ from .join import build_section_frame
 from .derive import build_sections
 from .clean import build_rooms, build_instructors
 from .model_cpsat import build_and_solve, split_roomable
+from .decompose import solve_decomposed
 from .validate import validate
 from .report import data_quality_report, parse_existing, mode_b_benchmark
 from .export import build_schedule_dict, write_schedule_json, write_csv
@@ -32,6 +33,8 @@ def main():
     ap.add_argument("--mode", default="A,B")
     ap.add_argument("--out", default="out")
     ap.add_argument("--time-limit", type=float, default=60.0)
+    ap.add_argument("--decompose", action="store_true",
+                    help="solve faculty-by-faculty sharing the room pool (for full --scope all)")
     args = ap.parse_args()
 
     cfg = Config(solve_time_limit_s=args.time_limit)
@@ -61,11 +64,18 @@ def main():
     modes = set(m.strip().upper() for m in args.mode.split(","))
     assignments, stats = [], {}
     if "A" in modes:
-        assignments, stats = build_and_solve(sections, room_list, instructors, cfg)
+        if args.decompose:
+            assignments, stats = solve_decomposed(sections, room_list, instructors, cfg)
+        else:
+            assignments, stats = build_and_solve(sections, room_list, instructors, cfg)
         viol = validate(assignments, sections, rooms, instructors, cfg)
-        print(f"[mode-A] status={stats['status_name']} blocks={stats['n_blocks']} "
-              f"vars={stats['n_vars']} unplaced={len(stats['unplaced'])} "
-              f"wall={stats['wall_time']:.1f}s violations={len(viol)}")
+        if "status_name" in stats:
+            print(f"[mode-A] status={stats['status_name']} blocks={stats['n_blocks']} "
+                  f"vars={stats['n_vars']} unplaced={len(stats['unplaced'])} "
+                  f"wall={stats['wall_time']:.1f}s violations={len(viol)}")
+        else:
+            print(f"[mode-A] decomposed groups={stats['n_groups']} "
+                  f"assignments={stats['n_assignments']} violations={len(viol)}")
         payload = build_schedule_dict(
             args.period, assignments, sections, rooms, instructors,
             conflicts=[{"kind": v.kind, "detail": v.detail} for v in viol])

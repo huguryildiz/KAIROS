@@ -64,3 +64,12 @@ class State:
             for iid in iids:
                 self.instr_slot[(iid, c.day, hh)].discard(bid)
             self.sect_slot[(s.section_id, c.day, hh)].discard(bid)
+
+
+def greedy_construct(state: State, order: List[str], cand_by_block) -> None:
+    for bid in order:
+        s = state.sec_of[bid]; iids = state.sec_instr.get(s.section_id, [])
+        for c in cand_by_block[bid]:
+            if state.free_to_place(c, s.section_id, iids):
+                state.occupy(bid, c)
+                break

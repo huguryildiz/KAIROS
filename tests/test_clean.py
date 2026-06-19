@@ -5,6 +5,7 @@ from timetabling.config import Config
 def test_classify_room():
     assert clean.classify_room("A514-PC-L") is True
     assert clean.classify_room("A211-PC-L") is True
+    assert clean.classify_room("H007/009-PC") is True   # PC labs count as lab rooms
     assert clean.classify_room("A231-H") is False
     assert clean.classify_room("F306") is False
 
@@ -14,10 +15,13 @@ def test_build_rooms_marks_online_nonphysical_and_lab_count():
     assert "Online" in rooms and rooms["Online"].is_physical is False
     assert rooms["Online"].is_virtual is True
     physical = [r for r in rooms.values() if r.is_physical and not r.room.startswith("AMFI-")]
-    assert len(physical) == 100                      # 101 CSV rooms - 1 online (excl. synthetic halls)
+    assert len(physical) == 103                      # 100 CSV (excl online/halls) + 3 real lab rooms
     labs = [r for r in physical if r.is_lab]
-    assert 8 <= len(labs) <= 20                       # ~14 lab/PC rooms
+    assert 8 <= len(labs) <= 25
     assert rooms["A216"].cap == 25
+    # real lab rooms absent from the CSV are injected
+    assert rooms["A317-MF-L"].cap == 50 and rooms["A317-MF-L"].is_lab
+    assert rooms["H007/009-PC"].is_lab               # PC lab now flagged
 
 
 def test_build_instructors_full_vs_part_time():

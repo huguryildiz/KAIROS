@@ -5,6 +5,7 @@ def test_phase2_defaults():
     assert c.max_block_len == 4
     assert c.max_theory_session == 2
     assert c.extra_rooms == ()
+    assert c.extra_lab_rooms == (("A317-MF-L", 50), ("A326-MF-L", 50), ("DB102-MF-L", 50))
     assert c.compact_cohort_years == (2, 3, 4)
     assert c.w_cohort_gap == 3
     assert c.w_order == 1

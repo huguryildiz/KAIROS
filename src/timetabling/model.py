@@ -49,6 +49,7 @@ class Section:
     blocks: List[Block] = field(default_factory=list)
     is_virtual: bool = False
     plan_room: str = ""
+    lab_room: str = ""          # pinned lab room (from Plan), "" = lab in a regular room
 
 
 @dataclass(frozen=True)

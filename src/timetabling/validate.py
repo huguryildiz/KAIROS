@@ -35,10 +35,11 @@ def validate(assignments: List[Assignment], sections: List[Section],
         if s is None:
             continue
         room = rooms.get(a.room)
-        if room is not None and room.cap < s.students:
+        is_virt = room is not None and room.is_virtual
+        if not is_virt and room is not None and room.cap < s.students:
             viol.append(Violation("capacity",
                         f"{a.block_id} in {a.room} (cap {room.cap}) < {s.students} students"))
-        if a.kind == "lab" and (room is None or not room.is_lab):
+        if a.kind == "lab" and not is_virt and (room is None or not room.is_lab):
             viol.append(Violation("lab", f"{a.block_id} lab block in non-lab room {a.room}"))
         end_cap = cfg.undergrad_end if s.level <= 4 else cfg.grad_end
         if a.end > end_cap:
@@ -53,7 +54,8 @@ def validate(assignments: List[Assignment], sections: List[Section],
                 viol.append(Violation("blackout", f"{a.block_id} covers blackout {a.day} {hh}:00"))
                 break
         for hh in range(a.start, a.end):
-            room_occ[(a.room, a.day, hh)].append(a.block_id)
+            if not is_virt:
+                room_occ[(a.room, a.day, hh)].append(a.block_id)
             for iid in s.instructor_ids:
                 instr_occ[(iid, a.day, hh)].append(a.block_id)
             section_occ[(a.section_id, a.day, hh)].append(a.block_id)

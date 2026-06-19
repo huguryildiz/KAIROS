@@ -32,3 +32,22 @@ def test_virtual_room_unlimited_concurrency():
     assigns, stats = build_and_solve(secs, rooms, instr, cfg)
     assert len(assigns) == 60
     assert {a.room for a in assigns} == {"Online"}
+
+
+def test_validate_exempts_virtual_room():
+    from timetabling.model import Assignment
+    from timetabling.validate import validate
+    rooms = {"Online": Room("Online", 9999, False, False, True)}
+    instr = {"i1": Instructor("i1", "A", True, "D"), "i2": Instructor("i2", "B", True, "D")}
+
+    def vsec(sid, iid):
+        s = Section(sid, "001", "X 101", "x", 1, "X", "F", "X-1", [iid], 300,
+                    2, 0, 0, 2, "", is_virtual=True)
+        s.blocks = [Block(f"{sid}#T", sid, "theory", 2, False)]
+        return s
+
+    secs = [vsec("X 101_01", "i1"), vsec("X 101_02", "i2")]
+    # both in the SAME virtual slot, 300 students each — exempt from capacity + room overlap
+    a = [Assignment("X 101_01#T", "X 101_01", "theory", "Online", "Mo", 9, 11),
+         Assignment("X 101_02#T", "X 101_02", "theory", "Online", "Mo", 9, 11)]
+    assert validate(a, secs, rooms, instr, Config()) == []

@@ -26,6 +26,7 @@ class Config:
     online_room: str = "Online"
     # solver
     solve_time_limit_s: float = 60.0
+    max_rooms_per_block: int = 12   # best-fit: only the K smallest fitting rooms per block
     # objective weights (light)
     w_evening: int = 4
     w_room_count: int = 2

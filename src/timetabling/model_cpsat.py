@@ -77,6 +77,7 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
     cand_by_block: Dict[str, List[Candidate]] = {}
     unplaced: List[str] = []
     default_instr = Instructor("", "", False, "")
+    order_terms = []
 
     room_occ = defaultdict(list)          # (room, day, hour) -> vars
     instr_occ = defaultdict(list)         # (instr_id, day, hour) -> vars
@@ -101,6 +102,10 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
             v = model.NewBoolVar(f"x|{c.block_id}|{c.room}|{c.day}|{c.start}")
             x[(c.block_id, c.room, c.day, c.start)] = v
             bvars.append(v)
+            if 2 <= s.level <= 4:
+                coeff = cfg.w_order * (4 - s.level) * (c.start - cfg.horizon_start)
+                if coeff:
+                    order_terms.append(coeff * v)
             for hh in range(c.start, c.start + c.length):
                 room_occ[(c.room, c.day, hh)].append(v)
                 for iid in s.instructor_ids:
@@ -179,6 +184,7 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
         w = cfg.w_instr_days if ins.is_staff else cfg.w_parttime_days
         obj.append(w * d)
     obj += [cfg.w_cohort_gap * g for g in gap_terms]
+    obj += order_terms
     if obj:
         model.Minimize(sum(obj))
 

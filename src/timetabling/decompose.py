@@ -28,6 +28,8 @@ def solve_decomposed(sections: List[Section], rooms: List[Room],
             for hh in range(x.start, x.end):
                 reserved.add((x.room, x.day, hh))
         all_assigns.extend(a)
+        # st always carries status_name/unplaced/wall_time: each group is solved by
+        # build_and_solve (never the decomposed path), so these keys are guaranteed.
         per_group.append({"group": g, "n_sections": len(groups[g]),
                           "status": st["status_name"], "unplaced": len(st["unplaced"]),
                           "wall_time": st["wall_time"]})

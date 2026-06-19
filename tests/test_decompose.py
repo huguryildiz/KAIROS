@@ -17,6 +17,9 @@ def test_decomposition_is_conflict_free_across_groups():
     fb = _sec("FB_01", "B 201", "Faculty B", "b", "B-2")
     assigns, stats = decompose.solve_decomposed([fa, fb], rooms, instr, cfg)
     assert len(assigns) == 2
+    assert stats["n_groups"] == 2
+    assert len(stats["groups"]) == 2
+    assert stats["n_assignments"] == 2
     # both used the one room -> must differ in (day, hour)
     s = {(x.room, x.day, x.start) for x in assigns}
     assert len(s) == 2

@@ -11,6 +11,7 @@ from .clean import build_rooms, build_instructors
 from .route import mark_virtual
 from .model_cpsat import build_and_solve as _cpsat_solve, split_roomable
 from .decompose import solve_decomposed
+from .repair import solve_repair
 from .validate import validate
 from .report import data_quality_report, parse_existing, mode_b_benchmark
 from .export import build_schedule_dict, write_schedule_json, write_csv
@@ -38,6 +39,8 @@ def main():
                     help="cap candidate rooms per block (default from Config=12; lower = smaller/faster model)")
     ap.add_argument("--decompose", action="store_true",
                     help="solve faculty-by-faculty sharing the room pool (for full --scope all)")
+    ap.add_argument("--repair", action="store_true",
+                    help="warm-started small-neighborhood repair solver (full --scope all)")
     args = ap.parse_args()
 
     cfg = Config(solve_time_limit_s=args.time_limit)
@@ -71,12 +74,18 @@ def main():
     modes = set(m.strip().upper() for m in args.mode.split(","))
     assignments, stats = [], {}
     if "A" in modes:
-        if args.decompose:
+        if args.repair:
+            assignments, stats = solve_repair(sections, rooms, instructors, cfg)
+        elif args.decompose:
             assignments, stats = solve_decomposed(sections, room_list, instructors, cfg)
         else:
             assignments, stats = _cpsat_solve(sections, room_list, instructors, cfg)
         viol = validate(assignments, sections, rooms, instructors, cfg)
-        if "status_name" in stats:
+        if "placed" in stats:
+            print(f"[mode-A] repair placed={stats['placed']}/{stats['total']} "
+                  f"({stats['placed']/stats['total']:.1%}) unplaced={len(stats['unplaced'])} "
+                  f"violations={len(viol)}")
+        elif "status_name" in stats:
             print(f"[mode-A] status={stats['status_name']} blocks={stats['n_blocks']} "
                   f"vars={stats['n_vars']} unplaced={len(stats['unplaced'])} "
                   f"wall={stats['wall_time']:.1f}s violations={len(viol)}")

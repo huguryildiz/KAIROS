@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Dict, List
 from collections import defaultdict
+from dataclasses import replace
 
 from ortools.sat.python import cp_model
 
@@ -78,6 +79,9 @@ def greedy_construct(state: State, order: List[str], cand_by_block) -> None:
 BATCH = 30
 REPAIR_TL = 12.0
 MAX_FREE = 240
+# Repair needs maneuvering room: small neighborhoods place far better with a wide
+# best-fit room set. Measured: 12 rooms -> ~82% placed, 24 rooms -> ~95%.
+REPAIR_MAX_ROOMS = 24
 
 
 def competitors(state: State, batch, cand_by_block) -> set:
@@ -181,6 +185,7 @@ def repair_round(state: State, batch, cand_by_block) -> int:
 
 
 def solve_repair(sections, rooms, instructors, cfg):
+    cfg = replace(cfg, max_rooms_per_block=max(cfg.max_rooms_per_block, REPAIR_MAX_ROOMS))
     room_list = list(rooms.values())
     virtual_names = {r.room for r in room_list if r.is_virtual}
     blocks = [(b, s) for s in sections for b in s.blocks]

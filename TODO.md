@@ -1,72 +1,229 @@
 # TODO — Future Phases
 
 Phase 1 (end-to-end pipeline + slice-level feasibility proof) is complete.
-See [README.md](README.md). The items below are the backlog for later phases.
+The full Phase-1 record is below; the items after it are the backlog for later phases.
+
+---
+
+## Phase 1 — ✅ Completed (end-to-end pipeline + slice feasibility)
+
+**Goal achieved:** a working CP-SAT pipeline that turns the real university data into a
+conflict-free `day + time + room` assignment per section, with feasibility proven to **0 hard
+violations** on department/faculty slices, an independent validator, and a stable JSON contract
+for a future UI. Authoritative design: [spec](docs/superpowers/specs/2026-06-19-course-timetabling-cpsat-design.md);
+implementation: [plan](docs/superpowers/plans/2026-06-19-uctp-cpsat-pipeline.md).
+
+### 1.1 Pipeline (built, all modules under `src/timetabling/`) — ✅
+
+`io_csv → clean → schedule_parse → join → derive → model_cpsat → validate → report → export`,
+orchestrated by `__main__.py`. CLI flags: `--period` (001/002), `--scope`
+(`all` / `faculty=` / `dept=`), `--mode` (A/B/A,B), `--time-limit`, `--out`. All tunables in the
+`Config` dataclass (`config.py`).
+
+### 1.2 Constraint model (decided and implemented) — ✅
+
+- **Hard constraints by candidate pruning, not model constraints.** `gen_candidates` emits only
+  legal `(room, day, start)` placements: capacity, lab-room, undergrad <18:00 window, Friday
+  13–14 and Thursday 14–16 blackouts.
+- **CP-SAT model carries only** H1 placement (`AddExactlyOne` per block) and H2–H4 no-overlap
+  (room / instructor / cohort, as `sum(occupancy) <= 1` per resource-slot).
+- **Soft preferences** are weighted penalty terms in `Minimize` (never pruning), so they cannot
+  cause infeasibility. Phase-1 objective covers evening-slot use, room compactness, and
+  instructor / part-time day-compactness.
+- **Blocks from T/P/L** (`blocks_from_tpl`): one theory block of `T+P` hours, one lab block of
+  `L` hours (lab block restricted to lab rooms). The two blocks share instructor + cohort, so
+  H3/H4 already separate them — no explicit per-section non-overlap needed.
+- **Cohort = `(Dept_Code, Year_Level)`** proxy (known over-restrictive flaw → TODO 2.1).
+
+### 1.3 Independent validator + pre-filter — ✅
+
+- `validate.py` re-derives every hard violation from the assignment list, decoupled from the
+  solver, so a model/encoding bug cannot pass silently (`check_placement` flag off for Mode-B).
+- `split_roomable` pre-filters unschedulable sections (no fitting room, or a single block longer
+  than the day window) and reports them, so the rest solves to 0 violations.
+
+### 1.4 Outputs + UI contract — ✅
+
+`schedule_<period>.json` (UI contract, stable per-assignment field set), `schedule_<period>.csv`,
+`data_quality_<period>.json` (parse/room/cohort/join checks + unschedulable list),
+`mode_b_<period>.json` (generated vs. existing program).
+
+### 1.5 Verified results (period 001) — ✅ each slice beats the existing program
+
+| Slice | Sections | Status | Hard violations | Mode A vs existing |
+|---|---|---|---|---|
+| ADA dept | 5 | OPTIMAL | 0 | 1 room vs 4 |
+| Econ faculty | 16 | OPTIMAL | 0 | 5 rooms vs 13, 0 vs 9 conflicts |
+| Psychology | 35 | FEASIBLE | 0 | 6 rooms vs 19, 0 vs 36 conflicts |
+| Architecture | 12 (+5 studios excluded) | OPTIMAL | 0 | 3 rooms vs 10 |
+
+Test suite green (`python3 -m pytest -q`).
+
+### 1.6 Known limitations carried into Phase 2
+
+1. Cohort proxy too restrictive for service/elective + multi-section courses → infeasible there
+   (e.g. ENG-1: 47 sections / 188 h vs a ~45 h week). → **2.1**
+2. Long single blocks (studios, T+P ≥ ~10h) do not fit the day window → need multi-day split;
+   excluded + reported. → **2.2**
+3. Oversize sections (students > largest room = 100) → excluded + reported. → **2.4**
+4. Team-taught sections (comma-joined Staff IDs) treated as one synthetic instructor, name
+   blank. → **2.3**
+5. Full period (~793 sections) does not solve as-is because of #1–#2. → **2.1/2.5**
 
 ---
 
 ## Phase 2 — Model fidelity and full-scale solving
 
-### 2.1 Cohort constraint fix (high priority, spec-faithful)
+> **Status (2026-06-19):** Phase 2 is complete. All model items (2.1–2.8) are implemented,
+> tested, and verified on real data. Per-faculty results: 0 hard violations, beats the existing
+> program across all three faculties. Full-period solving via decomposition is measured but
+> partial (~49% placed); complete full-period solving is deferred. 68 tests pass.
 
-- **Problem:** Currently *any* two sections of the same cohort cannot overlap. But spec
-  hard-constraint #3 says "in two **courses** at the same time" → different **sections**
-  of the same course (opened in parallel for different student groups) should be allowed
-  to overlap.
-- **To do:** Enforce cohort no-overlap at the **course-code level**: at most one *distinct
-  course code* active per `(cohort, slot)`; sections of the same course may run in parallel.
-  CP encoding: a `course_busy[cohort, course, day, hour]` indicator variable +
-  `sum(course_busy) <= 1` per `(cohort, slot)`.
-- **Expected effect:** Cases like CMPE 113 _01–_04 and service courses become feasible.
-- **Test:** two sections of the same course may run in parallel; two sections of
-  *different* courses may not.
+### 2.1 Cohort constraint fix → SOFT cohort penalty — ✅ Done
 
-### 2.2 Split long blocks across multiple days
+- **Outcome:** Course-level cohort constraint implemented, then revised to **soft** after
+  proving still INFEASIBLE at scale (Computer Engineering, 61 sections: INFEASIBLE with hard
+  course-level cohort / OPTIMAL with cohort removed). The `(Dept_Code, Year_Level)` proxy
+  over-counts conflict because students split across electives — 4XX courses are mostly
+  electives, of which a student takes only 2–3 per term. Cohort overlap is now a weighted
+  penalty (`w_cohort_conflict`, default 50) the solver minimizes, not a prohibition.
+  Reported as soft metric `cohort_conflicts` in `mode_b_<period>.json`; **not** a hard
+  `Violation`. Rooms, instructors, capacity, lab, window, blackout, and H_self stay hard.
+- **Test:** `test_course_cohort.py` (same-course sections may overlap; different-course
+  sections incur a penalty but are not forbidden).
 
-- **Problem:** A single block of T+P ≥ ~10h does not fit the 09–18 window (studio courses).
-- **To do:** Extend `blocks_from_tpl` to split a long theory load into smaller blocks spread
-  across multiple days (Article 1 is already IGNORED; free splitting is allowed). A section's
-  blocks already cannot overlap via the cohort/instructor constraints; additionally reward
-  "spread across non-adjacent days" (soft #2). Make the split strategy parametric (e.g. a max
-  block length).
-- **Test:** a 10-hour section is split into ≥2 blocks and placed.
+### 2.2 Split long blocks across multiple days — ✅ Done
 
-### 2.3 Team-taught sections
+- **Outcome:** `blocks_from_tpl` splits any block longer than `cfg.max_block_len` (default 4h)
+  into near-equal sub-blocks (e.g. 10h → 4+3+3). Block ids: `#T`/`#L` for single blocks,
+  `#T1..#Tk`/`#L1..#Lk` for split ones. Kind detection: `"#L" in block_id`. Enables
+  Architecture studios (previously excluded). A "spread across non-adjacent days" soft term
+  (`w_nonadjacent`) is implemented but **disabled by default (= 0)**; calibrate before enabling.
+- **Test:** `test_split_blocks.py`, `test_nonadjacent.py`.
 
-- **Problem:** Grades `Staff ID` carries two comma-joined IDs for some sections
-  (`"00003893,00002022"`) → treated as one synthetic instructor, name left blank.
-- **To do:** Split the IDs; treat the section as belonging to *all* listed instructors
-  (include each in instructor no-overlap); show joined names for the UI.
+### 2.3 Team-taught sections — ✅ Done
 
-### 2.4 Oversize sections
+- **Outcome:** `Section.instructor_ids: list[str]` (comma-joined IDs split). Every ID enters
+  instructor no-overlap (H3) and day soft terms. Seminar blackout applies if any co-instructor
+  is full-time. `schedule.json` shows joined display names.
+- **Test:** `test_team_taught.py`.
 
-- **Problem:** 16 sections (largest TEDU 101 = 497 students) exceed the largest room (100).
-- **Options:** (a) add large lecture halls to the room master; (b) split the section into
-  parallel sub-groups; (c) turn the capacity constraint into a soft "overflow penalty"
-  (optional). Currently excluded and reported — apply once decided.
+### 2.4 Oversize sections → large halls — ✅ Done (option a: add large halls)
 
-### 2.5 Full-period solve and decomposition
+- **Outcome:** `cfg.extra_rooms = ((500,2),(250,3),(150,4))` injects synthetic `AMFI-<cap>-<n>`
+  halls into the room master. Capacity stays hard. The real amphitheater inventory is not in
+  the data; capacities are assumed and configurable (documented in the data-quality report).
+  Enables Basic Sciences service courses (TEDU 101, 497 students).
+- **Test:** `test_clean_halls.py`.
 
-- After 2.1–2.2, attempt the **full 001 period (~793 sections)** with `--scope all`; measure
-  time/quality. If needed:
-  - **Faculty-based decomposition** sharing the room pool + a shared-room reservation scheme.
-  - Warm start (hint from the existing program) — Mode C.
-- Also run the **002 (Spring) period** and report (the pipeline is period-parametric).
+### 2.5 Full-period solve and decomposition — ✅ Done (measured; full solve deferred)
 
-### 2.6 Soft objective calibration
+- **Outcome:** `decompose.py` (`--decompose`) solves faculties in sequence, reserving
+  `(room, instructor, day, hour)` across groups. Measured (mrpb=8, 45s/faculty):
+  period 001 placed 483/988 blocks (~49%), period 002 placed 446, both at **0 resource
+  conflicts**. Evening ratio ~7%, 63/53 rooms vs existing 248/218. Single global solve
+  is intractable (UNKNOWN at 300s, ~123k–356k variables) — see deferred work below.
+- **Test:** `test_decompose.py`.
 
-- Tune weights against benchmarks: room fill ~0.53, evening ratio ~7%.
-- Incrementally add soft #2/#4/#5/#7/#8/#14 (non-adjacent days, day balance, daily load,
-  instructor free days, part-time clustering, practicum buffer) and measure their effect.
+### 2.6 Soft objective calibration — ✅ Done
+
+- **Outcome:** `w_evening` tuned to 10; evening ratio ~0.07 achieved (matching the ~7%
+  benchmark). New `room_fill` metric added to `mode_b_<period>.json`. `w_cohort_conflict`
+  set to 50 (high, student conflict is "almost hard"). `w_nonadjacent` remains 0 (disabled)
+  pending further need. Weights for remaining staged softs (`w_day_balance`, `w_daily_load`,
+  etc.) stay at 0 — YAGNI until a benchmark gap warrants them.
+
+### 2.7 Course-level day-ordering (S-Order, soft) — ✅ Done (cheap form)
+
+- **Outcome:** Per-candidate term `w_order * (4 − level) * (start − horizon_start)` for
+  `level ∈ {2,3,4}`; pushes lower-level courses earlier in the day. `w_order` in `config.py`.
+  The faithful inversion-count form is deferred (see deferred work below).
+- **Test:** `test_s_order.py`.
+
+### 2.8 Engineering lab days (S-EngLab, soft) — ✅ Done
+
+- **Outcome:** Lab-block candidates of an Engineering section (`section.faculty` contains
+  `cfg.eng_faculty_match = "Engineering"`) are penalized `w_englab` when `day ∉
+  cfg.eng_lab_days` (default `("Th","Fr")`). Soft only, no pruning. Covers all 7 Engineering
+  departments.
+- **Test:** `test_s_englab.py`.
+
+### Deferred / future work (not in Phase 2 scope)
+
+1. **Complete full-period conflict-free timetable.** The single global CP-SAT solve is
+   intractable at full scale (~793 sections, period 001). Paths forward:
+   - Better decomposition: iterative / overlapping partitions, column generation.
+   - Commercial MIP solver (e.g. Gurobi) which scales better than CP-SAT on dense
+     assignment LPs.
+   - Finer cohort/curriculum data (elective flags, per-student course sets) to make the
+     cohort constraint tighter and less combinatorially explosive.
+2. **Finer cohort modeling.** The `(Dept_Code, Year_Level)` proxy remains an
+   over-approximation of student conflict. True sub-groups (mandatory vs elective, actual
+   course enrollment) would allow a harder cohort constraint without infeasibility.
+3. **S-Order faithful form.** The current cheap per-candidate term is an approximation;
+   the cohort-internal inversion-count form (Boolean aux per pair) would be more precise
+   but is heavier — revisit only if the cheap form proves too weak at scale.
+4. **Mode C warm start.** Hint the solver from the existing program's schedule — not started.
+5. **`w_nonadjacent` calibration.** The non-adjacent-split soft term is implemented but
+   disabled (`= 0`); enable once full-period solving stabilizes.
 
 ---
 
-## Phase 3 — Web UI (read-only)
+## Phase 3 — Web UI + interactive deployment (Solve-on-demand)
 
-- React + shadcn/ui; does not run the solver, only reads `schedule_<period>.json`.
-- Weekly grid (Mon–Fri × 09:00–21:00); room / instructor / cohort / department filters.
-- Highlight conflicts and unmet soft constraints; Mode-B comparison summary.
-- The JSON contract is fixed in `export.py` — the UI consumes that.
+A web UI so 1-2 known users can **trigger** solves from outside the institution network,
+instead of an operator running the CLI, and view the result. Decisions made 2026-06-19.
+(Supersedes the earlier "read-only React UI" idea — the interactive Streamlit UI covers it.)
+
+**Input model (user-provided, replaces the fixed `data/` CSVs for UI runs):**
+
+- **Course list = the primary input.** One row per **section**, columns:
+  `Course Code | Course Name | Section No | T | P | L | Lecturer Name | Lecturer Email | ~Students`.
+- **Upload (CSV + Excel `.xlsx`) is primary; in-UI row entry is secondary** (for small
+  edits/additions). Excel support adds an `openpyxl` dependency.
+- **Cohort is derived from the course code** (dept = letter prefix, year level = first digit
+  of the number, e.g. `CMPE 113` → CMPE, year 1). Service/elective courses get the wrong
+  cohort — the known, accepted flaw (same as TODO 2.1). No enrollment file in the UI flow.
+- **Instructor identity = email** (display name kept separately, for show only). Solves the
+  name-collision problem the current `Staff_ID` keying guards against. Team-taught = comma-
+  separated emails; blank email → section excluded from instructor no-overlap (warn).
+- **Classrooms are NOT re-uploaded** — managed in a dedicated "Classrooms" screen
+  (add/edit/delete room + capacity + an explicit **is-lab** flag; today lab-room status is
+  derived from the room name in `clean.py`, so the UI must set it explicitly).
+- **Period** (001/002) is a selection.
+- Upload validation reuses the `data_quality_*` checks (missing columns, T+P+L=0, oversize).
+
+**UI / deployment:**
+
+- **UI tech: Streamlit** (pure Python, no separate frontend build). Chosen over React/shadcn
+  for a 1-2-user internal tool — fastest path to a working "Solve" UI.
+- **No FastAPI / no job system.** Because Streamlit is Python and runs in the **same
+  container** as the solver, it calls `run_pipeline()` **directly** — the earlier FastAPI
+  `/solve` + `BackgroundTasks` layer is unnecessary at this scale.
+- **Refactor first:** extract a callable `run_pipeline(period, scope, mode, time_limit)` from
+  `__main__.py` so the CLI and Streamlit share one code path (no duplication).
+- **Solve UX: blocking spinner.** Solve button → `st.spinner` while `run_pipeline()` runs →
+  show results. Fine for 1-2 users / one solve at a time (no async job tracking needed).
+- **Input form** mirrors the CLI flags: `period` (001/002), `scope` (all / faculty= / dept=),
+  `mode` (A / B / A,B), `time-limit` (slider).
+- **Result views, built in order:**
+  - **A** (v0): flat assignments table + search/filter + CSV/JSON download + an
+    "unschedulable sections" section (from `data_quality_*`).
+  - **B:** weekly Mon-Fri × hour grid + room / instructor / cohort / department filters.
+  - **C:** conflict highlighting + Mode-B comparison summary.
+  - Consumes the fixed `schedule_<period>.json` / `export.py` contract.
+- **Target: Google Cloud Run** — single Docker image (Streamlit + OR-Tools CP-SAT + `data/`),
+  in the user's own GCP project, **EU/TR region**, locked to 1-2 people via IAM/auth,
+  **4-8 vCPU** (~800-section problem is small; 64-96 vCPU is overkill). Scale-to-zero → no
+  idle cost, fits seasonal use. Browser talks directly to Cloud Run (no Vercel — would only
+  add a second platform + CORS).
+- **PII / KVKK:** gate is the institution's policy — confirmed OK on the user's own,
+  region-controlled cloud. Fallback if data may not leave the building: on-prem/intranet VM
+  with VPN/reverse-proxy. Enable disk encryption and access logging regardless.
+- **Rejected alternatives:** Vercel/GitHub Pages (frontend-only, can't run the solver);
+  Gurobi WLS (licensing only, different paid solver); Google OR API / MathOpt Service
+  (Alpha/Beta, quota-limited, sends PII to a shared Google service, and does **not** support
+  CP-SAT — only GLOP/PDLP/SCIP, would require reformulating the model as a MIP).
 
 ---
 

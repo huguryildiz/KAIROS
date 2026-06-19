@@ -5,7 +5,8 @@ from collections import defaultdict
 from ortools.sat.python import cp_model
 
 from .config import Config
-from .model import Section, Block, Room, Instructor, Candidate, Assignment
+from .model import (Section, Block, Room, Instructor, Candidate, Assignment,
+                    overload_eligible_ids)
 
 
 def _blackout_hours(instructors, cfg: Config):
@@ -90,6 +91,7 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
     section_occ = defaultdict(list)       # (section_id, day, hour) -> vars
     room_used_vars = defaultdict(list)            # room -> vars
     instr_day_vars = defaultdict(list)            # (instr_id, day) -> vars
+    instr_day_load = defaultdict(list)            # (instr_id, day) -> per-hour vars (sum = daily hours)
     evening_vars = []
 
     compact_years = {str(y) for y in cfg.compact_cohort_years}
@@ -130,6 +132,7 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
                     room_occ[(c.room, c.day, hh)].append(v)
                 for iid in s.instructor_ids:
                     instr_occ[(iid, c.day, hh)].append(v)
+                    instr_day_load[(iid, c.day)].append(v)
                 cohort_course_occ[(s.cohort_key, s.code, c.day, hh)].append(v)
                 if s.cohort_key.rsplit("-", 1)[-1] in compact_years:
                     cohort_hour_occ[(s.cohort_key, c.day, hh)].append(v)
@@ -223,6 +226,19 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
         model.Add(sum(vs) == 0).OnlyEnforceIf(d.Not())
         instr_day[(iid, day)] = d
 
+    # soft: per-(instructor, day) overload — hours beyond cfg.max_instr_daily_hours.
+    # instr_day_load sums one var per occupied hour, so its sum == daily teaching hours.
+    overload_terms = []
+    if cfg.w_instr_daily_overload:
+        cap = cfg.max_instr_daily_hours
+        eligible = overload_eligible_ids(sections, cfg)
+        for (iid, day), vs in instr_day_load.items():
+            if iid not in eligible or len(vs) <= cap:
+                continue
+            over = model.NewIntVar(0, len(vs), f"iover|{iid}|{day}")
+            model.Add(over >= sum(vs) - cap)
+            overload_terms.append(over)
+
     obj = []
     obj += [cfg.w_evening * v for v in evening_vars]
     obj += [cfg.w_room_count * y for y in room_used.values()]
@@ -235,6 +251,7 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
     obj += englab_terms
     obj += [cfg.w_nonadjacent * t for t in nonadj_terms]
     obj += [cfg.w_cohort_conflict * t for t in cohort_conflict_terms]
+    obj += [cfg.w_instr_daily_overload * t for t in overload_terms]
     if obj:
         model.Minimize(sum(obj))
 

@@ -49,6 +49,15 @@ class Config:
     w_room_count: int = 2
     w_instr_days: int = 3
     w_parttime_days: int = 5
+    # soft: penalize each teaching-hour beyond this many per (instructor, day).
+    # 0 = disabled (opt-in). A hard cap is INFEASIBLE: ~19 instructors carry
+    # >20h/week (service courses) and cannot fit 5 days at 4h. See TODO.md.
+    max_instr_daily_hours: int = 4
+    w_instr_daily_overload: int = 0
+    # exempt high-load instructors (e.g. Basic Sciences service courses): apply the
+    # overload penalty only to instructors whose total weekly teaching load is at most
+    # this many hours. 0 = no exemption (penalize everyone).
+    overload_exempt_weekly: int = 16
     evening_from_hour: int = 17   # an hour-slot >= this counts as "evening" for the soft penalty
 
     def days(self) -> list:

@@ -49,6 +49,9 @@ def main():
     ap.add_argument("--overload-exempt-weekly", type=int, default=None,
                     help="exempt instructors above this weekly load from the overload penalty "
                          "(default Config=16; 0 = penalize everyone)")
+    ap.add_argument("--no-soft-shaping", action="store_true",
+                    help="disable evening + cohort-conflict shaping in repair greedy "
+                         "construction (for baseline A/B; default on)")
     args = ap.parse_args()
 
     cfg_kwargs = {"solve_time_limit_s": args.time_limit,
@@ -59,6 +62,8 @@ def main():
         cfg_kwargs["max_instr_daily_hours"] = args.instr_daily_cap
     if args.overload_exempt_weekly is not None:
         cfg_kwargs["overload_exempt_weekly"] = args.overload_exempt_weekly
+    if args.no_soft_shaping:
+        cfg_kwargs["soft_shaping_in_repair"] = False
     cfg = Config(**cfg_kwargs)
     os.makedirs(args.out, exist_ok=True)
 

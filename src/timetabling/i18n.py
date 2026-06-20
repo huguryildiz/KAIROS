@@ -17,6 +17,7 @@ DAY_LABELS = {
 STRINGS = {
     "tr": {
         "lang_label": "Dil / Language",
+        "nav_home": "Ana sayfa",
         # hero (landing)
         "hero_eyebrow": "Üniversite ders programlama",
         "hero_title_html": "Her ders, <em>çakışmasız</em> bir haftalık programda.",
@@ -85,6 +86,7 @@ STRINGS = {
     },
     "en": {
         "lang_label": "Dil / Language",
+        "nav_home": "Home",
         "hero_eyebrow": "University course timetabling",
         "hero_title_html": "Every section, placed on a <em>conflict-free</em> weekly grid.",
         "hero_body": "Upload your course list, set your rooms, and let the CP-SAT solver assign "

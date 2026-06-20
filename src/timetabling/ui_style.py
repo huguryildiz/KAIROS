@@ -43,6 +43,17 @@ def dept_color(dept: str) -> str:
     return _PALETTE[idx]
 
 
+def block_color(a: dict) -> str:
+    """Per-course color so each course reads as a distinct block. Keyed on the
+    course code (sections of the same course share a hue); falls back to the
+    section id's course prefix, then the department."""
+    key = str(a.get("course_code")
+              or str(a.get("section_id", "")).split("_")[0]
+              or a.get("dept", ""))
+    idx = sum(ord(c) for c in key) % len(_PALETTE)
+    return _PALETTE[idx]
+
+
 BRAND_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap');
@@ -117,14 +128,15 @@ table.tt td{border-bottom:1px solid #EEF1F6;border-left:1px solid #F2F4F8;
   vertical-align:top;height:30px;padding:3px;}
 td.tt-time{color:var(--muted-fg);font:500 12px/30px var(--mono);text-align:center;background:#FAFBFD;}
 .tt-blk{border-radius:6px;padding:4px 8px;margin:1px 0;
-  background:color-mix(in srgb, var(--c) 11%, #fff);
+  background:color-mix(in srgb, var(--c) 14%, #fff);
   border-left:3px solid var(--c);
   color:color-mix(in srgb, var(--c) 70%, #0b1020);}
-.tt-blk.cont{background:color-mix(in srgb, var(--c) 7%, #fff);min-height:14px;opacity:.7;
+.tt-blk.cont{background:color-mix(in srgb, var(--c) 9%, #fff);min-height:14px;opacity:.7;
   border-radius:0;}
 .tt-blk.lab{border-left-style:dashed;}
 .tt-blk .code{font:600 12px/1.15 var(--font);display:block;}
-.tt-blk .meta{font:500 10px/1.2 var(--mono);opacity:.7;display:block;margin-top:2px;}
+.tt-blk .who{font:500 10px/1.25 var(--font);display:block;margin-top:2px;opacity:.85;}
+.tt-blk .meta{font:500 10px/1.2 var(--mono);opacity:.7;display:block;margin-top:1px;}
 .tt-blk .tag{font:600 8px/1 var(--mono);letter-spacing:.04em;border:1px solid currentColor;
   border-radius:4px;padding:1px 4px;margin-left:6px;vertical-align:1px;}
 .tt-empty{color:#9AA3B2;font:500 13px/1 var(--font);padding:22px;text-align:center;}
@@ -141,23 +153,30 @@ def metric_cards_html(cards: List[Tuple[str, str, str]]) -> str:
     return f'<div class="tt-cards">{cells}</div>'
 
 
-def _block_html(a: dict, is_start: bool, meta_field: str = "room") -> str:
-    color = dept_color(a.get("dept", ""))
+def _block_html(a: dict, is_start: bool) -> str:
+    color = block_color(a)
     is_lab = "lab" in str(a.get("block_kind", "")).lower()
     klass = "tt-blk" + (" lab" if is_lab else "") + ("" if is_start else " cont")
     if not is_start:
         return f'<div class="{klass}" style="--c:{color}"></div>'
     tag = '<span class="tag">LAB</span>' if is_lab else ""
-    meta = escape(str(a.get(meta_field, "") or a.get("room", "")))
-    code = escape(str(a.get("course_code") or a.get("section_id", "")))
-    title = " · ".join(str(a.get(k, "")) for k in ("instructor_name", "room", "cohort") if a.get(k))
+    # Three stacked lines: section id, lecturer, room — one course per color.
+    section = escape(str(a.get("section_id") or a.get("course_code", "")))
+    instructor = escape(str(a.get("instructor_name", "")))
+    room = escape(str(a.get("room", "")))
+    title = " · ".join(str(a.get(k, "")) for k in
+                       ("course_code", "instructor_name", "room", "cohort") if a.get(k))
+    lines = [f'<span class="code">{section}{tag}</span>']
+    if instructor:
+        lines.append(f'<span class="who">{instructor}</span>')
+    if room:
+        lines.append(f'<span class="meta">{room}</span>')
     return (f'<div class="{klass}" style="--c:{color}" title="{escape(title)}">'
-            f'<span class="code">{code}{tag}</span>'
-            f'<span class="meta">{meta}</span></div>')
+            f'{"".join(lines)}</div>')
 
 
 def week_grid_html(schedule: dict, hour_lo: int = 9, hour_hi: int = 21,
-                   meta_field: str = "room", lang: str = DEFAULT_LANG) -> str:
+                   lang: str = DEFAULT_LANG) -> str:
     grid = build_week_grid(schedule, hour_lo, hour_hi)
     if not schedule.get("assignments"):
         return (f'<div class="tt-wrap"><div class="tt-empty">'
@@ -170,8 +189,7 @@ def week_grid_html(schedule: dict, hour_lo: int = 9, hour_hi: int = 21,
         cells = [f'<td class="tt-time">{h:02d}:00</td>']
         for d in DAYS_ORDER:
             blocks = grid.get((d, h), [])
-            inner = "".join(_block_html(a, is_start=(int(a.get("start", 0)) == h),
-                                        meta_field=meta_field)
+            inner = "".join(_block_html(a, is_start=(int(a.get("start", 0)) == h))
                             for a in blocks)
             cells.append(f"<td>{inner}</td>")
         rows.append("<tr>" + "".join(cells) + "</tr>")

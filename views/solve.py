@@ -1,19 +1,13 @@
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 import streamlit as st
 from timetabling.config import Config
 from timetabling.ui_input import (build_sections_from_courselist,
                                   build_instructors_from_courselist, build_rooms_from_ui)
 from timetabling.route import mark_virtual
 from timetabling.pipeline import run_pipeline
-from timetabling.ui_style import BRAND_CSS, logo_img_html
-from timetabling.ui_app import lang_selector
+from timetabling.ui_app import get_lang
 from timetabling.i18n import t
 
-st.set_page_config(page_title="Solve · Course Timetabling", page_icon="▶", layout="wide")
-st.markdown(BRAND_CSS, unsafe_allow_html=True)
-st.sidebar.markdown(logo_img_html(), unsafe_allow_html=True)
-lang = lang_selector()
+lang = get_lang()
 
 st.header(t("solve_header", lang))
 courses = st.session_state.get("courses", [])
@@ -38,4 +32,4 @@ if st.button(t("solve_button", lang), type="primary"):
     st.session_state["period"] = period
     st.success(t("solve_done", lang, a=len(res.assignments),
                  v=len(res.violations), u=len(res.unschedulable)))
-    st.page_link("pages/4_Results.py", label=t("solve_see_results", lang))
+    st.page_link("views/results.py", label=t("solve_see_results", lang))

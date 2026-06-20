@@ -1,16 +1,10 @@
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 import pandas as pd
 import streamlit as st
 from timetabling.defaults import DEFAULT_CLASSROOMS
-from timetabling.ui_style import BRAND_CSS, logo_img_html
-from timetabling.ui_app import lang_selector
+from timetabling.ui_app import get_lang
 from timetabling.i18n import t
 
-st.set_page_config(page_title="Classrooms · Course Timetabling", page_icon="🏫", layout="wide")
-st.markdown(BRAND_CSS, unsafe_allow_html=True)
-st.sidebar.markdown(logo_img_html(), unsafe_allow_html=True)
-lang = lang_selector()
+lang = get_lang()
 
 st.header(t("cr_header", lang))
 st.caption(t("cr_caption", lang))

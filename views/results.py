@@ -1,16 +1,12 @@
-import sys, os, json
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+import json
 import pandas as pd
 import streamlit as st
 from timetabling.ui_grid import filter_assignments, distinct_values
-from timetabling.ui_style import BRAND_CSS, metric_cards_html, week_grid_html, logo_img_html
-from timetabling.ui_app import lang_selector
+from timetabling.ui_style import metric_cards_html, week_grid_html
+from timetabling.ui_app import get_lang
 from timetabling.i18n import t
 
-st.set_page_config(page_title="Results · Course Timetabling", page_icon="📊", layout="wide")
-st.markdown(BRAND_CSS, unsafe_allow_html=True)
-st.sidebar.markdown(logo_img_html(), unsafe_allow_html=True)
-lang = lang_selector()
+lang = get_lang()
 
 st.header(t("res_header", lang))
 res = st.session_state.get("result")
@@ -34,7 +30,6 @@ st.markdown(metric_cards_html([
 # that entity's week so cells stay readable.
 VIEW_KEY = {"cohort": "res_view_cohort", "room": "res_view_room",
             "instructor_name": "res_view_instructor", "dept": "res_view_dept"}
-META_FOR = {"cohort": "room", "room": "cohort", "instructor_name": "room", "dept": "room"}
 
 c1, c2 = st.columns([1, 2])
 view_field = c1.selectbox(t("res_view_by", lang), list(VIEW_KEY),

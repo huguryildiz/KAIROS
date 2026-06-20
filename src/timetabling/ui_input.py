@@ -89,3 +89,30 @@ def build_rooms_from_ui(classroom_rows: List[Dict], cfg: Config) -> Dict[str, Ro
     rooms[cfg.online_room] = Room(room=cfg.online_room, cap=10_000, is_lab=False,
                                   is_physical=False, is_virtual=True)
     return rooms
+
+
+_REQUIRED = ("Course Code", "Section No", "T", "P", "L", "Lecturer Email")
+
+
+def validate_courselist(rows: List[Dict]) -> List[str]:
+    warns: List[str] = []
+    if not rows:
+        return ["No rows found in the uploaded file."]
+    missing = [c for c in _REQUIRED if c not in rows[0]]
+    if missing:
+        return [f"Missing required column(s): {', '.join(missing)}"]
+    zero_hours = sum(1 for r in rows
+                     if (parse_int(r.get("T"), 0) + parse_int(r.get("P"), 0)
+                         + parse_int(r.get("L"), 0)) == 0)
+    blank_email = sum(1 for r in rows if not parse_emails(r.get("Lecturer Email", "")))
+    bad_code = sum(1 for r in rows if cohort_from_code(r.get("Course Code", ""))[0] == "UNK")
+    part_time = sum(1 for r in rows if is_part_time(r.get("Lecturer Name", "")))
+    if zero_hours:
+        warns.append(f"{zero_hours} row(s) have T+P+L=0 (defaulted to a 3h theory block).")
+    if blank_email:
+        warns.append(f"{blank_email} row(s) have a blank lecturer email "
+                     f"(excluded from instructor no-overlap).")
+    if bad_code:
+        warns.append(f"{bad_code} row(s) have an unparseable course code (cohort = UNK).")
+    warns.append(f"{part_time} lecturer(s) detected as part-time via '(S)'.")
+    return warns

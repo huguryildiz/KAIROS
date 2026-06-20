@@ -40,8 +40,7 @@ if not entities:
     st.stop()
 entity = c2.selectbox(t(VIEW_KEY[view_field], lang), entities)
 view = filter_assignments(sched, view_field, entity)
-st.markdown(week_grid_html(view, meta_field=META_FOR[view_field], lang=lang),
-            unsafe_allow_html=True)
+st.markdown(week_grid_html(view, lang=lang), unsafe_allow_html=True)
 st.caption(t("res_grid_caption", lang, n=len(view["assignments"])))
 
 st.write("")

@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Dict, List
-from collections import defaultdict
+from collections import defaultdict, Counter
 from dataclasses import replace
 from time import perf_counter
 
@@ -29,6 +29,7 @@ class State:
         self.sect_slot = defaultdict(set)
         self.sect_theory_day = defaultdict(set)   # (section_id, day) -> {theory block_ids}
         self.instr_day_hours = defaultdict(int)   # (iid, day) -> placed teaching hours
+        self.cohort_slot_courses = defaultdict(Counter)   # (cohort, day, hour) -> {course: count}
 
     def free_to_place(self, c, sid, iids):
         for hh in range(c.start, c.start + c.length):
@@ -60,6 +61,7 @@ class State:
             for iid in iids:
                 self.instr_slot[(iid, c.day, hh)].add(bid)
             self.sect_slot[(s.section_id, c.day, hh)].add(bid)
+            self.cohort_slot_courses[(s.cohort_key, c.day, hh)][s.code] += 1
 
     def release(self, bid):
         c = self.placed.pop(bid, None)
@@ -78,6 +80,10 @@ class State:
             for iid in iids:
                 self.instr_slot[(iid, c.day, hh)].discard(bid)
             self.sect_slot[(s.section_id, c.day, hh)].discard(bid)
+            cnt = self.cohort_slot_courses[(s.cohort_key, c.day, hh)]
+            cnt[s.code] -= 1
+            if cnt[s.code] <= 0:
+                del cnt[s.code]
 
 
 def greedy_construct(state: State, order: List[str], cand_by_block,

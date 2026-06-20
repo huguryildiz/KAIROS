@@ -15,3 +15,45 @@ def test_is_part_time():
 def test_parse_emails():
     assert parse_emails("a@x.edu, b@x.edu") == ["a@x.edu", "b@x.edu"]
     assert parse_emails("  ") == []
+
+
+from timetabling.config import Config
+from timetabling.ui_input import (
+    build_sections_from_courselist, build_instructors_from_courselist,
+    build_rooms_from_ui,
+)
+
+_ROWS = [
+    {"Course Code": "CMPE 113", "Course Name": "Intro", "Section No": "01",
+     "T": "3", "P": "0", "L": "2", "Lecturer Name": "A. Yilmaz",
+     "Lecturer Email": "a@x.edu", "~Students": "40"},
+    {"Course Code": "MATH 101", "Course Name": "Calc", "Section No": "02",
+     "T": "4", "P": "0", "L": "0", "Lecturer Name": "B. Demir (S)",
+     "Lecturer Email": "", "~Students": "30"},
+]
+
+
+def test_build_sections_from_courselist():
+    secs, rep = build_sections_from_courselist(_ROWS, "001", Config())
+    s0 = secs[0]
+    assert s0.section_id == "CMPE 113_01"
+    assert s0.cohort_key == "CMPE-1"
+    assert s0.instructor_ids == ["a@x.edu"]
+    assert s0.students == 40
+    assert any("#L" in b.block_id for b in s0.blocks)   # lab block exists
+    assert rep["missing_email"] == 1                    # MATH row has blank email
+
+
+def test_build_instructors_part_time():
+    instr = build_instructors_from_courselist(_ROWS)
+    assert instr["a@x.edu"].is_staff is True
+    # B. Demir has a blank email -> not keyed; full-timeness asserted via a present email
+    rows = [{"Lecturer Name": "C (S)", "Lecturer Email": "c@x.edu", "Course Code": "EE 201"}]
+    instr2 = build_instructors_from_courselist(rows)
+    assert instr2["c@x.edu"].is_staff is False
+
+
+def test_build_rooms_adds_online_virtual():
+    rooms = build_rooms_from_ui([{"Room": "A301", "Cap": "60", "Lab": ""}], Config())
+    assert rooms["A301"].cap == 60 and rooms["A301"].is_lab is False
+    assert rooms["Online"].is_virtual is True

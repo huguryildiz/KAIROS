@@ -24,3 +24,68 @@ def is_part_time(lecturer_name: str) -> bool:
 
 def parse_emails(s: str) -> List[str]:
     return [e.strip() for e in str(s or "").split(",") if e.strip()]
+
+
+def _truthy(v) -> bool:
+    return str(v or "").strip().lower() in ("1", "true", "yes", "y", "x", "lab", "✓")
+
+
+def build_sections_from_courselist(rows: List[Dict], period: str,
+                                   cfg: Config) -> Tuple[List[Section], Dict]:
+    sections: List[Section] = []
+    report = {"missing_email": 0, "missing_hours": 0}
+    for r in rows:
+        code = str(r.get("Course Code", "")).strip()
+        if not code:
+            continue
+        sec_no = str(r.get("Section No", "")).strip()
+        sid = f"{code}_{sec_no}" if sec_no else code
+        dept, year, cohort = cohort_from_code(code)
+        T = parse_int(r.get("T"), 0); P = parse_int(r.get("P"), 0)
+        L = parse_int(r.get("L"), 0)
+        if (T + P + L) == 0:
+            report["missing_hours"] += 1
+        emails = parse_emails(r.get("Lecturer Email", ""))
+        if not emails:
+            report["missing_email"] += 1
+        students = parse_int(r.get("~Students"), 1) or 1
+        sections.append(Section(
+            section_id=sid, period=period, code=code,
+            name=str(r.get("Course Name", "")).strip(),
+            level=course_level(code), dept_code=dept, faculty="",
+            cohort_key=cohort, instructor_ids=emails, students=students,
+            T=T, P=P, L=L, Cr=(T + P + L), category="",
+            blocks=blocks_from_tpl(sid, T, P, L, T + P + L,
+                                   cfg.max_block_len, cfg.max_theory_session),
+            plan_room="",
+        ))
+    return sections, report
+
+
+def build_instructors_from_courselist(rows: List[Dict]) -> Dict[str, Instructor]:
+    out: Dict[str, Instructor] = {}
+    for r in rows:
+        emails = parse_emails(r.get("Lecturer Email", ""))
+        names = [n.strip() for n in str(r.get("Lecturer Name", "")).split(",")]
+        dept, _, _ = cohort_from_code(r.get("Course Code", ""))
+        for i, email in enumerate(emails):
+            name = names[i] if i < len(names) else (names[0] if names else "")
+            if email in out:
+                continue
+            out[email] = Instructor(staff_id=email, name=name,
+                                    is_staff=not is_part_time(name), home_dept=dept)
+    return out
+
+
+def build_rooms_from_ui(classroom_rows: List[Dict], cfg: Config) -> Dict[str, Room]:
+    rooms: Dict[str, Room] = {}
+    for r in classroom_rows:
+        name = str(r.get("Room", "")).strip()
+        if not name:
+            continue
+        rooms[name] = Room(room=name, cap=parse_int(r.get("Cap"), 0) or 0,
+                           is_lab=_truthy(r.get("Lab")), is_physical=True,
+                           is_virtual=False)
+    rooms[cfg.online_room] = Room(room=cfg.online_room, cap=10_000, is_lab=False,
+                                  is_physical=False, is_virtual=True)
+    return rooms

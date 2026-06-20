@@ -367,11 +367,14 @@ Both solvers share the same candidate generation and constraints.
 
 **(b) Repair — `repair.solve_repair` (`--repair`, production).**
 
-1. **Greedy construction** — place each block in its first feasible candidate (order:
-   fewest candidates first, ties by larger sections). When the overload penalty is enabled,
-   this pass is **overload-aware**: a first sweep prefers a candidate that keeps every
-   eligible instructor within the daily cap $C$, falling back to any feasible candidate
-   (the cap is soft). This *placement shaping* is the main lever for reducing overload.
+1. **Greedy construction (soft-shaping)** — place each block in its **lowest soft-score**
+   feasible candidate (ties broken by candidate order = best-fit room). The unified score is
+   `w_evening·evening_hours + w_cohort_conflict·new_cohort_conflicts + w_instr_overload·overload_added`.
+   Evening + cohort-conflict are **on by default** (`soft_shaping_in_repair=True`,
+   `--no-soft-shaping` to disable); overload is opt-in via its own weight. This construction
+   shaping is the main lever for soft quality — far more effective than post-hoc polish, which
+   has little maneuvering room. `new_cohort_conflicts` is myopic (sees only already-placed
+   blocks), so the reduction is partial but cheap and placement-safe.
 2. **Warm-started small-neighbourhood repair** — repeatedly free a small batch of unplaced
    blocks plus their competitors and re-solve that neighbourhood with CP-SAT (soft H1,
    warm-started from the current placement); frozen blocks stay as reservations. Loop until
@@ -399,6 +402,20 @@ The penalty is **opt-in** (`w_instr_daily_overload=0` by default), so the defaul
 is the baseline. Enabling it trades roughly **1 % placement** for a large drop in eligible
 instructors teaching more than the cap. Exempt (high-load) instructors are unchanged by
 design — the worst single day stays at 9 h.
+
+**Measured effect of soft-shaping** (period 001, evening + cohort-conflict, **on by default**,
+two `--no-soft-shaping` baselines for the noise band):
+
+| metric | baseline (off) | shaping on |
+|---|---|---|
+| placed assignments | 1581–1584 | 1602 (no loss — slightly higher) |
+| evening ratio | ~19.4 % | 12.6 % (≈ −35 %) |
+| cohort-conflict (proxy) | ~540–575 | 384 (≈ −31 %) |
+
+Unlike the overload penalty, soft-shaping costs **no placement** (spreading cohorts and
+avoiding evenings also distributes load and improves packing). Both student-facing metrics
+drop by roughly a third versus the manual program's far worse 32.5 % evening / 139
+cohort-conflicts (and 0 hard violations vs the program's 83).
 
 ---
 

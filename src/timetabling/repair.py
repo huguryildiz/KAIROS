@@ -7,7 +7,7 @@ from time import perf_counter
 from ortools.sat.python import cp_model
 
 from .config import Config
-from .model import Section, Room, Instructor, Candidate, Assignment
+from .model import Section, Room, Instructor, Candidate, Assignment, overload_eligible_ids
 from .model_cpsat import gen_candidates, _instructors_of
 
 BIG = 10_000
@@ -28,6 +28,7 @@ class State:
         self.instr_slot = defaultdict(set)
         self.sect_slot = defaultdict(set)
         self.sect_theory_day = defaultdict(set)   # (section_id, day) -> {theory block_ids}
+        self.instr_day_hours = defaultdict(int)   # (iid, day) -> placed teaching hours
 
     def free_to_place(self, c, sid, iids):
         for hh in range(c.start, c.start + c.length):
@@ -52,6 +53,7 @@ class State:
             self.sect_theory_day[(s.section_id, c.day)].add(bid)
         for iid in iids:
             self.instr_blocks[iid].add(bid)
+            self.instr_day_hours[(iid, c.day)] += c.length
         for hh in range(c.start, c.start + c.length):
             if c.room not in self.virtual:
                 self.room_owner[(c.room, c.day, hh)] = bid
@@ -69,6 +71,7 @@ class State:
             self.sect_theory_day[(s.section_id, c.day)].discard(bid)
         for iid in iids:
             self.instr_blocks[iid].discard(bid)
+            self.instr_day_hours[(iid, c.day)] -= c.length
         for hh in range(c.start, c.start + c.length):
             if self.room_owner.get((c.room, c.day, hh)) == bid:
                 del self.room_owner[(c.room, c.day, hh)]
@@ -77,9 +80,31 @@ class State:
             self.sect_slot[(s.section_id, c.day, hh)].discard(bid)
 
 
-def greedy_construct(state: State, order: List[str], cand_by_block) -> None:
+def greedy_construct(state: State, order: List[str], cand_by_block,
+                     eligible=None, cap=0) -> None:
+    """Greedy first-feasible placement. When eligible/cap are given, a first pass prefers
+    placements that keep every eligible instructor within the daily-hours cap; this shaping
+    is what actually reduces overload (post-hoc polish has little maneuvering room). The cap
+    is soft, so a second pass falls back to any feasible placement."""
+    eligible = eligible or set()
+
+    def _keeps_cap(c, iids):
+        return all(state.instr_day_hours[(iid, c.day)] + c.length <= cap
+                   for iid in iids if iid in eligible)
+
     for bid in order:
         s = state.sec_of[bid]; iids = state.sec_instr.get(s.section_id, [])
+        if eligible and cap:
+            for c in cand_by_block[bid]:
+                if state.free_to_place(c, s.section_id, iids) and _keeps_cap(c, iids):
+                    state.occupy(bid, c)
+                    break
+            else:
+                for c in cand_by_block[bid]:
+                    if state.free_to_place(c, s.section_id, iids):
+                        state.occupy(bid, c)
+                        break
+            continue
         for c in cand_by_block[bid]:
             if state.free_to_place(c, s.section_id, iids):
                 state.occupy(bid, c)
@@ -92,6 +117,10 @@ MAX_FREE = 240
 # Repair needs maneuvering room: small neighborhoods place far better with a wide
 # best-fit room set. Measured: 12 rooms -> ~82% placed, 24 rooms -> ~95%.
 REPAIR_MAX_ROOMS = 24
+# polish phase (overload only): bounded re-optimization of already-placed blocks
+POLISH_SWEEPS = 4
+POLISH_TL = 6.0
+POLISH_BUDGET_S = 240.0
 
 
 def competitors(state: State, batch, cand_by_block) -> set:
@@ -111,19 +140,23 @@ def competitors(state: State, batch, cand_by_block) -> set:
     return comp - set(batch)
 
 
-def repair_round(state: State, batch, cand_by_block) -> int:
+def repair_round(state: State, batch, cand_by_block, cfg=None, eligible=None,
+                 tl=REPAIR_TL) -> int:
     comp = competitors(state, batch, cand_by_block)
     free = list(dict.fromkeys(list(batch) + list(comp)))[:MAX_FREE]
     free_set = set(free)
 
     reserved_room, reserved_instr = set(), set()
     frozen_theory_day = defaultdict(set)
+    frozen_instr_hours = defaultdict(int)   # (iid, day) -> frozen teaching hours
     for bid, c in state.placed.items():
         if bid in free_set:
             continue
         s = state.sec_of[bid]; iids = state.sec_instr.get(s.section_id, [])
         if "#L" not in bid:
             frozen_theory_day[s.section_id].add(c.day)
+        for iid in iids:
+            frozen_instr_hours[(iid, c.day)] += c.length
         for hh in range(c.start, c.start + c.length):
             if c.room not in state.virtual:
                 reserved_room.add((c.room, c.day, hh))
@@ -133,6 +166,7 @@ def repair_round(state: State, batch, cand_by_block) -> int:
     m = cp_model.CpModel()
     x = {}
     room_occ = defaultdict(list); instr_occ = defaultdict(list); sect_occ = defaultdict(list)
+    instr_day_load = defaultdict(list)   # (iid, day) -> per-hour free vars (sum = free hours)
     theory_day = defaultdict(list)
     unpl = {}
     cur = {}
@@ -159,6 +193,7 @@ def repair_round(state: State, batch, cand_by_block) -> int:
                     room_occ[(c.room, c.day, hh)].append(v)
                 for iid in iids:
                     instr_occ[(iid, c.day, hh)].append(v)
+                    instr_day_load[(iid, c.day)].append(v)
                 sect_occ[(s.section_id, c.day, hh)].append(v)
         m.AddExactlyOne(bvars + [u])
         if bid in state.placed:
@@ -170,7 +205,25 @@ def repair_round(state: State, batch, cand_by_block) -> int:
     for vs in theory_day.values():           # <=1 theory session per (section, day)
         if len(vs) > 1:
             m.Add(sum(vs) <= 1)
-    m.Minimize(BIG * sum(unpl.values()))
+
+    # soft: per-(instructor, day) overload — frozen hours are a constant, free blocks vary.
+    # Weighted well under BIG so it only breaks ties and never blocks a placement.
+    obj = BIG * sum(unpl.values())
+    if cfg is not None and cfg.w_instr_daily_overload and eligible:
+        cap = cfg.max_instr_daily_hours
+        keys = set(instr_day_load) | set(frozen_instr_hours)
+        for key in keys:
+            iid = key[0]
+            if iid not in eligible:
+                continue
+            const = frozen_instr_hours.get(key, 0)
+            vs = instr_day_load.get(key, [])
+            if const + len(vs) <= cap:
+                continue
+            over = m.NewIntVar(0, const + len(vs), f"iover|{key[0]}|{key[1]}")
+            m.Add(over >= sum(vs) + const - cap)
+            obj += cfg.w_instr_daily_overload * over
+    m.Minimize(obj)
 
     for bid in free:
         if bid in cur:
@@ -183,7 +236,7 @@ def repair_round(state: State, batch, cand_by_block) -> int:
             m.AddHint(unpl[bid], 1)
 
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = REPAIR_TL
+    solver.parameters.max_time_in_seconds = tl
     solver.parameters.num_search_workers = 8
     st = solver.Solve(m)
     if st not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
@@ -223,9 +276,11 @@ def solve_repair(sections, rooms, instructors, cfg):
     order = sorted((b.block_id for b, _ in blocks),
                    key=lambda bid: (len(cand_by_block[bid]), -sec_of[bid].students))
 
+    eligible = overload_eligible_ids(sections, cfg) if cfg.w_instr_daily_overload else set()
+
     state = State(sec_of, sec_instr, virtual_names)
     t0 = perf_counter()
-    greedy_construct(state, order, cand_by_block)
+    greedy_construct(state, order, cand_by_block, eligible, cfg.max_instr_daily_hours)
 
     sweep = 0
     while True:
@@ -239,9 +294,37 @@ def solve_repair(sections, rooms, instructors, cfg):
         for i in range(0, len(unplaced), BATCH):
             batch = [bid for bid in unplaced[i:i + BATCH] if bid not in state.placed]
             if batch:
+                # placement phase: pure placement (no overload steering) so the result
+                # matches the baseline; overload is handled additively in POLISH below.
                 gained += repair_round(state, batch, cand_by_block)
         if gained == 0 or sweep >= 25:
             break
+
+    # POLISH (overload only): once placement converges, re-optimize the days of
+    # overloaded eligible instructors. repair_round never lowers placement (its accept
+    # guard), so this strictly reduces overload-hours without costing any placement.
+    polish_rounds = 0
+    if cfg.w_instr_daily_overload and eligible:
+        cap = cfg.max_instr_daily_hours
+        t_polish = perf_counter()
+        prev = None
+        for _ in range(POLISH_SWEEPS):
+            bad = sorted({iid for (iid, day), h in state.instr_day_hours.items()
+                          if h > cap and iid in eligible})
+            if not bad or perf_counter() - t_polish > POLISH_BUDGET_S:
+                break
+            for iid in bad:
+                if perf_counter() - t_polish > POLISH_BUDGET_S:
+                    break
+                batch = list(state.instr_blocks.get(iid, set()))
+                if batch:
+                    repair_round(state, batch, cand_by_block, cfg, eligible, tl=POLISH_TL)
+                    polish_rounds += 1
+            cur = sum(max(0, h - cap) for (iid, day), h in state.instr_day_hours.items()
+                      if iid in eligible)
+            if prev is not None and cur >= prev:    # no further improvement
+                break
+            prev = cur
 
     assignments = []
     for bid, c in state.placed.items():
@@ -257,6 +340,7 @@ def solve_repair(sections, rooms, instructors, cfg):
         "unplaced": unplaced_ids,
         "wall_time": round(perf_counter() - t0, 1),
         "sweeps": sweep,
+        "polish_rounds": polish_rounds,
         "placed": len(state.placed),
         "total": total,
     }

@@ -76,3 +76,23 @@ class Assignment:
 class Violation:
     kind: str               # "instructor" | "cohort" | "room" | "capacity" | "lab" | "window" | "blackout" | "placement"
     detail: str
+
+
+def weekly_load_hours(sections) -> dict:
+    """Total weekly teaching hours per instructor id (team-taught counts fully per id)."""
+    load: dict = {}
+    for s in sections:
+        h = sum(b.length for b in s.blocks)
+        for iid in s.instructor_ids:
+            load[iid] = load.get(iid, 0) + h
+    return load
+
+
+def overload_eligible_ids(sections, cfg) -> set:
+    """Instructor ids the daily-overload penalty applies to. With overload_exempt_weekly
+    > 0, high-load instructors (e.g. Basic Sciences service courses) are exempt because a
+    4h/day target is infeasible for them and the penalty would only distort placement."""
+    cap = getattr(cfg, "overload_exempt_weekly", 0)
+    if not cap:
+        return {iid for s in sections for iid in s.instructor_ids}
+    return {iid for iid, h in weekly_load_hours(sections).items() if h <= cap}

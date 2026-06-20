@@ -3,10 +3,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 import pandas as pd
 import streamlit as st
 from timetabling.ui_grid import filter_assignments, distinct_values
-from timetabling.ui_style import BRAND_CSS, metric_cards_html, week_grid_html
+from timetabling.ui_style import BRAND_CSS, metric_cards_html, week_grid_html, logo_img_html
 
 st.set_page_config(page_title="Results · Course Timetabling", page_icon="📊", layout="wide")
 st.markdown(BRAND_CSS, unsafe_allow_html=True)
+st.sidebar.markdown(logo_img_html(), unsafe_allow_html=True)
 
 st.header("Results")
 res = st.session_state.get("result")

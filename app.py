@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 import streamlit as st
 from timetabling.defaults import DEFAULT_CLASSROOMS
-from timetabling.ui_style import BRAND_CSS
+from timetabling.ui_style import BRAND_CSS, logo_img_html
 
 st.set_page_config(page_title="Course Timetabling", page_icon="📅", layout="wide")
 st.markdown(BRAND_CSS, unsafe_allow_html=True)
@@ -16,10 +16,7 @@ st.session_state.setdefault("courses", [])
 st.session_state.setdefault("classrooms", [dict(r) for r in DEFAULT_CLASSROOMS])
 st.session_state.setdefault("result", None)
 
-logo = os.path.join(os.path.dirname(__file__), "assets", "logo.svg")
-if os.path.exists(logo):
-    with open(logo, encoding="utf-8") as f:
-        st.sidebar.markdown(f.read(), unsafe_allow_html=True)
+st.sidebar.markdown(logo_img_html(), unsafe_allow_html=True)
 
 st.markdown(
     """

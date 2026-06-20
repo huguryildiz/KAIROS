@@ -3,10 +3,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 import pandas as pd
 import streamlit as st
 from timetabling.defaults import DEFAULT_CLASSROOMS
-from timetabling.ui_style import BRAND_CSS
+from timetabling.ui_style import BRAND_CSS, logo_img_html
 
 st.set_page_config(page_title="Classrooms · Course Timetabling", page_icon="🏫", layout="wide")
 st.markdown(BRAND_CSS, unsafe_allow_html=True)
+st.sidebar.markdown(logo_img_html(), unsafe_allow_html=True)
 
 st.header("Classrooms")
 st.caption("Add, remove, or edit rooms. Lab is detected from room name (-L / -PC suffix) "

@@ -6,10 +6,11 @@ from timetabling.ui_input import (build_sections_from_courselist,
                                   build_instructors_from_courselist, build_rooms_from_ui)
 from timetabling.route import mark_virtual
 from timetabling.pipeline import run_pipeline
-from timetabling.ui_style import BRAND_CSS
+from timetabling.ui_style import BRAND_CSS, logo_img_html
 
 st.set_page_config(page_title="Solve · Course Timetabling", page_icon="▶", layout="wide")
 st.markdown(BRAND_CSS, unsafe_allow_html=True)
+st.sidebar.markdown(logo_img_html(), unsafe_allow_html=True)
 
 st.header("Solve")
 courses = st.session_state.get("courses", [])

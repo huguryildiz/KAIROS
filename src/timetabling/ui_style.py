@@ -6,10 +6,26 @@ surfaces with a subtle card shadow, Inter for text and Geist Mono for numerics.
 Kept import-light so the HTML builders stay unit-testable.
 """
 from __future__ import annotations
+import base64
+import os
 from html import escape
 from typing import List, Tuple
 
 from .ui_grid import build_week_grid, DAYS_ORDER
+
+_LOGO_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "logo.svg")
+
+
+def logo_img_html(width: int = 180, path: str = _LOGO_PATH) -> str:
+    """Sidebar logo as a base64 <img> — robust against Streamlit's markdown
+    sanitizer, which renders raw inline SVG (with comments) as literal text."""
+    try:
+        with open(path, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode("ascii")
+    except OSError:
+        return ""
+    return (f'<img src="data:image/svg+xml;base64,{b64}" width="{width}" '
+            f'style="margin:6px 0 12px" alt="Course Timetabling">')
 
 # Department block palette — calm, professional hues that read on white as
 # light-tint chips with a solid color bar (consistent with the navy theme).

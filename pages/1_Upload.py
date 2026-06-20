@@ -3,10 +3,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 import pandas as pd
 import streamlit as st
 from timetabling.ui_input import validate_courselist
-from timetabling.ui_style import BRAND_CSS
+from timetabling.ui_style import BRAND_CSS, logo_img_html
 
 st.set_page_config(page_title="Upload · Course Timetabling", page_icon="📤", layout="wide")
 st.markdown(BRAND_CSS, unsafe_allow_html=True)
+st.sidebar.markdown(logo_img_html(), unsafe_allow_html=True)
 
 st.header("Upload courses")
 st.caption("One row per section. Columns: Course Code, Course Name, Section No, T, P, L, "

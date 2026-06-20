@@ -9,12 +9,10 @@ from .join import build_section_frame
 from .derive import build_sections
 from .clean import build_rooms, build_instructors
 from .route import mark_virtual, mark_lab_rooms
-from .model_cpsat import build_and_solve as _cpsat_solve, split_roomable
-from .decompose import solve_decomposed
-from .repair import solve_repair
-from .validate import validate
+from .model_cpsat import split_roomable
+from .pipeline import run_pipeline
 from .report import data_quality_report, parse_existing, mode_b_benchmark
-from .export import build_schedule_dict, write_schedule_json, write_csv
+from .export import write_schedule_json, write_csv
 
 
 def _apply_scope(frame, scope: str):
@@ -93,13 +91,9 @@ def main():
     modes = set(m.strip().upper() for m in args.mode.split(","))
     assignments, stats = [], {}
     if "A" in modes:
-        if args.repair:
-            assignments, stats = solve_repair(sections, rooms, instructors, cfg)
-        elif args.decompose:
-            assignments, stats = solve_decomposed(sections, room_list, instructors, cfg)
-        else:
-            assignments, stats = _cpsat_solve(sections, room_list, instructors, cfg)
-        viol = validate(assignments, sections, rooms, instructors, cfg)
+        solver = "repair" if args.repair else "decompose" if args.decompose else "cpsat"
+        res = run_pipeline(args.period, all_sections, rooms, instructors, cfg, solver=solver)
+        assignments, stats, viol = res.assignments, res.stats, res.violations
         if "placed" in stats:
             print(f"[mode-A] repair placed={stats['placed']}/{stats['total']} "
                   f"({stats['placed']/stats['total']:.1%}) unplaced={len(stats['unplaced'])} "
@@ -112,11 +106,8 @@ def main():
         else:
             print(f"[mode-A] decomposed groups={stats['n_groups']} "
                   f"assignments={stats['n_assignments']} violations={len(viol)}")
-        payload = build_schedule_dict(
-            args.period, assignments, sections, rooms, instructors,
-            conflicts=[{"kind": v.kind, "detail": v.detail} for v in viol])
-        write_schedule_json(os.path.join(args.out, f"schedule_{args.period}.json"), payload)
-        write_csv(os.path.join(args.out, f"schedule_{args.period}.csv"), payload)
+        write_schedule_json(os.path.join(args.out, f"schedule_{args.period}.json"), res.schedule)
+        write_csv(os.path.join(args.out, f"schedule_{args.period}.csv"), res.schedule)
         if viol:
             print("  !! HARD violations:", [f"{v.kind}:{v.detail}" for v in viol[:10]])
         else:

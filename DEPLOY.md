@@ -76,3 +76,25 @@ downtime. IAM bindings persist across deploys.
 - **Cost:** scale-to-zero + 1–2 users ≈ a few cents per active hour, $0 when idle.
 - **Bumping the solve time limit > 600 s:** also raise the Solve-page slider max and
   keep `--timeout` ≥ that value.
+
+## Troubleshooting
+
+- **Solve button "does nothing" on cloud (even with small/sample data):** the
+  container ran out of memory. The app idles ~400 MiB (streamlit + pandas + ortools);
+  a CP-SAT solve allocates past a **512 MiB** limit and Cloud Run **OOM-kills** the
+  container (SIGKILL — uncatchable in Python, so the click silently produces nothing
+  while lighter interactions keep working). **Solve needs `--memory` ≥ 4 GiB.** Fix the
+  service the domain actually serves:
+  ```bash
+  gcloud run services update timetabling --region <REGION> \
+    --memory 4Gi --cpu 4 --timeout 3600 --cpu-boost
+  ```
+- **Use the region the custom domain points to.** `schedule.huguryildiz.com` is
+  domain-mapped to the **`europe-west1`** service (confirm with
+  `gcloud beta run domain-mappings list --region <REGION>`). Apply resource changes
+  there — not to a same-named service in another region.
+- **GitHub / Cloud Build continuous deploy can reset resources.** A trigger that runs
+  `gcloud run deploy` without `--memory/--cpu/--timeout` may recreate the service at the
+  **512 MiB / 1 vCPU / 300 s defaults** → solve OOMs again. `gcloud run deploy` normally
+  *preserves* unspecified settings on an existing service, but if a deploy reverts them,
+  re-apply the command above or bake the flags into the trigger / `cloudbuild.yaml`.

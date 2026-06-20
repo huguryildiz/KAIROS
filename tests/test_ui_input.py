@@ -57,3 +57,31 @@ def test_build_rooms_adds_online_virtual():
     rooms = build_rooms_from_ui([{"Room": "A301", "Cap": "60", "Lab": ""}], Config())
     assert rooms["A301"].cap == 60 and rooms["A301"].is_lab is False
     assert rooms["Online"].is_virtual is True
+
+
+from timetabling.ui_input import validate_courselist
+from timetabling.route import mark_virtual
+from timetabling.pipeline import run_pipeline
+
+
+def test_validate_courselist_flags_problems():
+    warns = validate_courselist(_ROWS)
+    assert any("email" in w.lower() for w in warns)
+
+
+def test_validate_courselist_missing_column():
+    warns = validate_courselist([{"Course Code": "X 101"}])
+    assert any("column" in w.lower() for w in warns)
+
+
+def test_ui_inputs_feed_run_pipeline():
+    cfg = Config(solve_time_limit_s=10.0)
+    secs, _ = build_sections_from_courselist(_ROWS, "001", cfg)
+    instr = build_instructors_from_courselist(_ROWS)
+    rooms = build_rooms_from_ui(
+        [{"Room": "A301", "Cap": "100", "Lab": ""},
+         {"Room": "LAB1", "Cap": "40", "Lab": "x"}], cfg)
+    mark_virtual(secs, rooms, cfg)
+    res = run_pipeline("001", secs, rooms, instr, cfg, solver="cpsat")
+    assert res.violations == []
+    assert len(res.assignments) >= 2   # at least the two sections' blocks placed

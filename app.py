@@ -5,23 +5,37 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 import streamlit as st
+from timetabling.defaults import DEFAULT_CLASSROOMS
+from timetabling.ui_style import BRAND_CSS
 
 st.set_page_config(page_title="Course Timetabling", page_icon="📅", layout="wide")
+st.markdown(BRAND_CSS, unsafe_allow_html=True)
 
 # default session state
 st.session_state.setdefault("courses", [])
-st.session_state.setdefault("classrooms", [
-    {"Room": "A301", "Cap": "60", "Lab": ""},
-    {"Room": "A317", "Cap": "30", "Lab": "x"},
-])
+st.session_state.setdefault("classrooms", [dict(r) for r in DEFAULT_CLASSROOMS])
 st.session_state.setdefault("result", None)
 
 logo = os.path.join(os.path.dirname(__file__), "assets", "logo.svg")
 if os.path.exists(logo):
     with open(logo, encoding="utf-8") as f:
         st.sidebar.markdown(f.read(), unsafe_allow_html=True)
-st.sidebar.markdown("**Course Timetabling**")
 
-st.title("Course Timetabling")
-st.write("Use the sidebar: **Upload courses → Classrooms → Solve → Results**.")
-st.info("Upload a course-list CSV to begin.")
+st.markdown(
+    """
+    <div class="tt-hero">
+      <div class="eyebrow">University course timetabling</div>
+      <h1>Every section, placed on a <em>conflict-free</em> weekly grid.</h1>
+      <p>Upload your course list, set your rooms, and let the CP-SAT solver assign a
+         day, time, and room to each section — no double-booked rooms, instructors, or labs.</p>
+      <div class="tt-steps">
+        <span class="tt-step"><b>1</b>Upload courses</span>
+        <span class="tt-step"><b>2</b>Classrooms</span>
+        <span class="tt-step"><b>3</b>Solve</span>
+        <span class="tt-step"><b>4</b>Results</span>
+      </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+st.caption("Start from the sidebar → **Upload courses**.")

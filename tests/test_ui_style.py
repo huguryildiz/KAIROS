@@ -1,5 +1,6 @@
 from timetabling.ui_style import (block_color, dept_color, metric_cards_html,
-                                   week_grid_html)
+                                   week_grid_html, brand_css, hero_html,
+                                   appbar_html, stepper_html, kpi_chips_html)
 
 _SCHED = {"assignments": [
     {"section_id": "A_01", "course_code": "A 101", "room": "R1", "day": "Mo",
@@ -48,3 +49,36 @@ def test_week_grid_cell_stacks_section_lecturer_room():
 def test_metric_cards_html():
     html = metric_cards_html([("Placed", "100%", "good")])
     assert "Placed" in html and "100%" in html and "tt-card good" in html
+
+
+def test_brand_css_light_vs_dark_tokens():
+    light, dark = brand_css("light"), brand_css("dark")
+    assert "#F4F6FA" in light and "#0E1220" not in light      # light canvas only
+    assert "#0E1220" in dark                                   # dark canvas present
+    assert ".tt-blk" in light and ".tt-blk" in dark            # component CSS in both
+    assert 'data-testid="stHeader"' in light                   # hides native chrome
+    assert brand_css() == light                                # default is light
+
+
+def test_stepper_marks_status_classes():
+    steps = [{"key": "upload", "label": "Yükle", "status": "done"},
+             {"key": "solve", "label": "Çöz", "status": "locked"},
+             {"key": "results", "label": "Sonuçlar", "status": "active"}]
+    html = stepper_html(steps, "tr")
+    assert "step done" in html and "step locked" in html and "step active" in html
+    assert 'href="#s-upload"' in html
+    assert "Yükle" in html and "Sonuçlar" in html
+
+
+def test_kpi_chips_render_label_value_tone():
+    html = kpi_chips_html([("Şube", "793", ""), ("Çakışma", "0", "good")])
+    assert "793" in html and "Şube" in html and "kpi good" in html
+
+
+def test_appbar_live_flag_and_context():
+    assert "context-pill live" in appbar_html("tr", "793 şube", live=True)
+    assert "Veri" in appbar_html("tr", "Veri bekleniyor", live=False)
+
+
+def test_hero_html_localized():
+    assert "tt-hero" in hero_html("tr") and "tt-hero" in hero_html("en")

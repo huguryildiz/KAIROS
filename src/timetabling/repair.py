@@ -86,35 +86,50 @@ class State:
                 del cnt[s.code]
 
 
+def _soft_score(state: State, c, s, cfg: Config, eligible, cap) -> int:
+    """Weighted soft penalty for placing candidate c. Lower is better. evening + cohort
+    are gated by cfg.soft_shaping_in_repair; overload by its own weight (opt-in)."""
+    score = 0
+    if cfg.soft_shaping_in_repair:
+        score += cfg.w_evening * sum(1 for h in range(c.start, c.start + c.length)
+                                     if h >= cfg.evening_from_hour)
+        for h in range(c.start, c.start + c.length):
+            slot = state.cohort_slot_courses.get((s.cohort_key, c.day, h))
+            if slot and any(cc != s.code for cc in slot):
+                score += cfg.w_cohort_conflict
+    if cfg.w_instr_daily_overload and eligible:
+        for iid in s.instructor_ids:
+            if iid in eligible:
+                score += cfg.w_instr_daily_overload * max(
+                    0, state.instr_day_hours[(iid, c.day)] + c.length - cap)
+    return score
+
+
 def greedy_construct(state: State, order: List[str], cand_by_block,
-                     eligible=None, cap=0) -> None:
-    """Greedy first-feasible placement. When eligible/cap are given, a first pass prefers
-    placements that keep every eligible instructor within the daily-hours cap; this shaping
-    is what actually reduces overload (post-hoc polish has little maneuvering room). The cap
-    is soft, so a second pass falls back to any feasible placement."""
+                     cfg: Config = None, eligible=None, cap=0) -> None:
+    """Greedy construction. With cfg shaping enabled, place each block in its lowest
+    soft-score feasible candidate (ties broken by candidate order = best-fit room);
+    otherwise first-feasible. Shaping is on when soft_shaping_in_repair is set, or when
+    the overload penalty is enabled (its own weight + an eligible set)."""
     eligible = eligible or set()
-
-    def _keeps_cap(c, iids):
-        return all(state.instr_day_hours[(iid, c.day)] + c.length <= cap
-                   for iid in iids if iid in eligible)
-
+    shaping = cfg is not None and (cfg.soft_shaping_in_repair
+                                   or (cfg.w_instr_daily_overload and eligible))
     for bid in order:
         s = state.sec_of[bid]; iids = state.sec_instr.get(s.section_id, [])
-        if eligible and cap:
+        if shaping:
+            best, best_score = None, None
             for c in cand_by_block[bid]:
-                if state.free_to_place(c, s.section_id, iids) and _keeps_cap(c, iids):
+                if state.free_to_place(c, s.section_id, iids):
+                    sc = _soft_score(state, c, s, cfg, eligible, cap)
+                    if best is None or sc < best_score:
+                        best, best_score = c, sc
+            if best is not None:
+                state.occupy(bid, best)
+        else:
+            for c in cand_by_block[bid]:
+                if state.free_to_place(c, s.section_id, iids):
                     state.occupy(bid, c)
                     break
-            else:
-                for c in cand_by_block[bid]:
-                    if state.free_to_place(c, s.section_id, iids):
-                        state.occupy(bid, c)
-                        break
-            continue
-        for c in cand_by_block[bid]:
-            if state.free_to_place(c, s.section_id, iids):
-                state.occupy(bid, c)
-                break
 
 
 BATCH = 30
@@ -286,7 +301,7 @@ def solve_repair(sections, rooms, instructors, cfg):
 
     state = State(sec_of, sec_instr, virtual_names)
     t0 = perf_counter()
-    greedy_construct(state, order, cand_by_block, eligible, cfg.max_instr_daily_hours)
+    greedy_construct(state, order, cand_by_block, cfg, eligible, cfg.max_instr_daily_hours)
 
     sweep = 0
     while True:

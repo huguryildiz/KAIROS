@@ -58,6 +58,9 @@ class Config:
     # overload penalty only to instructors whose total weekly teaching load is at most
     # this many hours. 0 = no exemption (penalize everyone).
     overload_exempt_weekly: int = 16
+    # apply evening + cohort-conflict soft shaping in the repair greedy construction
+    # (default on; --no-soft-shaping turns it off for baseline A/B runs)
+    soft_shaping_in_repair: bool = True
     evening_from_hour: int = 17   # an hour-slot >= this counts as "evening" for the soft penalty
 
     def days(self) -> list:

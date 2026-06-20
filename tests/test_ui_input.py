@@ -65,13 +65,17 @@ from timetabling.pipeline import run_pipeline
 
 
 def test_validate_courselist_flags_problems():
+    # now returns (code, kwargs) tuples for i18n rendering
     warns = validate_courselist(_ROWS)
-    assert any("email" in w.lower() for w in warns)
+    codes = [c for c, _ in warns]
+    assert "warn_blank_email" in codes
+    assert ("info_part_time", {"n": 1}) in warns
 
 
 def test_validate_courselist_missing_column():
     warns = validate_courselist([{"Course Code": "X 101"}])
-    assert any("column" in w.lower() for w in warns)
+    assert warns[0][0] == "warn_missing_cols"
+    assert "Section No" in warns[0][1]["cols"]
 
 
 def test_ui_inputs_feed_run_pipeline():

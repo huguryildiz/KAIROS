@@ -94,13 +94,14 @@ def build_rooms_from_ui(classroom_rows: List[Dict], cfg: Config) -> Dict[str, Ro
 _REQUIRED = ("Course Code", "Section No", "T", "P", "L", "Lecturer Email")
 
 
-def validate_courselist(rows: List[Dict]) -> List[str]:
-    warns: List[str] = []
+def validate_courselist(rows: List[Dict]) -> List[Tuple[str, Dict]]:
+    """Return (i18n_code, kwargs) warnings so the UI can render them per language."""
     if not rows:
-        return ["No rows found in the uploaded file."]
+        return [("warn_no_rows", {})]
     missing = [c for c in _REQUIRED if c not in rows[0]]
     if missing:
-        return [f"Missing required column(s): {', '.join(missing)}"]
+        return [("warn_missing_cols", {"cols": ", ".join(missing)})]
+    warns: List[Tuple[str, Dict]] = []
     zero_hours = sum(1 for r in rows
                      if (parse_int(r.get("T"), 0) + parse_int(r.get("P"), 0)
                          + parse_int(r.get("L"), 0)) == 0)
@@ -108,11 +109,10 @@ def validate_courselist(rows: List[Dict]) -> List[str]:
     bad_code = sum(1 for r in rows if cohort_from_code(r.get("Course Code", ""))[0] == "UNK")
     part_time = sum(1 for r in rows if is_part_time(r.get("Lecturer Name", "")))
     if zero_hours:
-        warns.append(f"{zero_hours} row(s) have T+P+L=0 (defaulted to a 3h theory block).")
+        warns.append(("warn_zero_hours", {"n": zero_hours}))
     if blank_email:
-        warns.append(f"{blank_email} row(s) have a blank lecturer email "
-                     f"(excluded from instructor no-overlap).")
+        warns.append(("warn_blank_email", {"n": blank_email}))
     if bad_code:
-        warns.append(f"{bad_code} row(s) have an unparseable course code (cohort = UNK).")
-    warns.append(f"{part_time} lecturer(s) detected as part-time via '(S)'.")
+        warns.append(("warn_bad_code", {"n": bad_code}))
+    warns.append(("info_part_time", {"n": part_time}))
     return warns

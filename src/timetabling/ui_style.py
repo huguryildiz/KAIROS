@@ -12,6 +12,7 @@ from html import escape
 from typing import List, Tuple
 
 from .ui_grid import build_week_grid, DAYS_ORDER
+from .i18n import DAY_LABELS, DEFAULT_LANG, t
 
 _LOGO_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "logo.svg")
 
@@ -33,8 +34,6 @@ _PALETTE = [
     "#2B3A8C", "#0F766E", "#B4490F", "#5671D7", "#6D5BD0",
     "#0E7490", "#B8860B", "#BE385E", "#2F855A", "#7C3AED",
 ]
-_DAY_LABEL = {"Mo": "Mon", "Tu": "Tue", "We": "Wed", "Th": "Thu", "Fr": "Fri",
-              "Sa": "Sat"}
 
 
 def dept_color(dept: str) -> str:
@@ -158,12 +157,14 @@ def _block_html(a: dict, is_start: bool, meta_field: str = "room") -> str:
 
 
 def week_grid_html(schedule: dict, hour_lo: int = 9, hour_hi: int = 21,
-                   meta_field: str = "room") -> str:
+                   meta_field: str = "room", lang: str = DEFAULT_LANG) -> str:
     grid = build_week_grid(schedule, hour_lo, hour_hi)
     if not schedule.get("assignments"):
-        return '<div class="tt-wrap"><div class="tt-empty">No sessions to show.</div></div>'
+        return (f'<div class="tt-wrap"><div class="tt-empty">'
+                f'{t("grid_empty", lang)}</div></div>')
+    days = DAY_LABELS.get(lang, DAY_LABELS[DEFAULT_LANG])
     head = '<th class="tt-time"></th>' + "".join(
-        f"<th>{_DAY_LABEL.get(d, d)}</th>" for d in DAYS_ORDER)
+        f"<th>{days.get(d, d)}</th>" for d in DAYS_ORDER)
     rows = []
     for h in range(hour_lo, hour_hi):
         cells = [f'<td class="tt-time">{h:02d}:00</td>']

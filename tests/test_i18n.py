@@ -24,3 +24,14 @@ def test_langs_and_parity():
     assert set(LANGS) == {"tr", "en"}
     # every TR key has an EN counterpart and vice versa
     assert set(STRINGS["tr"]) == set(STRINGS["en"])
+
+
+def test_new_ui_keys_bilingual():
+    keys = ["app_title", "appbar_waiting", "theme_toggle", "step_review",
+            "review_header", "upload_sample_btn", "kpi_sections", "kpi_rooms",
+            "hero_stat_sections"]
+    for k in keys:
+        for lang in LANGS:
+            assert t(k, lang) and t(k, lang) != k        # present, actually translated
+    assert "793" in t("appbar_loaded", "tr", n=793)
+    assert "793" in t("appbar_loaded", "en", n=793)

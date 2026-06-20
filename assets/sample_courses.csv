@@ -1,0 +1,19 @@
+Course Code,Course Name,Section No,T,P,L,Lecturer Name,Lecturer Email,~Students
+CMPE 241,Data Structures,01,3,0,2,A. Yilmaz,ayilmaz@uni.edu,42
+CMPE 241,Data Structures,02,3,0,2,A. Yilmaz,ayilmaz@uni.edu,38
+CMPE 332,Operating Systems,01,3,0,2,A. Yilmaz,ayilmaz@uni.edu,44
+CMPE 113,Intro to Programming,01,3,0,2,A. Yilmaz,ayilmaz@uni.edu,50
+PSY 212,Developmental Psychology,01,3,0,0,M. Demir,mdemir@uni.edu,60
+PSY 305,Cognitive Psychology,01,3,0,0,M. Demir,mdemir@uni.edu,48
+EE 302,Electronics II,01,2,0,2,K. Aslan,kaslan@uni.edu,35
+MATH 101,Calculus I,01,4,0,0,N. Sahin,nsahin@uni.edu,96
+MATH 101,Calculus I,02,4,0,0,N. Sahin,nsahin@uni.edu,90
+PHYS 101,Physics I,01,3,0,2,R. Acar,racar@uni.edu,80
+BUS 220,Marketing Principles,01,3,0,0,E. Celik (S),ecelik@uni.edu,120
+ARCH 171,Architectural Design Studio,01,0,8,0,L. Kaya,lkaya@uni.edu,18
+ENG 201,Technical English,01,3,0,0,J. Park (S),jpark@uni.edu,30
+HIST 111,History of Civilization,01,2,0,0,B. Koc,bkoc@uni.edu,70
+ECON 101,Microeconomics,01,3,0,0,S. Un,sun@uni.edu,85
+CHEM 101,General Chemistry,01,3,0,2,T. Yildiz,tyildiz@uni.edu,64
+BIO 150,Introduction to Biology,01,3,0,2,D. Ozkan,dozkan@uni.edu,55
+IE 240,Operations Research,01,3,0,0,F. Sezer,fsezer@uni.edu,40

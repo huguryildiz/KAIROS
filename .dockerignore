@@ -1,0 +1,18 @@
+# Keep the image small and PII-free.
+data/
+out/
+.git/
+.github/
+.claude/
+.superpowers/
+tests/
+docs/
+*.md
+.gitignore
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+.streamlit/secrets.toml

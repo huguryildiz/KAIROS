@@ -204,7 +204,22 @@ td.tt-time{color:var(--faint);font:500 .72rem/32px var(--mono);text-align:center
 .stButton>button:not([kind="primary"]):hover,.stDownloadButton>button:hover{border-color:var(--primary);color:var(--primary);box-shadow:var(--sh-1);}
 [data-testid="stFileUploaderDropzone"]{background:var(--surface-2);border:1.6px dashed var(--dz);border-radius:var(--r-lg);}
 [data-testid="stFileUploaderDropzone"]:hover{border-color:var(--primary);}
-[data-testid="stDataFrame"],[data-testid="stDataEditor"]{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;}
+[data-testid="stFileUploaderDropzone"] *{color:var(--ink);}
+/* Glide data grid (st.dataframe / st.data_editor) — themed via its own vars so
+   both light and dark follow our tokens. */
+[data-testid="stDataFrame"],[data-testid="stDataEditor"]{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;
+  --gdg-accent-color:var(--primary);--gdg-accent-light:var(--primary-50);
+  --gdg-bg-cell:var(--surface);--gdg-bg-cell-medium:var(--surface-2);
+  --gdg-bg-header:var(--surface-2);--gdg-bg-header-has-focus:var(--primary-50);
+  --gdg-bg-header-hovered:var(--surface-2);--gdg-bg-bubble:var(--surface);
+  --gdg-border-color:var(--border-2);--gdg-horizontal-border-color:var(--border-2);
+  --gdg-text-dark:var(--ink);--gdg-text-medium:var(--muted);--gdg-text-light:var(--faint);
+  --gdg-text-header:var(--muted);--gdg-font-family:var(--font);}
+/* Misc Streamlit chrome that should follow the theme */
+hr{border-color:var(--border) !important;}
+[data-testid="stWidgetLabel"] p,[data-testid="stCaptionContainer"],.stRadio label{color:var(--ink);}
+[data-baseweb="slider"] [role="slider"]{background:var(--primary) !important;}
+[data-testid="stAlert"]{border-radius:var(--r);}
 """
 
 

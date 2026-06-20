@@ -1,7 +1,9 @@
+# Native baseline = light (matches ui_style _LIGHT_TOKENS). Dark theme is driven
+# at runtime by ui_style.brand_css("dark") via the in-app ☀️/🌙 toggle.
 [theme]
 base = "light"
 primaryColor = "#2B3A8C"
-backgroundColor = "#F5F7FA"
+backgroundColor = "#F4F6FA"
 secondaryBackgroundColor = "#FFFFFF"
-textColor = "#161B26"
+textColor = "#131722"
 font = "sans serif"

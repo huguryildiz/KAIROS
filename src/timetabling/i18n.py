@@ -35,9 +35,11 @@ STRINGS = {
         "review_caption": "Çözmeden önce kapsamı doğrula. Uyarılar engelleyici değildir.",
         # sample data
         "upload_dropzone_title": "CSV dosyasını buraya bırakın",
+        "upload_dropzone_drag": "Bırakın, yükleyelim",
         "upload_dropzone_sub": "veya bilgisayarınızdan seçin · maks. 200 MB · yalnızca .csv",
         "upload_sample_btn": "+ Örnek veri seti ile dene",
         "upload_sample_caption": "Gerçek CSV gerekmez — **Örnek veri seti** ile tüm akışı şimdi deneyebilirsiniz.",
+        "upload_change_btn": "Farklı dosya yükle",
         # kpi labels
         "kpi_sections": "Şube",
         "kpi_courses": "Ders",
@@ -56,6 +58,10 @@ STRINGS = {
         "step_classrooms": "Derslikler",
         "step_solve": "Çöz",
         "step_results": "Sonuçlar",
+        "step_settings": "Ayarlar",
+        # settings step (School Settings)
+        "set_caption": "Okulunuzun politikalarını, hoca müsaitliğini ve tercih ağırlıklarını "
+                       "buradan ayarlayın. Dokunmazsanız varsayılanlar kullanılır.",
         "start_hint": "Kenar çubuğundan başla → **Ders yükle**.",
         # upload
         "upload_header": "Ders yükle",
@@ -65,7 +71,7 @@ STRINGS = {
         "upload_uploader": "Ders listesi (CSV)",
         "upload_loaded": "{n} satır yüklendi.",
         "upload_current": "Şu an {n} satır yüklü — değiştirmek için yeniden yükle.",
-        "upload_none": "Henüz dosya yok. Örnek: examples/courses_demo.csv.",
+        "upload_none": "Henüz dosya yok. Yukarıdan örnek veri seti ile deneyin.",
         "upload_format_label": "Her satır bir şube — beklenen sütunlar:",
         "upload_format_tpl": "T = haftalık teori saati · P = pratik / tartışma saati · L = laboratuvar saati",
         # validation warnings
@@ -165,9 +171,11 @@ STRINGS = {
         "review_header": "Uploaded data",
         "review_caption": "Review the scope before solving. Warnings are informational, not blocking.",
         "upload_dropzone_title": "Drop your CSV file here",
+        "upload_dropzone_drag": "Release to upload",
         "upload_dropzone_sub": "or browse from your computer · max 200 MB · CSV only",
         "upload_sample_btn": "+ Try with sample dataset",
         "upload_sample_caption": "No real CSV needed — try the **full flow** right now with sample data.",
+        "upload_change_btn": "Replace file",
         "kpi_sections": "Sections",
         "kpi_courses": "Courses",
         "kpi_depts": "Departments",
@@ -184,6 +192,10 @@ STRINGS = {
         "step_classrooms": "Classrooms",
         "step_solve": "Solve",
         "step_results": "Results",
+        "step_settings": "Settings",
+        # settings step (School Settings)
+        "set_caption": "Configure your school's policy, instructor availability, and "
+                       "preference weights here. Leave untouched to use the defaults.",
         "start_hint": "Start from the sidebar → **Upload courses**.",
         "upload_header": "Upload courses",
         "upload_caption": "One row per section. Columns: `Course Code, Course Name, Section No, "
@@ -192,7 +204,7 @@ STRINGS = {
         "upload_uploader": "Course list (CSV)",
         "upload_loaded": "Loaded {n} rows.",
         "upload_current": "{n} rows currently loaded — re-upload to replace.",
-        "upload_none": "No file yet. Try the sample at examples/courses_demo.csv.",
+        "upload_none": "No file yet. Use the sample dataset button above.",
         "upload_format_label": "One row per section — expected columns:",
         "upload_format_tpl": "T = weekly theory hours · P = practice / discussion hours · L = lab hours",
         "upload_error_title": "Could not read the file.",

@@ -8,12 +8,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 import streamlit as st
 from timetabling.defaults import DEFAULT_CLASSROOMS
+from timetabling.settings import default_settings
 from timetabling.ui_style import (brand_css, appbar_html, stepper_html,
                                   hero_html, footer_html)
 from timetabling.ui_app import (get_lang, get_theme, theme_toggle,
                                 lang_selector_bar, hero_chips)
 from timetabling.i18n import t
-from views import upload, review, classrooms, solve, results
+from views import upload, review, classrooms, settings, solve, results
 
 _ICON = os.path.join(os.path.dirname(__file__), "assets", "icon.svg")
 st.set_page_config(page_title="Kairos | Course Timetabling", page_icon=_ICON, layout="wide")
@@ -24,6 +25,8 @@ st.session_state.setdefault("classrooms", [dict(r) for r in DEFAULT_CLASSROOMS])
 st.session_state.setdefault("result", None)
 st.session_state.setdefault("lang", "tr")
 st.session_state.setdefault("theme", "light")
+st.session_state.setdefault("settings", default_settings())
+st.session_state.setdefault("availability", {})
 
 st.markdown(brand_css(get_theme()), unsafe_allow_html=True)
 
@@ -92,6 +95,8 @@ with st.container(key="topbar"):
          "status": "done" if has_courses else "locked"},
         {"key": "classrooms", "label": t("step_classrooms", lang),
          "status": "done" if has_courses else "locked"},
+        {"key": "settings", "label": t("step_settings", lang),
+         "status": "active" if has_courses else "locked"},
         {"key": "solve", "label": t("step_solve", lang), "status": _solve_status()},
         {"key": "results", "label": t("step_results", lang),
          "status": "active" if has_result else "locked"},
@@ -117,6 +122,9 @@ if has_courses:
     st.divider()
     _anchor("classrooms")
     classrooms.render(lang)
+    st.divider()
+    _anchor("settings")
+    settings.render(lang)
     st.divider()
     _anchor("solve")
     solve.render(lang)

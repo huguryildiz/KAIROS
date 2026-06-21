@@ -1,4 +1,4 @@
-"""Step 5 — Results: metric cards, weekly grid (view/selection), downloads."""
+"""Step 6 — Results: metric cards, weekly grid (view/selection), downloads."""
 import json
 
 import pandas as pd
@@ -18,7 +18,7 @@ def render(lang: str) -> None:
     res = st.session_state.get("result")
     if res is None:
         return
-    st.markdown(eyebrow_html(5, t("step_results", lang), "results"),
+    st.markdown(eyebrow_html(6, t("step_results", lang), "results"),
                 unsafe_allow_html=True)
 
     sched = res.schedule

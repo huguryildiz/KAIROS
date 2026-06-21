@@ -56,31 +56,36 @@ def render(lang: str) -> None:
 
 
     st.write("")
-    c3, c4, _ = st.columns([1, 1, 2])
-    c3.download_button(t("res_dl_json", lang),
-                       json.dumps(sched, ensure_ascii=False, indent=2),
-                       file_name="schedule.json",
-                       key="dl_json")
-    c4.download_button(t("res_dl_csv", lang),
-                       pd.DataFrame(sched["assignments"]).to_csv(index=False),
-                       file_name="schedule.csv",
-                       key="dl_csv")
-
-    # PDF export — one weekly-grid PDF per selected entity (zipped if 2+).
+    # Downloads — JSON, CSV and PDF on one row. The button row is rendered into a
+    # container placed ABOVE the entity chips, but filled AFTER the multiselect so
+    # the PDF button reflects the current chip selection.
     dim_label = t(VIEW_KEY[view_field], lang)
+    btn_row = st.container()
     pdf_entities = st.multiselect(
         t("res_pdf_pick", lang, dim=dim_label),
         entities, default=[entity], format_func=fmt or str,
         key="pdf_entities")
-    if pdf_entities:
-        n = len(pdf_entities)
-        pdf_data, pdf_name, pdf_mime = build_pdf_bundle(
-            sched, view_field, pdf_entities, dim_label, lang)
-        label = t("res_dl_pdf", lang) + (f" ({n})" if n > 1 else "")
-        st.download_button(label, pdf_data, file_name=pdf_name,
-                           mime=pdf_mime, key="dl_pdf")
-    else:
-        st.caption(t("res_pdf_pick_empty", lang))
+    with btn_row:
+        c3, c4, c5 = st.columns(3)
+        c3.download_button(t("res_dl_json", lang),
+                           json.dumps(sched, ensure_ascii=False, indent=2),
+                           file_name="schedule.json",
+                           key="dl_json")
+        c4.download_button(t("res_dl_csv", lang),
+                           pd.DataFrame(sched["assignments"]).to_csv(index=False),
+                           file_name="schedule.csv",
+                           key="dl_csv")
+        if pdf_entities:
+            n = len(pdf_entities)
+            pdf_data, pdf_name, pdf_mime = build_pdf_bundle(
+                sched, view_field, pdf_entities, dim_label, lang)
+            label = t("res_dl_pdf", lang) + (f" ({n})" if n > 1 else "")
+            c5.download_button(label, pdf_data, file_name=pdf_name,
+                               mime=pdf_mime, key="dl_pdf")
+        else:
+            c5.download_button(t("res_dl_pdf", lang), b"",
+                               file_name="schedule.pdf", key="dl_pdf",
+                               disabled=True)
 
     if res.unschedulable:
         with st.expander(t("res_unsched_title", lang, n=len(res.unschedulable))):

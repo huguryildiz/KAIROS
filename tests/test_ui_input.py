@@ -266,7 +266,26 @@ def test_required_room_type_categorical():
     assert rt("studio").required_room_type == "studio"
     assert rt("computer pc lab").required_room_type == "pc"
     assert rt("").required_room_type == "" and rt("").requires_lab_room is False
-    assert rt("", L="2").requires_lab_room is True     # L>0 -> lab family
+    # L>0 alone is NOT a section-level lab-room demand (the lab *block* carries it);
+    # only an explicit Room Type sets requires_lab_room.
+    assert rt("", L="2").requires_lab_room is False
+    assert rt("pc").requires_lab_room is True
+
+
+def test_categorical_room_routing_pc_not_lab():
+    """A pc-typed section must land in a pc room, never a (wet) lab room."""
+    cfg = Config(solve_time_limit_s=10.0)
+    rows = [{"Course Code": "CS 101", "Section No": "01", "T": "2", "P": "0", "L": "0",
+             "Instructor Email": "a@x.edu", "Section Capacity": "20", "Room Type": "pc"}]
+    secs, _ = build_sections_from_courselist(rows, "001", cfg)
+    instr = build_instructors_from_courselist(rows)
+    rooms = build_rooms_from_ui([{"Room": "WET1", "Capacity": "50", "Type": "lab"},
+                                 {"Room": "PC1", "Capacity": "50", "Type": "pc"}], cfg)
+    mark_virtual(secs, rooms, cfg)
+    res = run_pipeline("001", secs, rooms, instr, cfg, solver="cpsat")
+    assert res.violations == []
+    a = next(x for x in res.assignments if x.section_id == "CS 101_01")
+    assert a.room == "PC1"            # pc demand -> pc room, not the lab room
 
 
 def test_build_rooms_categorical_type_and_back_compat():

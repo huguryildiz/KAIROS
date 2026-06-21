@@ -19,8 +19,15 @@ def feasible_rooms_for(block: Block, section: Section, rooms: List[Room],
         return [r for r in rooms if r.is_virtual][:1]
     if block.needs_lab and section.lab_room:
         return [r for r in rooms if r.room == section.lab_room]   # pinned lab room
-    if section.requires_lab_room:        # explicit Room Type = lab -> lab-flagged rooms only
-        fr = [r for r in rooms if r.is_physical and r.is_lab and r.cap >= section.students]
+    if section.requires_lab_room:        # explicit Room Type demand
+        rt = section.required_room_type
+        if rt in ("pc", "studio", "lab"):
+            # specific category -> only rooms of exactly that type (UI rooms carry it)
+            fr = [r for r in rooms if r.is_physical and r.type == rt
+                  and r.cap >= section.students]
+        else:
+            # generic lab-family demand -> is_lab keeps the CLI path working too
+            fr = [r for r in rooms if r.is_physical and r.is_lab and r.cap >= section.students]
     else:
         # non-lab block, or a lab held in a regular room (no designated lab room)
         fr = [r for r in rooms if r.is_physical and r.cap >= section.students]

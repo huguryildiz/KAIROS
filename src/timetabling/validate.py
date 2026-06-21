@@ -41,9 +41,13 @@ def validate(assignments: List[Assignment], sections: List[Section],
         if a.kind == "lab" and not is_virt and s.lab_room and a.room != s.lab_room:
             viol.append(Violation("lab_room",
                         f"{a.block_id} lab not in pinned {s.lab_room} (got {a.room})"))
-        if s.requires_lab_room and not is_virt and room is not None and not room.is_lab:
-            viol.append(Violation("room_type",
-                        f"{a.block_id} in {a.room} but section requires a lab room"))
+        if s.requires_lab_room and not is_virt and room is not None:
+            rt = s.required_room_type
+            ok = (room.type == rt) if rt in ("pc", "studio", "lab") else room.is_lab
+            if not ok:
+                viol.append(Violation("room_type",
+                            f"{a.block_id} in {a.room} ({room.type}) but section "
+                            f"requires {rt or 'a lab'} room"))
         if s.fixed_day and s.blocks and a.block_id == s.blocks[0].block_id \
                 and (a.day != s.fixed_day or a.start != s.fixed_start):
             viol.append(Violation("fixed",

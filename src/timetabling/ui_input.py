@@ -133,7 +133,7 @@ def build_sections_from_courselist(rows: List[Dict], period: str,
             blocks=blocks_from_tpl(sid, T, P, L, T + P + L,
                                    cfg.max_block_len, cfg.max_theory_session),
             plan_room="",
-            requires_lab_room=(bool(rtype) or L > 0),
+            requires_lab_room=(rtype in ("lab", "pc", "studio")),
             required_room_type=rtype,
             fixed_day=fixed_day, fixed_start=fixed_start,
         ))

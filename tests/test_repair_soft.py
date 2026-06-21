@@ -1,0 +1,28 @@
+from timetabling.config import Config
+from timetabling.model import Section, Block, Candidate
+from timetabling.repair import _cand_soft
+
+
+def _sec(sid, iid, level=1, faculty="F", code="X 101"):
+    s = Section(sid, "001", code, "x", level, code.split()[0], faculty,
+                f"{code.split()[0]}-{level}", [iid], 30, 2, 0, 0, 2, "")
+    s.blocks = [Block(f"{sid}#T", sid, "theory", 2, False)]
+    return s
+
+
+def test_cand_soft_counts_evening_hours():
+    cfg = Config()  # w_evening=10, evening_from_hour=17
+    s = _sec("A_01", "i1")
+    morning = Candidate("A_01#T", "R1", "Mo", 9, 2)   # 9-11, no evening
+    evening = Candidate("A_01#T", "R1", "Mo", 16, 2)  # 16-18, hour 17 is evening
+    assert _cand_soft(morning, s, cfg) == 0
+    assert _cand_soft(evening, s, cfg) == 10
+
+
+def test_cand_soft_penalizes_late_start_for_low_levels():
+    cfg = Config()  # w_order=1
+    s = _sec("A_01", "i1", level=2)
+    early = Candidate("A_01#T", "R1", "Mo", 9, 2)    # (4-2)*(9-9)=0
+    late = Candidate("A_01#T", "R1", "Mo", 14, 2)    # (4-2)*(14-9)=10
+    assert _cand_soft(early, s, cfg) == 0
+    assert _cand_soft(late, s, cfg) == 10

@@ -117,6 +117,20 @@ def _soft_score(state: State, c, s, cfg: Config, eligible, cap) -> int:
     return score
 
 
+def _cand_soft(c, s, cfg: Config) -> int:
+    """Per-candidate separable soft cost: evening + S-Order + S-EngLab. Independent of
+    other blocks, so it folds into a variable's objective coefficient. Mirrors the
+    per-variable coefficients in model_cpsat.build_and_solve."""
+    cost = cfg.w_evening * sum(1 for h in range(c.start, c.start + c.length)
+                               if h >= cfg.evening_from_hour)
+    if 2 <= s.level <= 4:
+        cost += cfg.w_order * (4 - s.level) * (c.start - cfg.horizon_start)
+    if (cfg.eng_faculty_match in s.faculty and "#L" in c.block_id
+            and c.day not in cfg.eng_lab_days):
+        cost += cfg.w_englab
+    return cost
+
+
 def greedy_construct(state: State, order: List[str], cand_by_block,
                      cfg: Config = None, eligible=None, cap=0) -> None:
     """Greedy construction. With cfg shaping enabled, place each block in its lowest

@@ -49,3 +49,4 @@ CLAUDE.md
 # Local Claude Code config — kept on disk, not tracked
 .claude/
 .superpowers/
+bench/_ctx/

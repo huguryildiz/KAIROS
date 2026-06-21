@@ -56,8 +56,8 @@ def render(lang: str) -> None:
             f'W.onbeforeunload=function(e){{e.preventDefault();e.returnValue="";}};'
             f'if(!t0)t0=Date.now();'
             f'var es=Math.round((Date.now()-t0)/1000),rm=Math.max(0,B-es);'
-            f'var sp=el.querySelector(".solve-eta");'
-            f'if(sp)sp.textContent="· "+f(es)+" {_lbl_elapsed} "+f(rm);'
+            f'var sp=D.querySelector(".solve-eta");'
+            f'if(sp)sp.textContent=f(es)+" {_lbl_elapsed} "+f(rm);'
             f'}}else{{W.onbeforeunload=null;t0=null;}}'
             f'setTimeout(tick,1000);}}'
             f'tick();'
@@ -82,8 +82,8 @@ def render(lang: str) -> None:
             f'<div class="solve-running">'
             f'<span class="solve-gear"></span>'
             f'{escape(t("solve_spinner", lang, n=len(secs)))}'
-            f'<span class="solve-eta"></span>'
-            f'</div>',
+            f'</div>'
+            f'<div class="solve-eta"></div>',
             unsafe_allow_html=True,
         )
         res = run_pipeline(_PERIOD, secs, rooms, instr, cfg, solver="auto")

@@ -105,8 +105,8 @@ def build_sections_from_courselist(rows: List[Dict], period: str,
         faculty = str(r.get("Dept", "")).strip()            # DEPT = faculty name
         if dept == "UNK" and faculty:                       # unparseable code -> DEPT fallback
             dept = faculty.upper()
-        yr = parse_int(r.get("Year"), 0)        # optional Year column overrides cohort year
-        eff_year = yr if yr > 0 else year
+        yr = parse_int(r.get("Year"), 0)        # optional Year column overrides cohort year (1-6 only)
+        eff_year = yr if 1 <= yr <= 6 else year
         cohort = f"{dept}-{eff_year}"
         T = parse_int(r.get("T"), 0); P = parse_int(r.get("P"), 0)
         L = parse_int(r.get("L"), 0)
@@ -174,9 +174,10 @@ def build_rooms_from_ui(classroom_rows: List[Dict], cfg: Config) -> Dict[str, Ro
         # Type column (categorical); legacy Lab boolean accepted as a fallback.
         rtype = normalize_room_type(r.get("Type") if r.get("Type") is not None
                                     else r.get("Lab"), name)
+        dept = str(r.get("Dept", "") or "").strip()
         rooms[name] = Room(room=name, cap=parse_int(cap_raw, 0) or 0,
                            is_lab=(rtype != "normal"), is_physical=True,
-                           is_virtual=False, type=rtype)
+                           is_virtual=False, type=rtype, dept=dept)
     rooms[cfg.online_room] = Room(room=cfg.online_room, cap=10_000, is_lab=False,
                                   is_physical=False, is_virtual=True, type="normal")
     return rooms

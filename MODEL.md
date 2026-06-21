@@ -85,6 +85,11 @@ Listed heaviest weight first; weights live in `config.py`.
 - **Instructor daily overload** (`w_instr_daily_overload=0`, opt-in) — penalize teaching-hours
   beyond 4 h/day per instructor; only for instructors with ≤16 h/week total. Off by default
   because a hard daily cap is infeasible (service-course instructors carry >20 h/week).
+- **Instructor weekly-days overload** (`w_instr_weekly_overload=0`, opt-in) — penalize each
+  distinct teaching day beyond a weekly cap (`max_instr_weekly_days=5`) per instructor (no
+  high-load exemption — it applies to every instructor). Off by default; the School-Settings
+  "instructor weekly-days cap" turns it on. Distinct from the day-compression term, which
+  minimizes days outright rather than penalizing only those beyond a cap.
 - **Non-adjacent split** (`w_nonadjacent=0`, disabled) — superseded by the hard theory
   different-day rule.
 
@@ -146,12 +151,13 @@ behavior. A downloadable "school profile" JSON persists a school's settings + av
 | $\ell_b$ | length of block $b$ (hours) | — | T/P/L |
 | $\mathrm{lvl}_s$ | course level of section $s$ ($1\dots4$) | — | course code |
 | $C$ | daily teaching-hours cap | $4$ | `max_instr_daily_hours` |
+| $C_w$ | weekly distinct-day cap | $5$ | `max_instr_weekly_days` |
 | $W$ | weekly-load exemption threshold | $16$ | `overload_exempt_weekly` |
 | — | undergrad end-of-day | 18:00 | `undergrad_end` |
+| — | graduate window | 18:00–21:00 | `grad_start`, `grad_end` |
 | — | evening threshold | 17:00 | `evening_from_hour` |
-| — | Friday blackout | 13–14 | `friday_blackout` |
-| — | seminar blackout (full-time only) | Th 14–16 | `seminar_blackout` |
-| — | AM/PM split for half-day availability | 13:00 | `midday_split_hour` |
+| — | blackout slots (universal / full-time-only) | none | `blackout` (School Settings) |
+| — | AM/PM boundary (legacy half-day availability) | 13:00 (fixed) | `midday_split_hour` |
 | — | per-instructor unavailable slots | — | `instr_unavailable` (School Settings) |
 
 ---
@@ -175,7 +181,8 @@ $(r,d,h)$ only when it already satisfies:
 - room capacity $\mathrm{cap}_r \ge n_s$ (the virtual `Online` room is exempt — unlimited);
 - lab-room pinning — a lab block only in the section's designated lab room;
 - undergrad window $h + \ell_b \le 18$;
-- Friday 13–14 and Thursday 14–16 (seminar, full-time only) blackouts;
+- configured blackout slots (`Config.blackout`; none by default — each is universal or
+  full-time-only, resolved per section via `cfg.closed_hours`);
 - per-instructor availability (`Config.instr_unavailable`) — a candidate is dropped if any of
   the section's instructors is marked unavailable over its span;
 - fixed-slot pin — a section's first block is restricted to its declared `(day, start)`;
@@ -349,6 +356,10 @@ $$
 
 - See §6.
 
+### 5.10 Instructor weekly-days overload — $w_{\text{wkover}}=0$ (opt-in)
+
+- See §6.1.
+
 ---
 
 ## 6. Instructor daily overload (soft, opt-in)
@@ -389,6 +400,25 @@ $$
 
 **CLI.** `--instr-overload-weight`, `--instr-daily-cap`, `--overload-exempt-weekly`.
 
+### 6.1 Weekly distinct-day overload (soft, opt-in)
+
+A parallel term penalizes each distinct teaching **day** beyond a weekly cap $C_w$
+(`max_instr_weekly_days` $=5$), per instructor:
+
+$$
+o^{\text{wk}}_i \;\ge\; \Big(\textstyle\sum_{d} \delta_{i,d}\Big) - C_w, \quad o^{\text{wk}}_i \ge 0,
+\qquad \mathrm{pen}_{\text{wkover}} = \sum_{i} o^{\text{wk}}_i
+$$
+
+- $\delta_{i,d}$ is the instructor-day indicator of §5.3, so $\sum_d \delta_{i,d}$ is the
+  instructor's distinct teaching days that week; only days **beyond** $C_w$ are charged.
+- Weight `w_instr_weekly_overload` $=0$ by default (opt-in); the School-Settings *instructor
+  weekly-days cap* (§9.1) turns it on (weight 8). Like §6 it is soft — a hard cap would be
+  infeasible for high-load instructors.
+- **No exemption set:** unlike the daily term it applies to **every** instructor (not just
+  $\mathcal{E}$). Realized in both solvers — `model_cpsat.build_and_solve` adds it to
+  `Minimize`; `repair._soft_score` charges it during greedy construction.
+
 ---
 
 ## 7. Solution methods
@@ -399,7 +429,7 @@ Both solvers share the same candidate generation and constraints.
 
 - Builds the full model above and calls CP-SAT once.
 - Used for **scoped** runs (a faculty/department, Mode A/B benchmarking).
-- A single *global* solve (~356 k variables) returns **UNKNOWN** — it does not scale to the
+- A single *global* solve (~367 k variables) returns **UNKNOWN** — it does not scale to the
   full period, which is why (b) exists.
 
 **(b) Repair — `repair.solve_repair` (`--repair`, production).**
@@ -465,11 +495,14 @@ flowchart TD
     I --> J([return gained])
 ```
 
-Full-period result (overload off): 001 ≈ 91.7 % placed, 002 ≈ 88.6 %, both at **0 hard
-conflicts**. A ~8–11 % tail (Architecture studios) remains.
+Full-period result on TED University's Fall/Spring sample course lists
+(`sample_courses_2025_0XX.csv`, production classroom inventory, Apple M1 Pro / native
+arm64): 001 ≈ 99.2 % placed, 002 = 100 %, both at **0 hard conflicts** — only a 14-block
+Fall tail (0.8 %) remains, Spring fully placed.
 
 **Measured effect of the overload penalty** (period 001, $w_{\text{overload}}=30$, two
-baselines for the noise band):
+baselines for the noise band — measured on the Grades-roster CLI path, 793 undergraduate
+sections):
 
 | metric | baseline | overload on |
 |---|---|---|
@@ -502,15 +535,17 @@ cohort-conflicts (and 0 hard violations vs the program's 83).
 
 `validate.py` re-derives every hard violation directly from the assignment list, importing
 no solver internals, so a model/encoding bug cannot pass silently. It checks: room,
-instructor, capacity, **lab_room**, window ($<$ 18:00), blackout, H_self, and **split_day**
-(theory different-day). Cohort conflict and instructor overload are **soft metrics**, not
+instructor, capacity, **lab_room**, **room_type** (categorical room demand), **fixed** (pinned
+first block), window ($<$ 18:00 undergrad), blackout, **instructor_unavailable** (per-instructor
+availability), H_self, and **split_day** (theory different-day). Cohort conflict and instructor
+overload (daily and weekly) are **soft metrics**, not
 `Violation`s — reported in `mode_b_<period>.json` / `unmet_soft`, never failing validation.
 
 ---
 
 ## 9. UI-adjustable parameters (School Settings)
 
-Everything in §§2–6 is a `Config` default tuned to our own institution. The UI's **Step 4 —
+Everything in §§2–6 is a `Config` default tuned to our own institution. The UI's **Step 2 —
 School Settings** (`views/settings.py`) lets another school override a curated subset *without
 touching code*: the step writes a plain **Settings** dict (plus an availability map) into
 session state, and `settings.build_config(settings, availability, solve_seconds)` maps it into
@@ -525,16 +560,18 @@ every bad field falls back to its default and the solve proceeds.
 |---|---|---|---|
 | Day start | 6–12 | `horizon_start` | earliest start hour (default 09:00) |
 | Day end | 13–21 | `undergrad_end` | undergrad end-of-day window (default 18:00) |
-| Midday split | 10–16 | `midday_split_hour` | AM/PM boundary for half-day availability (default 13:00) |
 | Max theory session | 1–6 | `max_theory_session` | longest single theory session before splitting (default 2 h) |
 | Max block length | 1–8 | `max_block_len` | longest lab block before splitting (default 4 h) |
-| Instructor daily cap | 0–12 | `max_instr_daily_hours` + `w_instr_daily_overload` | **0 = off** (cap 4 h, weight 0); **N>0** sets cap = N h and turns the soft overload term on (weight 5). See §6. |
+| Instructor daily cap | 0–12 | `max_instr_daily_hours` + `w_instr_daily_overload` | **0 = off** (cap 4 h, weight 0); **N>0** sets cap = N h and turns the soft daily-overload term on (weight 5). See §6. |
+| Instructor weekly-days cap | 0–6 | `max_instr_weekly_days` + `w_instr_weekly_overload` | **0 = off** (cap 5 days, weight 0); **N>0** sets the weekly distinct-day cap = N and turns the soft weekly-overload term on (weight 8). See §6.1. |
 | Saturday | checkbox | `saturday_enabled` | add Sa to the teaching week |
 | Graduate | checkbox | `include_grad` | enable the graduate window (blocks end by 21:00) |
 | Graduate earliest start | 6–20 | `grad_start` | earliest hour a graduate block may start (default 18:00; only shown/used when Graduate is on). Lower it to allow daytime graduate classes; guarded to `day_start ≤ grad_start < 21`, else reverts to 18. |
+| Lunch break | checkbox + 9–16 / 10–17 | `lunch_enabled`, `lunch_start`, `lunch_end` | when on, `[lunch_start, lunch_end)` is closed every active day as a **universal** blackout (default off; expanded into `Config.blackout` slots in `build_config`). |
 
-The day window is guarded (`day_start < midday < day_end ≤ 21`); out-of-order values silently
-revert to `9 / 13 / 18`.
+The day window is guarded (`0 ≤ day_start < day_end ≤ 21`); out-of-order values silently
+revert to `9 / 18`. The AM/PM boundary for legacy half-day availability is no longer a
+user-facing control — it is fixed at 13:00.
 
 ### 9.2 Preference weights (off / normal / strong presets)
 
@@ -552,25 +589,32 @@ keep the calibrated relative scale intact.
 
 ### 9.3 Blackouts (add/remove list)
 
-Each row is `[day, hour, staff_only]`. `staff_only = false` → a **universal** blackout
-(`friday_blackout`); `staff_only = true` → a **full-time-only** blackout (`seminar_blackout`).
-The defaults are `Fr 13` (universal) and `Th 14`, `Th 15` (staff). Both are enforced by
-candidate pruning (§3).
+Each row is `[day, hour, staff_only]` → a `Config.blackout` triple. `staff_only = false` → a
+**universal** blackout (closed for everyone); `staff_only = true` → a **full-time-only**
+blackout (closed only when a section has a full-time staff instructor — e.g. a faculty seminar).
+**Empty by default** (no blackout slots). The *lunch break* toggle (§9.1) adds its own universal
+slots over `[lunch_start, lunch_end)` for every active day. All are enforced by candidate
+pruning (§3).
 
 ### 9.4 Instructor availability (the "Availability" expander)
 
 Per-instructor (keyed by the **email-or-name identity** from the uploaded course list — email
-when present, else the normalized display name) **AM / PM half-days** marked
-unavailable become a frozenset of `(identity, day, hour)` closed slots
-(`availability_closed_slots`) → `Config.instr_unavailable`. A candidate is pruned if **any**
-co-instructor of the section is closed over the block's span (hard, §3). AM =
-`[day_start, midday_split)`, PM = `[midday_split, 21)`.
+when present, else the normalized display name) a **per-hour grid** (one checkbox per teaching
+hour over `[day_start, day_end)` on each active day) marks unavailable slots, stored as a
+frozenset of `(identity, day, hour)` closed slots (`availability_closed_slots`) →
+`Config.instr_unavailable`. A candidate is pruned if **any** co-instructor of the section is
+closed over the block's span (hard, §3). Legacy half-day codes (`AM = [day_start, 13)`,
+`PM = [13, 21)`) are still decoded on load so older saved data keeps working; the AM/PM boundary
+is fixed at 13:00.
 
-### 9.5 School profile (the "Profile" expander)
+### 9.5 School profile (the "Profile" expander) — *currently disabled in the UI*
 
-Download the current Settings + availability as `kairos_school_profile.json`, or upload one to
-restore it. `profile_from_json` merges only **known** keys onto `DEFAULT_SETTINGS`, so a partial
-or older file stays safe.
+The profile import/export (`profile_to_json` / `profile_from_json`, `views/settings._profile`)
+would download the current Settings + availability as `kairos_school_profile.json` and restore
+it from an upload (`profile_from_json` merges only **known** keys onto `DEFAULT_SETTINGS`, so a
+partial or older file stays safe). The render call is **commented out** for now — an out-of-spec
+JSON upload can crash the parser — so the expander is not shown; the pure functions remain for
+when the upload path validates the schema defensively.
 
 ### 9.6 Adjacent but *not* in the Settings step
 
@@ -606,8 +650,8 @@ subproblem of bounded size.
 
 | Symbol | Meaning | Typical (Fall / Spring) | Bounded by config? |
 |---|---|---|---|
-| $S$ | sections | 793 / 801 | input |
-| $B$ | blocks, $\Theta(S)$ ($\approx 2.2\,S$) | 1708 / 1788 | input |
+| $S$ | sections | 841 / 826 | input |
+| $B$ | blocks, $\Theta(S)$ ($\approx 2.1\,S$) | 1766 / 1814 | input |
 | $\lvert R\rvert$ | rooms (physical + `Online`) | few dozen | input |
 | $\lvert I\rvert$ | instructors | hundreds | input |
 | $K$ | cohorts $(\text{dept},\text{year})$ | ~100 | input |
@@ -628,11 +672,11 @@ in roster size.
 
 Candidate pruning makes the variable set **sparse**: a variable exists only for a legal
 $(r,d,h)$, never the full $B\times\lvert R\rvert\times\lvert D\rvert\times\lvert H\rvert$
-product (`gen_candidates`, model_cpsat.py:59; var creation, model_cpsat.py:133).
+product (`gen_candidates`, model_cpsat.py:63; var creation, model_cpsat.py:138).
 
 $$\lvert x\rvert \;=\; \sum_{b}\lvert\mathcal C(b)\rvert \;\le\; B\cdot P \;=\; O(B).$$
 
-Concretely the full-period monolith is **≈356 k variables** (§7a) — about $B\times 208$
+Concretely the full-period monolith is **≈367 k variables** (§7a) — about $B\times 208$
 effective, well below the $B\times P$ cap because pinned labs contribute one room and large
 sections fit few rooms.
 
@@ -641,12 +685,12 @@ linear:
 
 | Constraint (§4–§6) | # rows | # literals | Code |
 |---|---|---|---|
-| H1 placement | $B$ | $O(BP)$ | `AddExactlyOne`, model_cpsat.py:162 |
-| H2 room no-overlap | $\le\lvert R\rvert\lvert D\rvert\lvert H\rvert$ | $O(BP\ell)$ | model_cpsat.py:165 |
-| H3 instructor no-overlap | $\le\lvert I\rvert\lvert D\rvert\lvert H\rvert$ | $O(BP\ell\iota)$ | model_cpsat.py:165 |
-| H_self section no-overlap | $\le\lvert S\rvert\lvert D\rvert\lvert H\rvert$ | $O(BP\ell)$ | model_cpsat.py:165 |
-| H_day theory diff-day | $O(\lvert S\rvert\lvert D\rvert)$ | $O(B\lvert D\rvert)$ | model_cpsat.py:220 |
-| soft terms (all) | $O(K\lvert D\rvert\lvert H\rvert+\lvert I\rvert\lvert D\rvert+\lvert R\rvert)$ | $O(BP\ell)$ | model_cpsat.py:170-270 |
+| H1 placement | $B$ | $O(BP)$ | `AddExactlyOne`, model_cpsat.py:166 |
+| H2 room no-overlap | $\le\lvert R\rvert\lvert D\rvert\lvert H\rvert$ | $O(BP\ell)$ | model_cpsat.py:169 |
+| H3 instructor no-overlap | $\le\lvert I\rvert\lvert D\rvert\lvert H\rvert$ | $O(BP\ell\iota)$ | model_cpsat.py:169 |
+| H_self section no-overlap | $\le\lvert S\rvert\lvert D\rvert\lvert H\rvert$ | $O(BP\ell)$ | model_cpsat.py:169 |
+| H_day theory diff-day | $O(\lvert S\rvert\lvert D\rvert)$ | $O(B\lvert D\rvert)$ | model_cpsat.py:224 |
+| soft terms (all) | $O(K\lvert D\rvert\lvert H\rvert+\lvert I\rvert\lvert D\rvert+\lvert R\rvert)$ | $O(BP\ell)$ | model_cpsat.py:174-293 |
 
 **Total model size $=O(BP\ell\iota)=O(B)$** for fixed config. The $\ell\iota$ factors are the
 span expansion (a block occupies $\ell$ hours) and team teaching (each co-instructor enters
@@ -661,11 +705,11 @@ per-block rules (capacity, lab-room, window, blackout) add **no** rows at all.
 | Solve (CP-SAT) | **NP-hard**, capped by `solve_time_limit_s` | $\propto$ model size |
 
 - **Build** is dominated by `gen_candidates` ($O(P\ell\iota)$ per block — the blackout /
-  availability membership checks scan the $\ell$-hour span, model_cpsat.py:80-84) plus
-  populating the occupancy dictionaries ($O(\ell\iota)$ per variable, model_cpsat.py:146-161).
+  availability membership checks scan the $\ell$-hour span, model_cpsat.py:83-88) plus
+  populating the occupancy dictionaries ($O(\ell\iota)$ per variable, model_cpsat.py:150-165).
 - **Solve** is the NP-hard part. Without a limit the worst case is $2^{O(BP)}$; here it is
-  bounded by `CpSolver.max_time_in_seconds` over 8 workers (model_cpsat.py:275-277). The
-  **time is capped; the guarantee is not** — at ≈356 k variables CP-SAT cannot even certify
+  bounded by `CpSolver.max_time_in_seconds` over 8 workers (model_cpsat.py:296-297). The
+  **time is capped; the guarantee is not** — at ≈367 k variables CP-SAT cannot even certify
   feasibility within budget and returns **UNKNOWN** (§7a). That single fact is why the repair
   solver exists.
 - **Space** is the model ($\Theta(B)$) plus CP-SAT's internal state ($\propto$ model size with
@@ -679,34 +723,34 @@ neighbourhoods.
 
 | Phase | Time | Space | Code |
 |---|---|---|---|
-| Generate all candidates | $O(BP\ell\iota)$ | $O(BP)$ stored | repair.py:292-295 |
-| Sort blocks (fewest cands first) | $O(B\log B)$ | — | repair.py:297 |
-| Greedy construction | $O(BP\ell\iota)$ | $O(B\ell\iota)$ state | repair.py:108 |
-| Repair sweep loop | $\le 25\lceil B/30\rceil=O(B)$ rounds | $O(1)$ live model | repair.py:311-328 |
-| — each `repair_round` | build $O(FP\ell\iota)$; solve $\le$ 12 s | $O(1)$, $F\le 240$ | repair.py:164 |
-| Polish (overload, opt-in) | $\le 4$ sweeps, $\le$ `POLISH_BUDGET_S`=240 s | $O(1)$ | repair.py:333-356 |
+| Generate all candidates | $O(BP\ell\iota)$ | $O(BP)$ stored | repair.py:305-308 |
+| Sort blocks (fewest cands first) | $O(B\log B)$ | — | repair.py:310-311 |
+| Greedy construction | $O(BP\ell\iota)$ | $O(B\ell\iota)$ state | repair.py:120 |
+| Repair sweep loop | $\le 25\lceil B/30\rceil=O(B)$ rounds | $O(1)$ live model | repair.py:324-341 |
+| — each `repair_round` | build $O(FP\ell\iota)$; solve $\le$ 12 s | $O(1)$, $F\le 240$ | repair.py:177 |
+| Polish (overload, opt-in) | $\le 4$ sweeps, $\le$ `POLISH_BUDGET_S`=240 s | $O(1)$ | repair.py:346-369 |
 
 - **Greedy construction** checks each candidate with `free_to_place` ($O(\ell\iota)$) and, with
-  soft-shaping on, `_soft_score` ($O(\ell)$) — repair.py:34-105. Linear overall.
-- **The decisive property:** `BATCH = 30` and `MAX_FREE = 240` (repair.py:135-137) cap every
+  soft-shaping on, `_soft_score` ($O(\ell)$) — repair.py:35-117. Linear overall.
+- **The decisive property:** `BATCH = 30` and `MAX_FREE = 240` (repair.py:148-150) cap every
   CP-SAT call to a neighbourhood of **≤240 blocks regardless of $B$**. The live model each
   round is therefore $O(1)$ in the roster — its build time, memory, and per-solve cost do not
   grow with the school. Each round is bounded by `REPAIR_TL`=12 s over 8 workers
-  (repair.py:259-262). The sweep count is bounded (≤25, plus a `gained==0` early exit), so the
+  (repair.py:273-274). The sweep count is bounded (≤25, plus a `gained==0` early exit), so the
   total is $O(B)$ rounds, the whole loop hard-capped by the `repair_time_limit_s` deadline
-  (repair.py:311, 320).
+  (repair.py:320, 340).
 
 **Monolith vs repair, stated as complexity:** the monolith solves **one $\Theta(B)$
 NP-hard model** (UNKNOWN at full size); repair solves **many $O(1)$-sized NP-hard models**
 (each trivially small and time-boxed at 12 s). That is exactly why repair scales where the
-monolith does not. Measured to convergence well inside the deadline: **Fall ≈297 s / 91.7 %,
-Spring ≈628 s / 88.6 %, both 0 hard** (§7).
+monolith does not. Measured to convergence well inside the deadline (sample course lists,
+Apple M1 Pro / native arm64): **Fall ≈30 s / 99.2 %, Spring ≈53 s / 100 %, both 0 hard** (§7).
 
 ### 10.5 Space summary
 
 - **Monolith:** $O(BP\ell\iota)$ model + CP-SAT internals — the ≥4 GiB RAM floor.
 - **Repair:** $O(BP)$ for `cand_by_block` + $O(B\ell\iota)$ for the `State` occupancy dicts
-  (`room_owner` / `instr_slot` / `sect_slot` / `cohort_slot_courses`, repair.py:16-87), and a
+  (`room_owner` / `instr_slot` / `sect_slot` / `cohort_slot_courses`, repair.py:16-90), and a
   **bounded $O(1)$ live mini-model**. So repair's *peak solver memory is independent of $B$* —
   the second reason it is the production path.
 - **Block derivation** (`build_sections` / `blocks_from_tpl`, derive.py): $O(S)$ time, $O(B)$
@@ -723,7 +767,7 @@ Spring ≈628 s / 88.6 %, both 0 hard** (§7).
 | Variables | $O(BP)$, one model | $O(BP)$ stored, **$O(1)$ live** |
 | Search | one NP-hard $\Theta(B)$ model, $\le$ `solve_time_limit_s` | $O(B)$ NP-hard **$O(1)$** models, each $\le$12 s, all $\le$ `repair_time_limit_s` |
 | Peak solver RAM | $\propto B$ (≥4 GiB floor) | $\propto B$ stored + **$O(1)$ live** |
-| Full-period outcome | UNKNOWN (~356 k vars) | 91.7 % / 88.6 %, 0 hard |
+| Full-period outcome | UNKNOWN (~367 k vars) | 99.2 % / 100 %, 0 hard |
 
 **Bottom line:** deterministic work is **linear in the roster**; the **NP-hard search is
 confined** — to a *time* box in the monolith, and additionally to a *size* box ($O(1)$

@@ -26,6 +26,7 @@ def build_schedule_dict(period, assignments: List[Assignment], sections: List[Se
             "cohort": s.cohort_key if s else "",
             "dept": s.dept_code if s else "",
             "students": s.students if s else 0,
+            "section_p": s.P if s else 0,
             "day": a.day, "start": a.start, "end": a.end,
             "room": a.room,
             "room_cap": room.cap if room else None,

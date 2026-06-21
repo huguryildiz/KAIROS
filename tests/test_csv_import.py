@@ -193,9 +193,9 @@ def test_parse_classrooms_room_cap_header_type_from_name():
     p = parse_classrooms(raw)
     assert p["stats"] == {"valid": 3, "duplicate": 0, "error": 0, "total": 3}
     rooms = ok_rooms(p)
-    assert rooms[0] == {"Room": "A211-PC-L", "Capacity": "99", "Type": "pc"}   # -PC
-    assert rooms[1] == {"Room": "A316-L", "Capacity": "40", "Type": "lab"}     # -L
-    assert rooms[2] == {"Room": "A216", "Capacity": "25", "Type": "normal"}
+    assert rooms[0] == {"Room": "A211-PC-L", "Capacity": "99", "Type": "pc", "Dept": ""}   # -PC
+    assert rooms[1] == {"Room": "A316-L", "Capacity": "40", "Type": "lab", "Dept": ""}     # -L
+    assert rooms[2] == {"Room": "A216", "Capacity": "25", "Type": "normal", "Dept": ""}
 
 
 def test_parse_classrooms_explicit_type_column_wins():

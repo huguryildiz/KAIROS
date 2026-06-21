@@ -31,6 +31,12 @@ def feasible_rooms_for(block: Block, section: Section, rooms: List[Room],
     else:
         # non-lab block, or a lab held in a regular room (no designated lab room)
         fr = [r for r in rooms if r.is_physical and r.cap >= section.students]
+    # Dept ownership: if a room declares owner dept(s), restrict to sections
+    # whose faculty matches one of them. Empty dept = open to all.
+    if fr and section.faculty:
+        fr = [r for r in fr if not r.dept or section.faculty in {
+            d.strip() for d in r.dept.split(";") if d.strip()
+        }]
     fr.sort(key=lambda r: (r.cap, r.room))
     return fr[:cfg.max_rooms_per_block]
 
@@ -54,7 +60,8 @@ def split_roomable(sections, rooms, cfg, instructors=None):
             else:
                 issues.append([b.block_id, "block longer than daily time window"])
         if issues:
-            excluded.append({"section_id": s.section_id, "students": s.students, "issues": issues})
+            excluded.append({"section_id": s.section_id, "students": s.students,
+                             "n_blocks": len(s.blocks), "issues": issues})
         else:
             roomable.append(s)
     return roomable, excluded

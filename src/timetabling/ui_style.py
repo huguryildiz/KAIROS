@@ -14,7 +14,7 @@ from html import escape
 from typing import List, Tuple
 
 from .ui_grid import build_week_grid, DAYS_ORDER
-from .i18n import DAY_LABELS, DEFAULT_LANG, field_label, t
+from .i18n import DAY_LABELS, DAY_LABELS_FULL, DEFAULT_LANG, field_label, t
 
 _LOGO_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "logo.svg")
 _ICON_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "icon.svg")
@@ -345,7 +345,8 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
 .imp-cols .col .tag{margin-left:1px;font:700 .53rem/1 var(--mono);text-transform:uppercase;letter-spacing:.05em;color:var(--warn);background:var(--warn-bg);border:1px solid var(--warn-bd);border-radius:5px;padding:3px 5px;}
 .imp-stats{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
 .imp-badge{display:inline-flex;align-items:baseline;gap:5px;border-radius:8px;padding:5px 11px;font:600 .72rem/1 var(--font);border:1px solid var(--border);background:var(--surface-2);color:var(--ink-2);}
-.imp-badge .n{font:800 .9rem/1 var(--font);font-variant-numeric:tabular-nums;}
+.imp-badge .n{font:800 .9rem/1 var(--font);font-variant-numeric:tabular-nums;color:var(--ink);}
+.imp-badge.good .n{color:var(--good);}
 .imp-badge.good{background:var(--good-bg);border-color:var(--good-bd);color:var(--good);}
 .imp-badge.warn{background:var(--warn-bg);border-color:var(--warn-bd);color:var(--warn);}
 .imp-badge.bad{background:var(--error-bg);border-color:var(--error-bd);color:var(--error);}
@@ -1687,8 +1688,10 @@ def import_preview_html(report: dict, lang: str = DEFAULT_LANG) -> str:
     stats_html = import_stats_html(report.get("stats", {}), lang)
 
     head = (f'<th class="num">{t("import_col_row", lang)}</th>'
-            + "".join((f'<th class="num">{escape(c)}</th>' if c in _IMP_NUM
-                       else f'<th>{escape(c)}</th>') for c in _IMP_COLS)
+            + "".join((f'<th class="num">{escape(field_label(c, lang))}</th>'
+                       if c in _IMP_NUM
+                       else f'<th>{escape(field_label(c, lang))}</th>')
+                      for c in _IMP_COLS)
             + f'<th>{t("import_col_status", lang)}</th>')
     trs = []
     for r in rows:
@@ -1789,7 +1792,7 @@ def week_grid_html(schedule: dict, hour_lo: int = 9, hour_hi: int = 21,
     if not schedule.get("assignments"):
         return (f'<div class="tt-wrap"><div class="tt-empty">'
                 f'{t("grid_empty", lang)}</div></div>')
-    days = DAY_LABELS.get(lang, DAY_LABELS[DEFAULT_LANG])
+    days = DAY_LABELS_FULL.get(lang, DAY_LABELS_FULL[DEFAULT_LANG])
     head = '<th class="tt-time"></th>' + "".join(
         f"<th>{days.get(d, d)}</th>" for d in DAYS_ORDER)
     rows = []

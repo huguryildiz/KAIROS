@@ -11,6 +11,7 @@ class Room:
     is_physical: bool
     is_virtual: bool = False
     type: str = "normal"        # normal | lab | pc | studio (supply side)
+    dept: str = ""              # semicolon-separated owner dept names; "" = open to all
 
 
 @dataclass(frozen=True)

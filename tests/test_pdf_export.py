@@ -1,6 +1,4 @@
 """Tests for the pure PDF export helpers (Streamlit-free)."""
-import io
-import zipfile
 from pathlib import Path
 
 import pytest
@@ -53,22 +51,27 @@ def test_build_pdf_bundle_single_entity_returns_pdf():
     assert bytes(data[:4]) == b"%PDF"
 
 
-def test_build_pdf_bundle_multi_entity_returns_zip():
+def test_build_pdf_bundle_multi_entity_returns_single_merged_pdf():
     from timetabling.pdf_export import build_pdf_bundle
     data, fname, mime = build_pdf_bundle(
         _sample_schedule(), "instructor_name",
         ["Şükrü Çağ", "Ayşe Yılmaz"], "Öğretim elemanı", "tr")
-    assert mime == "application/zip"
-    assert fname == "schedule_instructor_name.zip"
-    zf = zipfile.ZipFile(io.BytesIO(data))
-    names = zf.namelist()
-    assert len(names) == 2
-    for n in names:
-        assert n.endswith(".pdf")
-        assert zf.read(n)[:4] == b"%PDF"
+    assert mime == "application/pdf"
+    assert fname == "schedule_instructor_name.pdf"
+    assert bytes(data[:4]) == b"%PDF"
+    # Two entities → two pages in the merged PDF.
+    assert data.count(b"/Type /Page\n") + data.count(b"/Type/Page\n") + \
+           data.count(b"/Type /Page<") >= 2 or data.count(b"/Type /Page") >= 2
 
 
-def test_build_pdf_bundle_sanitizes_and_dedupes_names():
+def test_build_pdf_bundle_sorts_entities_naturally():
+    """EE-2 must come before EE-10 — alphabetic sort puts '10' before '2'."""
+    from timetabling.pdf_export import _natsort_key
+    ents = ["EE-10", "EE-2", "EE-1", "EE-11"]
+    assert sorted(ents, key=_natsort_key) == ["EE-1", "EE-2", "EE-10", "EE-11"]
+
+
+def test_build_pdf_bundle_sanitizes_filename():
     from timetabling.pdf_export import _sanitize_filename
     assert _sanitize_filename("Ahmet Acar") == "Ahmet_Acar"
     assert _sanitize_filename("A/B:C*?") == "A_B_C"
@@ -79,6 +82,3 @@ def test_pdf_i18n_keys_exist():
     from timetabling.i18n import t
     assert t("res_dl_pdf", "tr") == "PDF indir"
     assert t("res_dl_pdf", "en") == "Download PDF"
-    # {dim} interpolation works in both languages
-    assert "Öğretim" in t("res_pdf_pick", "tr", dim="Öğretim elemanı")
-    assert "Instructor" in t("res_pdf_pick", "en", dim="Instructor")

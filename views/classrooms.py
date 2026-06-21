@@ -99,12 +99,12 @@ def render(lang: str) -> None:
                 st.rerun()
 
         # Format hint — always visible (mirrors upload step behaviour).
-        st.caption(t("cr_upload_hint", lang))
-        _cr = [t("tbl_room", lang), t("tbl_cap", lang), t("tbl_type", lang)]
+        st.caption(t("cr_format_label", lang))
+        _cr = [t("tbl_room", lang), t("tbl_cap", lang), t("tbl_type", lang), t("tbl_room_dept", lang)]
         st.markdown(
             data_table_html(
                 _cr,
-                [["A216", "25", "normal"], ["A211-PC-L", "99", "pc"]],
+                [["A216", "25", "normal", ""], ["A311-PC-L", "99", "pc", t("sample_cr_dept", lang)]],
                 max_height=160, numeric=(_cr[1],)),
             unsafe_allow_html=True)
 
@@ -115,18 +115,18 @@ def render(lang: str) -> None:
         report = st.session_state.get("cr_report")
         if report:
             st.markdown(detected_columns_html(report["detected_columns"], lang,
-                                              required=("Room",)),
+                                              required=("Room", "Capacity", "Type")),
                         unsafe_allow_html=True)
             st.markdown(import_stats_html(report["stats"], lang),
                         unsafe_allow_html=True)
         _cr = [t("tbl_room", lang), t("tbl_cap", lang), t("tbl_type", lang),
-               t("import_col_status", lang)]
+               t("tbl_room_dept", lang), t("import_col_status", lang)]
         st.markdown(
             data_table_html(
                 _cr,
                 [[r.get("Room", ""), r.get("Capacity", r.get("Cap", "")),
-                  r.get("Type", ""), "ok"] for r in rooms],
+                  r.get("Type", ""), r.get("Dept", ""), "ok"] for r in rooms],
                 max_height=300, numeric=(_cr[1],),
-                pill_cols=(_cr[3],),
+                pill_cols=(_cr[4],),
                 pill_labels={"ok": t("import_status_ok", lang)}),
             unsafe_allow_html=True)

@@ -1,15 +1,16 @@
 import os
 
-import pandas as pd
-
 from timetabling.config import Config
 from timetabling.ui_input import build_sections_from_courselist, validate_courselist
+from timetabling.csv_import import read_raw, parse_courselist, ok_rows
 
 CSV = os.path.join(os.path.dirname(__file__), "..", "assets", "sample_courses.csv")
 
 
 def _rows():
-    return pd.read_csv(CSV, dtype=str).fillna("").to_dict("records")
+    # Route through the alias importer, exactly as the upload flow does, so the
+    # raw-header sample (COURSE_CODE/LECTURER/…) maps to canonical column names.
+    return ok_rows(parse_courselist(read_raw(CSV)))
 
 
 def test_sample_csv_loads_and_builds_sections():

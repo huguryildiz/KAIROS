@@ -25,7 +25,7 @@ def hero_chips(lang: str):
     result = st.session_state.get("result")
 
     if result is not None:                                  # solved → real outcome
-        total = len(result.assignments) + sum(len(s.blocks) for s in result.unschedulable)
+        total = len(result.assignments) + sum(s.get("n_blocks", len(s.get("issues", []))) for s in result.unschedulable)
         placed = (len(result.assignments) / total * 100) if total else 0
         conflicts = len(result.violations)
         return [

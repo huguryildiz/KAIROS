@@ -11,11 +11,21 @@ from timetabling.ui_style import eyebrow_html
 from timetabling.i18n import t, DAY_LABELS, DAY_LABELS_FULL
 from timetabling.settings import profile_to_json, profile_from_json
 from timetabling.ui_input import normalize_name
-from timetabling.drum_picker_widget import time_drum
 
 _LEVELS = ("off", "normal", "strong")
 _MIDDAY = 13  # hardcoded AM/PM boundary; no longer a user-facing setting
 _WEIGHT_KNOBS = ("evening", "cohort_gap", "room_count", "instr_days")
+
+
+def _hour_select(col, label: str, lo: int, hi: int, cur, key: str, help: str = "") -> int:
+    """Native HH:00 selectbox over [lo, hi]. Returns the chosen hour as int.
+    (st.number_input rejects a ':00' literal in format=, so we list the hours.)"""
+    opts = [f"{h:02d}:00" for h in range(lo, hi + 1)]
+    cur_s = f"{int(cur):02d}:00"
+    raw = col.selectbox(label, opts,
+                        index=opts.index(cur_s) if cur_s in opts else 0,
+                        key=key, help=help or None)
+    return int(raw.split(":")[0])
 
 
 def _emails(courses) -> list:
@@ -29,8 +39,8 @@ def _emails(courses) -> list:
     return sorted(seen)
 
 
-def _email_labels(courses) -> tuple[list[str], dict[str, str]]:
-    """Return (display_labels, label→email map) for the instructor selectbox.
+def _email_labels(courses) -> tuple[list[str], dict[str, str], dict[str, str]]:
+    """Return (display_labels, label→email map, email→name map) for the instructor selectbox.
 
     Display format: "Name (email)" when a name is available, else just "email".
     Availability is keyed by email, so the map lets callers recover the email from
@@ -57,7 +67,7 @@ def _email_labels(courses) -> tuple[list[str], dict[str, str]]:
         label = f"{name} ({key})" if (name and name.lower() != key) else (name or key)
         labels.append(label)
         label_to_email[label] = key
-    return labels, label_to_email
+    return labels, label_to_email, id_to_name
 
 
 def _bump() -> None:
@@ -84,23 +94,19 @@ def render(lang: str) -> None:
 def _policy(lang: str, s: dict) -> None:
     with st.expander(t("set_policy_header", lang), expanded=True, icon=":material/tune:"):
         st.caption(t("set_policy_desc", lang))
+        # Cap the hour dropdowns to the stepper width; responsive (shrinks on
+        # narrow viewports, never overflows — see CLAUDE.md mobile-portrait rule).
+        st.markdown(
+            "<style>.st-key-set_day_start,.st-key-set_day_end{max-width:260px;}</style>",
+            unsafe_allow_html=True,
+        )
         c1, c2, c3 = st.columns(3)
-        _start_opts = [f"{h:02d}:00" for h in range(6, 13)]
-        _end_opts   = [f"{h:02d}:00" for h in range(13, 22)]
-        with c1:
-            raw = time_drum(
-                t("set_day_start", lang), _start_opts,
-                f"{int(s['day_start']):02d}:00", key="set_day_start",
-                help=t("set_day_start_help", lang),
-            )
-            s["day_start"] = int(raw.split(":")[0])
-        with c2:
-            raw = time_drum(
-                t("set_day_end", lang), _end_opts,
-                f"{int(s['day_end']):02d}:00", key="set_day_end",
-                help=t("set_day_end_help", lang),
-            )
-            s["day_end"] = int(raw.split(":")[0])
+        s["day_start"] = _hour_select(c1, t("set_day_start", lang), 6, 12,
+                                      s["day_start"], "set_day_start",
+                                      help=t("set_day_start_help", lang))
+        s["day_end"] = _hour_select(c2, t("set_day_end", lang), 13, 21,
+                                    s["day_end"], "set_day_end",
+                                    help=t("set_day_end_help", lang))
         s["max_theory_session"] = c3.number_input(t("set_max_theory", lang), min_value=1,
                                                   max_value=6, value=int(s["max_theory_session"]),
                                                   step=1, help=t("set_max_theory_help", lang),
@@ -122,22 +128,20 @@ def _policy(lang: str, s: dict) -> None:
                                       value=bool(s["include_grad"]), key="set_grad")
         if s["include_grad"]:
             _gc1, gc2 = st.columns(2)
-            s["grad_start"] = gc2.number_input(
-                t("set_grad_start", lang), min_value=6, max_value=20,
-                value=int(s.get("grad_start", 18)), step=1, format="%02d:00",
-                help=t("set_grad_start_help", lang), key="set_grad_start")
+            s["grad_start"] = _hour_select(
+                gc2, t("set_grad_start", lang), 6, 20,
+                s.get("grad_start", 18), "set_grad_start",
+                help=t("set_grad_start_help", lang))
 
         s["lunch_enabled"] = st.toggle(t("set_lunch", lang),
                                        value=bool(s.get("lunch_enabled", False)),
                                        help=t("set_lunch_help", lang), key="set_lunch")
         if s["lunch_enabled"]:
             lc1, lc2, _ = st.columns([1, 1, 2])
-            s["lunch_start"] = lc1.number_input(t("set_lunch_start", lang), min_value=9,
-                                                max_value=16, value=int(s.get("lunch_start", 12)),
-                                                step=1, format="%02d:00", key="set_lunch_start")
-            s["lunch_end"] = lc2.number_input(t("set_lunch_end", lang), min_value=10,
-                                              max_value=17, value=int(s.get("lunch_end", 13)),
-                                              step=1, format="%02d:00", key="set_lunch_end")
+            s["lunch_start"] = _hour_select(lc1, t("set_lunch_start", lang), 9, 16,
+                                            s.get("lunch_start", 12), "set_lunch_start")
+            s["lunch_end"] = _hour_select(lc2, t("set_lunch_end", lang), 10, 17,
+                                          s.get("lunch_end", 13), "set_lunch_end")
 
         st.divider()
         st.markdown(f"**{t('set_weights_header', lang)}**")
@@ -187,8 +191,7 @@ def _blackouts(lang: str, s: dict) -> None:
     dl_full = DAY_LABELS_FULL.get(lang, DAY_LABELS_FULL["en"])
     nd = a1.selectbox(t("set_blackout_day", lang), _work_days(s),
                       format_func=lambda d: dl_full.get(d, d), key=f"bl_day_{rev}")
-    nh = a2.number_input(t("set_blackout_hour", lang), min_value=6, max_value=21,
-                         value=12, step=1, format="%02d:00", key=f"bl_hour_{rev}")
+    nh = _hour_select(a2, t("set_blackout_hour", lang), 6, 21, 12, f"bl_hour_{rev}")
     nscope = a3.segmented_control(t("set_blackout_scope", lang), scope_opts,
                                   default=scope_opts[0], key=f"bl_scope_{rev}")
     if a4.button(t("set_blackout_add", lang), icon=":material/add:", key=f"bl_add_{rev}", type="primary"):
@@ -246,7 +249,7 @@ def _fmt_ranges(hours) -> list:
 
 def _availability(lang: str) -> None:
     with st.expander(t("set_avail_header", lang), icon=":material/event_available:"):
-        labels, label_to_email = _email_labels(st.session_state.get("courses", []))
+        labels, label_to_email, email_to_name = _email_labels(st.session_state.get("courses", []))
         if not labels:
             st.caption(t("set_avail_none_instr", lang))
             return
@@ -314,17 +317,34 @@ def _availability(lang: str) -> None:
         restricted = {k: v for k, v in avail.items() if v}
         if restricted:
             st.caption(t("set_avail_summary", lang, n=len(restricted)))
-            rows_html = []
-            for em, slots in restricted.items():
+            for i_em, (em, slots) in enumerate(restricted.items()):
                 em_days = _slots_to_hours(slots, day_start, day_end, _MIDDAY)
-                chips = "".join(
-                    f"<span class='av-chip'>{escape(dl.get(d, d))} {rng}</span>"
-                    for d in days if d in em_days
-                    for rng in _fmt_ranges(em_days[d])
-                )
-                rows_html.append(
-                    f"<div class='av-sum-row'><span class='av-sum-who'>{escape(em)}</span>{chips}</div>")
-            st.markdown(f"<div class='av-sum'>{''.join(rows_html)}</div>", unsafe_allow_html=True)
+                name = email_to_name.get(em, "")
+                display = f"{name} ({em})" if (name and name.lower() != em) else em
+                with st.container(key=f"av_row_{i_em}_{rev}"):
+                    st.markdown(f"<span class='av-sum-who'>{escape(display)}</span>",
+                                unsafe_allow_html=True)
+                    for d in days:
+                        if d not in em_days:
+                            continue
+                        hs = sorted(em_days[d])
+                        ri = 0
+                        while ri < len(hs):
+                            rj = ri
+                            while rj + 1 < len(hs) and hs[rj + 1] == hs[rj] + 1:
+                                rj += 1
+                            range_hours = set(hs[ri:rj + 1])
+                            chip_label = f"{dl.get(d, d)} {hs[ri]:02d}:00–{hs[rj] + 1:02d}:00"
+                            if st.button(chip_label, key=f"av_rm_{i_em}_{d}_{hs[ri]}_{rev}"):
+                                new_slots = [e for e in (avail.get(em) or [])
+                                             if not (e[0] == d and int(e[1]) in range_hours)]
+                                if new_slots:
+                                    avail[em] = new_slots
+                                else:
+                                    avail.pop(em, None)
+                                _bump()
+                                st.rerun()
+                            ri = rj + 1
 
 
 def _profile(lang: str) -> None:

@@ -98,6 +98,7 @@ def render(lang: str) -> None:
         _h = {k: t(k, lang) for k in (
             "tbl_course_code", "tbl_course_name", "tbl_dept", "tbl_section_no",
             "tbl_lecturer_name", "tbl_lecturer_email", "tbl_capacity", "tbl_room_type",
+            "sample_course_name_1", "sample_dept_1", "sample_course_name_2", "sample_dept_2",
         )}
         st.markdown(
             '<div style="display:flex;justify-content:center">'
@@ -113,13 +114,13 @@ def render(lang: str) -> None:
             f'<th class="num">{_h["tbl_capacity"]}</th>'
             f'<th>{_h["tbl_room_type"]}</th>'
             '</tr></thead><tbody>'
-            '<tr><td>CMPE 113</td><td>Intro to Programming</td>'
-            '<td>Faculty of Engineering</td><td>CMPE 113_01</td>'
+            f'<tr><td>CMPE 113</td><td>{_h["sample_course_name_1"]}</td>'
+            f'<td>{_h["sample_dept_1"]}</td><td>CMPE 113_01</td>'
             '<td>Ahmet Yılmaz</td><td>ayilmaz@uni.edu</td>'
             '<td class="num">3</td><td class="num">0</td><td class="num">2</td>'
             '<td class="num">50</td><td>pc</td></tr>'
-            '<tr><td>MATH 101</td><td>Calculus I</td>'
-            '<td>Faculty of Basic Sciences</td><td>MATH 101_01</td>'
+            f'<tr><td>MATH 101</td><td>{_h["sample_course_name_2"]}</td>'
+            f'<td>{_h["sample_dept_2"]}</td><td>MATH 101_01</td>'
             '<td>Burak Demir</td><td>bdemir@uni.edu</td>'
             '<td class="num">4</td><td class="num">0</td><td class="num">0</td>'
             '<td class="num">60</td><td></td></tr>'

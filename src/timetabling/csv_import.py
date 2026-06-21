@@ -242,6 +242,8 @@ CLASSROOM_COL_MAP: Dict[str, List[str]] = {
              "mekan", "salon", "name"],
     "Capacity": ["capacity", "cap", "room_cap", "kapasite", "size", "seats"],
     "Type": ["type", "tip", "oda_tipi", "room_type", "kind", "tur", "lab"],
+    "Dept": ["dept", "department", "bolum", "bölüm", "faculty", "fakulte",
+             "birim", "owner", "sahip"],
 }
 CLASSROOM_POSITIONAL = tuple(CLASSROOM_COL_MAP.keys())
 
@@ -311,7 +313,8 @@ def parse_classrooms(raw_rows: List[List], existing: Sequence[Dict] = ()) -> Dic
         room = _cell(raw, ci.get("Room"))
         cap_raw = _cell(raw, ci.get("Capacity"))
         rtype = normalize_room_type(_cell(raw, ci.get("Type")), room)
-        rec = {"Room": room, "Capacity": cap_raw, "Type": rtype,
+        dept = _cell(raw, ci.get("Dept"))
+        rec = {"Room": room, "Capacity": cap_raw, "Type": rtype, "Dept": dept,
                "row_num": i + row_offset}
 
         key = room.strip().lower()
@@ -345,7 +348,8 @@ def ok_rooms(parsed: Dict) -> List[Dict]:
             continue
         cap = str(r["Capacity"]).strip()
         cap = str(int(cap)) if cap.lstrip("-").isdigit() else "0"
-        out.append({"Room": r["Room"], "Capacity": cap, "Type": r["Type"]})
+        out.append({"Room": r["Room"], "Capacity": cap, "Type": r["Type"],
+                    "Dept": r.get("Dept", "")})
     return out
 
 

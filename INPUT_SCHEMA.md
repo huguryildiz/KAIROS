@@ -19,11 +19,13 @@ no room is named on a section row, and no section is named on a room row.
 
 ## Table 1 — Sections (course list)
 
-One row per section (a single offering of a course). Headers are matched by
-**alias** (TR/EN, case-insensitive); when no header is recognized, columns map by
-**position** in the order below. Both the clean sample headers (`Course Code`,
-`Section No`, …) and a registrar export's headers (`COURSE_CODE`, `SECTION`,
-`SECT_CAP`, …) are accepted.
+One row per section (a single offering of a course). The importer detects a header
+row and matches each column by **alias** (TR/EN, case-insensitive), so column order
+does not matter — both the clean sample headers (`Course Code`, `Section No`, …) and
+a registrar export's headers (`COURSE_CODE`, `SECTION`, `SECT_CAP`, …) are accepted.
+A header-less file falls back to a fixed **positional** order (`COURSE_POSITIONAL`
+in `csv_import.py`); the table below lists the columns grouped logically, not in that
+fallback order.
 
 | Column | Required | Meaning / effect on the solver |
 |---|:---:|---|
@@ -53,6 +55,7 @@ are solver output): `ROOM`, `ROOM_CAP`, `SCHEDULE`.
 | `Room` | ✓ | Room name (unique). |
 | `Capacity` | ✓ | Seats. |
 | `Type` | ✓ | Room category: `normal / lab / pc / studio`. Derived from a name token (`-PC` → `pc`, `-L` → `lab`) when seeding; editable. |
+| `Dept` | optional | **Department ownership** for lab/pc rooms. Semicolon-separated list of department names (e.g. `"Department of Software Engineering;Dept.of Electric&Electronics Engineering"`). When set, only sections whose `DEPT` matches one of the listed values may be assigned to this room. Empty = open to all departments (general pool). Has no effect on `normal` / `studio` rooms. |
 
 When the user provides no room list, the table is pre-filled from the embedded
 `DEFAULT_CLASSROOMS` (with `Type`) and remains editable.

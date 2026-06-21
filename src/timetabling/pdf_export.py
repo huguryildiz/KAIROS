@@ -4,13 +4,12 @@ Builds landscape-A4 weekly grids (hours × Mon–Fri) with fpdf2, embedding a
 Unicode TTF (DejaVuSans) so Turkish glyphs render. The grid mirrors the on-screen
 calendar: each session is a colored block spanning its hours, labelled with the
 section id, a PRAT/LAB tag, the instructor (name + email) and the room. See
-build_pdf_bundle for the single-PDF / zip packaging used by the Results view.
+build_pdf_bundle: every entity of the current view (cohort/room/…) is merged
+into ONE multi-page PDF, one page per entity, naturally sorted by name.
 """
 from __future__ import annotations
 
-import io
 import re
-import zipfile
 from pathlib import Path
 from typing import List, Tuple
 
@@ -18,7 +17,7 @@ from fpdf import FPDF
 
 from .ui_grid import DAYS_ORDER, filter_assignments
 from .ui_style import block_color
-from .i18n import DAY_LABELS, DEFAULT_LANG
+from .i18n import DAY_LABELS_FULL, DEFAULT_LANG
 
 _FONT_DIR = Path(__file__).parent / "assets" / "fonts"
 _FONT_REGULAR = _FONT_DIR / "DejaVuSans.ttf"
@@ -57,14 +56,6 @@ def _block_tag(a: dict) -> str:
     if (a.get("section_p") or 0) > 0:
         return "PRAT"
     return ""
-
-
-def _instructor_text(a: dict) -> str:
-    name = str(a.get("instructor_name", "") or "")
-    iid = str(a.get("instructor_id", "") or "")
-    if name and iid and "@" in iid:
-        return f"{name} ({iid})"
-    return name or iid
 
 
 def _fit(pdf: FPDF, text: str, max_w: float) -> str:
@@ -149,9 +140,16 @@ def _draw_block(pdf: FPDF, a: dict, x: float, y: float, w: float, h: float,
     section = str(a.get("section_id") or a.get("course_code", ""))
     lines = [(section, tag, 7.2, True, code_rgb)]
     if show_instructor:
-        instr = _instructor_text(a)
-        if instr:
-            lines.append((instr, "", 6.0, False, (96, 100, 112)))
+        name = str(a.get("instructor_name", "") or "")
+        iid = str(a.get("instructor_id", "") or "")
+        if name:
+            lines.append((name, "", 6.0, False, (96, 100, 112)))
+        # Email on its own line below the name — kept separate (not parenthesised
+        # inline) so a long address can't crowd out the name via ellipsis.
+        if iid and "@" in iid:
+            lines.append((iid, "", 5.6, False, (130, 134, 146)))
+        elif iid and not name:
+            lines.append((iid, "", 6.0, False, (96, 100, 112)))
     room = str(a.get("room", "") or "")
     if room:
         lines.append((room, "", 6.0, False, _blend(accent, (70, 74, 86), 0.6)))
@@ -190,20 +188,20 @@ def _draw_tag(pdf: FPDF, tag: str) -> None:
     pdf.cell(pw, ph, tag, align="C")
 
 
-def build_grid_pdf(schedule: dict, title: str, lang: str = DEFAULT_LANG,
-                   show_instructor: bool = True) -> bytes:
-    """Render ONE landscape-A4 weekly calendar for an already-filtered schedule.
-
-    schedule: a schedule dict ({"assignments": [...]}) already narrowed to the
-        entity (use filter_assignments upstream).
-    title: header line, e.g. "Öğretim elemanı: Ahmet Acar".
-    """
-    days = DAY_LABELS.get(lang, DAY_LABELS[DEFAULT_LANG])
-
+def _new_pdf() -> FPDF:
+    """Fresh landscape-A4 PDF with the embedded Unicode font registered."""
     pdf = FPDF(orientation="L", unit="mm", format="A4")
     pdf.set_auto_page_break(auto=False)
     pdf.add_font("DejaVu", "", str(_FONT_REGULAR))
     pdf.add_font("DejaVu", "B", str(_FONT_BOLD))
+    return pdf
+
+
+def _draw_grid_page(pdf: FPDF, schedule: dict, title: str,
+                    lang: str, show_instructor: bool) -> None:
+    """Append ONE landscape-A4 weekly-grid page to `pdf` for the filtered
+    schedule. Caller manages page setup; this only draws."""
+    days = DAY_LABELS_FULL.get(lang, DAY_LABELS_FULL[DEFAULT_LANG])
     pdf.add_page()
 
     # Title
@@ -272,7 +270,30 @@ def build_grid_pdf(schedule: dict, title: str, lang: str = DEFAULT_LANG,
                 _draw_block(pdf, a, bx, byy, bw, bh, show_instructor,
                             cont=(hh > start))
 
+
+def build_grid_pdf(schedule: dict, title: str, lang: str = DEFAULT_LANG,
+                   show_instructor: bool = True) -> bytes:
+    """Render ONE landscape-A4 weekly calendar for an already-filtered schedule.
+
+    schedule: a schedule dict ({"assignments": [...]}) already narrowed to the
+        entity (use filter_assignments upstream).
+    title: header line, e.g. "Öğretim elemanı: Ahmet Acar".
+    """
+    pdf = _new_pdf()
+    _draw_grid_page(pdf, schedule, title, lang, show_instructor)
     return bytes(pdf.output())
+
+
+_NATSORT_RE = re.compile(r"(\d+)|(\D+)")
+
+
+def _natsort_key(s: str) -> tuple:
+    """Natural-sort key: 'EE-2' < 'EE-10' < 'EE-11'. Digits are sorted as ints,
+    text segments case-insensitively."""
+    out: list = []
+    for d, t in _NATSORT_RE.findall(str(s)):
+        out.append((0, int(d)) if d else (1, t.lower()))
+    return tuple(out)
 
 
 def _sanitize_filename(name: str) -> str:
@@ -287,24 +308,27 @@ def _sanitize_filename(name: str) -> str:
 def build_pdf_bundle(schedule: dict, view_field: str, entities: List[str],
                      dim_label: str, lang: str = DEFAULT_LANG
                      ) -> Tuple[bytes, str, str]:
-    """One PDF per entity. 1 → (pdf, '<entity>.pdf', application/pdf);
-    2+ → (zip, 'schedule_<view_field>.zip', application/zip)."""
-    pdfs: List[Tuple[str, bytes]] = []
-    seen: dict = {}
-    for ent in entities:
+    """Merge every entity of the current view into ONE multi-page PDF, one page
+    per entity, naturally sorted by name (so EE-1, EE-2, …, EE-10 read in order).
+
+    Returns (pdf_bytes, filename, mime).  For a single entity the filename is
+    '<entity>.pdf'; for multiples it is 'schedule_<view_field>.pdf'."""
+    ents = sorted({str(e) for e in entities}, key=_natsort_key)
+    # For the instructor view, enrich the page title with the email so it reads
+    # "Öğretim elemanı: Ahmet Güneş (agunes@uni.edu)" — mirrors the UI dropdown.
+    name_to_email: dict = {}
+    if view_field == "instructor_name":
+        for a in schedule.get("assignments", []):
+            nm = str(a.get("instructor_name", "") or "")
+            em = str(a.get("instructor_id", "") or "")
+            if nm and "@" in em and nm not in name_to_email:
+                name_to_email[nm] = em
+    pdf = _new_pdf()
+    for ent in ents:
         view = filter_assignments(schedule, view_field, ent)
-        data = build_grid_pdf(view, f"{dim_label}: {ent}", lang)
-        base = _sanitize_filename(str(ent))
-        seen[base] = seen.get(base, 0) + 1
-        fname = base if seen[base] == 1 else f"{base}_{seen[base]}"
-        pdfs.append((f"{fname}.pdf", data))
-
-    if len(pdfs) == 1:
-        name, data = pdfs[0]
-        return data, name, "application/pdf"
-
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for name, data in pdfs:
-            zf.writestr(name, data)
-    return buf.getvalue(), f"schedule_{view_field}.zip", "application/zip"
+        ent_label = f"{ent} ({name_to_email[ent]})" if ent in name_to_email else ent
+        _draw_grid_page(pdf, view, f"{dim_label}: {ent_label}", lang, True)
+    data = bytes(pdf.output())
+    fname = (_sanitize_filename(ents[0]) if len(ents) == 1
+             else f"schedule_{view_field}")
+    return data, f"{fname}.pdf", "application/pdf"

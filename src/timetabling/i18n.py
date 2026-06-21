@@ -148,7 +148,7 @@ STRINGS = {
         # course table column headers
         "tbl_course_code": "Ders Kodu",
         "tbl_course_name": "Ders Adı",
-        "tbl_dept": "Fakülte",
+        "tbl_dept": "Bölüm",
         "tbl_room_dept": "Bölüm",
         "tbl_section_no": "Şube No",
         "tbl_lecturer_name": "Öğretim Elemanı",
@@ -156,6 +156,12 @@ STRINGS = {
         "tbl_capacity": "Kontenjan",
         "tbl_room_type": "Derslik Türü",
         "tbl_students": "~Öğrenci",
+        # sample row values
+        "sample_course_name_1": "Programlamaya Giriş",
+        "sample_dept_1": "Bilgisayar Mühendisliği",
+        "sample_course_name_2": "Kalkülüs I",
+        "sample_dept_2": "Matematik",
+        "sample_cr_dept": "Yazılım Mühendisliği",
         # classroom table column headers
         "tbl_room": "Derslik",
         "tbl_cap": "Kapasite",
@@ -240,8 +246,6 @@ STRINGS = {
         "res_dl_json": "JSON indir",
         "res_dl_csv": "CSV indir",
         "res_dl_pdf": "PDF indir",
-        "res_pdf_pick": "PDF'e aktarılacak {dim}",
-        "res_pdf_pick_empty": "PDF için en az bir öğe seçin.",
         "res_unsched_title": "Yerleşemeyen şubeler ({n})",
         # grid (ui_style)
         "grid_empty": "Gösterilecek oturum yok.",
@@ -370,7 +374,7 @@ STRINGS = {
         # course table column headers
         "tbl_course_code": "Course Code",
         "tbl_course_name": "Course Name",
-        "tbl_dept": "Faculty",
+        "tbl_dept": "Department",
         "tbl_room_dept": "Department",
         "tbl_section_no": "Section No",
         "tbl_lecturer_name": "Instructor Name",
@@ -378,6 +382,12 @@ STRINGS = {
         "tbl_capacity": "Section Cap.",
         "tbl_room_type": "Room Type",
         "tbl_students": "~Students",
+        # sample row values
+        "sample_course_name_1": "Intro to Programming",
+        "sample_dept_1": "Computer Engineering",
+        "sample_course_name_2": "Calculus I",
+        "sample_dept_2": "Mathematics",
+        "sample_cr_dept": "Software Engineering",
         # classroom table column headers
         "tbl_room": "Room",
         "tbl_cap": "Capacity",
@@ -460,8 +470,6 @@ STRINGS = {
         "res_dl_json": "Download JSON",
         "res_dl_csv": "Download CSV",
         "res_dl_pdf": "Download PDF",
-        "res_pdf_pick": "{dim} to export as PDF",
-        "res_pdf_pick_empty": "Select at least one item for the PDF.",
         "res_unsched_title": "Unschedulable sections ({n})",
         "grid_empty": "No sessions to show.",
         # footer

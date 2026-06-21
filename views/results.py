@@ -15,6 +15,15 @@ VIEW_KEY = {"cohort": "res_view_cohort", "room": "res_view_room",
             "course_code": "res_view_course"}
 
 
+# Rendering a merged PDF (dozens of pages) takes seconds — cache so non-PDF
+# reruns (selectbox changes, etc.) don't redo the work. Cache key includes the
+# schedule's content via Streamlit's auto-hashing; max_entries bounds memory.
+@st.cache_data(show_spinner=False, max_entries=8)
+def _bundle(sched: dict, view_field: str, entities: tuple,
+            dim_label: str, lang: str):
+    return build_pdf_bundle(sched, view_field, list(entities), dim_label, lang)
+
+
 def render(lang: str) -> None:
     res = st.session_state.get("result")
     if res is None:
@@ -56,36 +65,24 @@ def render(lang: str) -> None:
 
 
     st.write("")
-    # Downloads — JSON, CSV and PDF on one row. The button row is rendered into a
-    # container placed ABOVE the entity chips, but filled AFTER the multiselect so
-    # the PDF button reflects the current chip selection.
+    # Downloads — JSON / CSV / PDF on one row. The PDF merges every entity of
+    # the current view dimension (e.g. all cohorts) into one multi-page file,
+    # sorted naturally (EE-1, EE-2, …, EE-10) so it reads in order.
     dim_label = t(VIEW_KEY[view_field], lang)
-    btn_row = st.container()
-    pdf_entities = st.multiselect(
-        t("res_pdf_pick", lang, dim=dim_label),
-        entities, default=[entity], format_func=fmt or str,
-        key="pdf_entities")
-    with btn_row:
-        c3, c4, c5 = st.columns(3)
-        c3.download_button(t("res_dl_json", lang),
+    pdf_data, pdf_name, pdf_mime = _bundle(
+        sched, view_field, tuple(entities), dim_label, lang)
+    with st.container(horizontal=True, horizontal_alignment="center",
+                      gap="small"):
+        st.download_button(t("res_dl_json", lang),
                            json.dumps(sched, ensure_ascii=False, indent=2),
                            file_name="schedule.json",
                            key="dl_json")
-        c4.download_button(t("res_dl_csv", lang),
+        st.download_button(t("res_dl_csv", lang),
                            pd.DataFrame(sched["assignments"]).to_csv(index=False),
                            file_name="schedule.csv",
                            key="dl_csv")
-        if pdf_entities:
-            n = len(pdf_entities)
-            pdf_data, pdf_name, pdf_mime = build_pdf_bundle(
-                sched, view_field, pdf_entities, dim_label, lang)
-            label = t("res_dl_pdf", lang) + (f" ({n})" if n > 1 else "")
-            c5.download_button(label, pdf_data, file_name=pdf_name,
-                               mime=pdf_mime, key="dl_pdf")
-        else:
-            c5.download_button(t("res_dl_pdf", lang), b"",
-                               file_name="schedule.pdf", key="dl_pdf",
-                               disabled=True)
+        st.download_button(t("res_dl_pdf", lang), pdf_data,
+                           file_name=pdf_name, mime=pdf_mime, key="dl_pdf")
 
     if res.unschedulable:
         with st.expander(t("res_unsched_title", lang, n=len(res.unschedulable))):

@@ -38,8 +38,10 @@ gcloud run deploy timetabling \
 ```
 
 - `--no-allow-unauthenticated` → no public access; IAM required.
-- `--timeout 3600` → keeps the Streamlit websocket alive (a solve can run up to the
-  600s slider limit; the websocket is one long request).
+- `--timeout 3600` → keeps the Streamlit websocket alive. The solve runs synchronously
+  inside that one long request; the fixed budget is **1200 s / 20 min** (`_SOLVE_SECONDS`
+  in `views/solve.py`), comfortably under the 3600 s timeout. Keep `--timeout` ≥ the
+  solve budget or a long solve drops the connection mid-run.
 - `--min-instances 0` → scales to zero, so there is no idle cost (first hit cold-starts
   ~10–30 s while the OR-Tools image boots).
 - `--source .` → Cloud Build reads the `Dockerfile`; `.dockerignore` keeps `data/` out.
@@ -74,8 +76,12 @@ downtime. IAM bindings persist across deploys.
 
 - **Region / KVKK:** keep the service in an EU region; enable Cloud Audit Logs.
 - **Cost:** scale-to-zero + 1–2 users ≈ a few cents per active hour, $0 when idle.
-- **Bumping the solve time limit > 600 s:** also raise the Solve-page slider max and
-  keep `--timeout` ≥ that value.
+- **Solve time limit:** a fixed **1200 s / 20 min** budget (`_SOLVE_SECONDS` in
+  `views/solve.py`), wired into both the CP-SAT and repair paths as a hard wall-clock
+  deadline (`solve_time_limit_s` + `repair_time_limit_s`). The largest real period
+  (~800 sections) converges in ~5–10.5 min, so 20 min leaves ~2× headroom. If you raise
+  `_SOLVE_SECONDS` above `--timeout` (3600 s), bump `--timeout` to match — and remember
+  the synchronous solve blocks the request for its whole duration.
 
 ## Troubleshooting
 

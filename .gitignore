@@ -40,6 +40,9 @@ out/
 # Source data — contains PII (lecturer names, staff IDs, student grade stats); not tracked
 data/
 
+# Working docs kept local (analyses, rules.pdf, UI mockup) — not part of the public repo
+docs/
+
 # Local Claude Code guidance — kept on disk, not tracked
 CLAUDE.md
 

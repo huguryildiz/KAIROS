@@ -36,6 +36,42 @@ def test_gen_candidates_lab_pinned_to_lab_room():
     assert cands and all(c.room == "LAB-L" for c in cands)
 
 
+def test_requires_lab_room_restricts_to_lab_rooms():
+    cfg = Config()
+    rooms = [Room("R1", 50, False, True), Room("LAB-L", 50, True, True)]
+    instr = Instructor("i1", "n", False, "D")
+    b = Block("S_01#T", "S_01", "theory", 2, False)   # a theory block (not a lab block)
+    s = _sec("S_01", 1, 20, [b])
+    s.requires_lab_room = True                         # explicit Room Type = lab
+    fr = [r.room for r in model_cpsat.feasible_rooms_for(b, s, rooms, cfg)]
+    assert fr == ["LAB-L"]                              # only the lab-flagged room
+    cands = model_cpsat.gen_candidates(b, s, [instr], rooms, cfg)
+    assert cands and all(c.room == "LAB-L" for c in cands)
+
+
+def test_availability_removes_candidates():
+    cfg = Config(instr_unavailable=frozenset(("i1", "Mo", h) for h in range(9, 13)))
+    rooms = [Room("R1", 50, False, True)]
+    instr = Instructor("i1", "n", False, "D")
+    b = Block("S_01#T", "S_01", "theory", 2, False)
+    s = _sec("S_01", 1, 20, [b])                 # instructor i1
+    cands = model_cpsat.gen_candidates(b, s, [instr], rooms, cfg)
+    assert cands                                  # still placeable other days/times
+    assert not any(c.day == "Mo" and c.start < 13 for c in cands)
+
+
+def test_fixed_pins_first_block():
+    cfg = Config()
+    rooms = [Room("R1", 50, False, True), Room("R2", 50, False, True)]
+    instr = Instructor("i1", "n", False, "D")
+    b = Block("S_01#T", "S_01", "theory", 2, False)
+    s = _sec("S_01", 1, 20, [b])
+    s.fixed_day = "We"
+    s.fixed_start = 10
+    cands = model_cpsat.gen_candidates(b, s, [instr], rooms, cfg)
+    assert cands and all(c.day == "We" and c.start == 10 for c in cands)
+
+
 def test_gen_candidates_seminar_blackout_fulltime_only():
     cfg = Config()
     rooms = [Room("R1", 50, False, True)]

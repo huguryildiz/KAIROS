@@ -30,6 +30,43 @@ def _truthy(v) -> bool:
     return str(v or "").strip().lower() in ("1", "true", "yes", "y", "x", "lab", "✓")
 
 
+def _is_lab_type(v) -> bool:
+    """A Room Type column value that means 'this section needs a lab-flagged room'."""
+    s = str(v or "").strip().lower()
+    return bool(s) and any(tok in s for tok in
+                           ("lab", "pc", "studio", "studyo", "bilgisayar", "laboratuvar"))
+
+
+_DAY_ALIASES = {
+    "mo": "Mo", "mon": "Mo", "monday": "Mo", "pzt": "Mo", "pazartesi": "Mo",
+    "tu": "Tu", "tue": "Tu", "tuesday": "Tu", "sal": "Tu", "sali": "Tu", "salı": "Tu",
+    "we": "We", "wed": "We", "wednesday": "We", "car": "We", "çar": "We",
+    "carsamba": "We", "çarşamba": "We",
+    "th": "Th", "thu": "Th", "thursday": "Th", "per": "Th", "persembe": "Th", "perşembe": "Th",
+    "fr": "Fr", "fri": "Fr", "friday": "Fr", "cum": "Fr", "cuma": "Fr",
+    "sa": "Sa", "sat": "Sa", "saturday": "Sa", "cmt": "Sa", "cumartesi": "Sa",
+}
+
+
+def parse_fixed(v) -> Tuple[str, int]:
+    """Parse a Fixed-slot value like 'Mo 9' / 'Pzt 09:00' / 'Fri 14' into
+    (day_code, start_hour). Returns ('', -1) when empty or unparseable."""
+    s = str(v or "").strip()
+    if not s:
+        return ("", -1)
+    parts = s.replace(",", " ").split()
+    if len(parts) < 2:
+        return ("", -1)
+    day = _DAY_ALIASES.get(parts[0].lower())
+    if not day:
+        return ("", -1)
+    try:
+        hour = int(parts[1].split(":")[0])
+    except ValueError:
+        return ("", -1)
+    return (day, hour) if 0 <= hour <= 23 else ("", -1)
+
+
 def build_sections_from_courselist(rows: List[Dict], period: str,
                                    cfg: Config) -> Tuple[List[Section], Dict]:
     sections: List[Section] = []
@@ -41,6 +78,9 @@ def build_sections_from_courselist(rows: List[Dict], period: str,
         sec_no = str(r.get("Section No", "")).strip()
         sid = f"{code}_{sec_no}" if sec_no else code
         dept, year, cohort = cohort_from_code(code)
+        yr = parse_int(r.get("Year"), 0)        # optional Year column overrides cohort year
+        if yr > 0:
+            cohort = f"{dept}-{yr}"
         T = parse_int(r.get("T"), 0); P = parse_int(r.get("P"), 0)
         L = parse_int(r.get("L"), 0)
         if (T + P + L) == 0:
@@ -49,6 +89,7 @@ def build_sections_from_courselist(rows: List[Dict], period: str,
         if not emails:
             report["missing_email"] += 1
         students = parse_int(r.get("~Students"), 1) or 1
+        fixed_day, fixed_start = parse_fixed(r.get("Fixed"))
         sections.append(Section(
             section_id=sid, period=period, code=code,
             name=str(r.get("Course Name", "")).strip(),
@@ -58,6 +99,8 @@ def build_sections_from_courselist(rows: List[Dict], period: str,
             blocks=blocks_from_tpl(sid, T, P, L, T + P + L,
                                    cfg.max_block_len, cfg.max_theory_session),
             plan_room="",
+            requires_lab_room=_is_lab_type(r.get("Room Type")),
+            fixed_day=fixed_day, fixed_start=fixed_start,
         ))
     return sections, report
 
@@ -68,12 +111,16 @@ def build_instructors_from_courselist(rows: List[Dict]) -> Dict[str, Instructor]
         emails = parse_emails(r.get("Lecturer Email", ""))
         names = [n.strip() for n in str(r.get("Lecturer Name", "")).split(",")]
         dept, _, _ = cohort_from_code(r.get("Course Code", ""))
+        # optional Part-time column overrides the "(S)" marker; absent -> fall back to "(S)"
+        pt = r.get("Part-time")
+        explicit_pt = _truthy(pt) if (pt is not None and str(pt).strip() != "") else None
         for i, email in enumerate(emails):
             name = names[i] if i < len(names) else (names[0] if names else "")
             if email in out:
                 continue
+            part_time = explicit_pt if explicit_pt is not None else is_part_time(name)
             out[email] = Instructor(staff_id=email, name=name,
-                                    is_staff=not is_part_time(name), home_dept=dept)
+                                    is_staff=not part_time, home_dept=dept)
     return out
 
 

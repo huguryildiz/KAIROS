@@ -17,3 +17,20 @@ def test_solve_repair_places_clean_small_instance():
     assigns, stats = solve_repair(secs, rooms, instr, cfg)
     assert stats["placed"] == 3 and stats["unplaced"] == []
     assert validate(assigns, secs, rooms, instr, cfg) == []
+
+
+def test_repair_respects_availability():
+    """An instructor unavailable all Monday must never be placed on Monday — proves the
+    gen_candidates chokepoint covers the repair path too."""
+    from timetabling.config import Config
+    from timetabling.model import Room, Section, Block, Instructor
+    from timetabling.repair import solve_repair
+    cfg = Config(solve_time_limit_s=5,
+                 instr_unavailable=frozenset(("i0", "Mo", h) for h in range(9, 18)))
+    rooms = {"R1": Room("R1", 50, False, True)}
+    instr = {"i0": Instructor("i0", "x", True, "D")}
+    s = Section("A_01", "001", "X 101", "x", 1, "X", "F", "X-1", ["i0"], 30, 2, 0, 0, 2, "")
+    s.blocks = [Block("A_01#T", "A_01", "theory", 2, False)]
+    assigns, stats = solve_repair([s], rooms, instr, cfg)
+    assert stats["placed"] == 1
+    assert all(a.day != "Mo" for a in assigns)

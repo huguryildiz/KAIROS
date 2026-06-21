@@ -138,3 +138,33 @@ def test_read_raw_and_parse_sample_all_ok():
     assert p["stats"]["total"] > 0
     assert p["stats"]["error"] == 0
     assert p["stats"]["valid"] == p["stats"]["total"]
+
+
+# --- Phase 4: optional columns (backward compatible) ----------------------
+
+def test_optional_columns_appended_after_original_nine():
+    assert COURSE_POSITIONAL[:9] == tuple(_EN_HEADER)
+    assert COURSE_POSITIONAL[9:] == ("Year", "Part-time", "Room Type", "Fixed")
+
+
+def test_backward_compat_9col_still_parses_with_empty_new_fields():
+    raw = [_row()]  # header-less 9-column row, exactly as today
+    p = parse_courselist(raw)
+    assert p["stats"] == {"valid": 1, "duplicate": 0, "error": 0, "total": 1}
+    r = ok_rows(p)[0]
+    assert r["Course Code"] == "CMPE 113"
+    assert r["Year"] == "" and r["Part-time"] == ""
+    assert r["Room Type"] == "" and r["Fixed"] == ""
+
+
+def test_new_column_aliases_detected_from_header():
+    header = _EN_HEADER + ["Year", "Part-time", "Room Type", "Fixed"]
+    raw = [header, _row() + ["2", "yes", "lab", "Mo 9"]]
+    m = map_columns(raw)
+    assert m["col_index"]["Year"] == 9
+    assert m["col_index"]["Part-time"] == 10
+    assert m["col_index"]["Room Type"] == 11
+    assert m["col_index"]["Fixed"] == 12
+    r = ok_rows(parse_courselist(raw))[0]
+    assert r["Year"] == "2" and r["Part-time"] == "yes"
+    assert r["Room Type"] == "lab" and r["Fixed"] == "Mo 9"

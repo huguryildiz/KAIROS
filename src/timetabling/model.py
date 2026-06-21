@@ -50,6 +50,9 @@ class Section:
     is_virtual: bool = False
     plan_room: str = ""
     lab_room: str = ""          # pinned lab room (from Plan), "" = lab in a regular room
+    requires_lab_room: bool = False  # section needs a lab-flagged room (UI Room Type column)
+    fixed_day: str = ""         # pin the section's first block to this day ("" = unpinned)
+    fixed_start: int = -1       # pin the section's first block to this start hour (-1 = unpinned)
 
 
 @dataclass(frozen=True)

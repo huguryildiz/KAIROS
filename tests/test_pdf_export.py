@@ -73,3 +73,12 @@ def test_build_pdf_bundle_sanitizes_and_dedupes_names():
     assert _sanitize_filename("Ahmet Acar") == "Ahmet_Acar"
     assert _sanitize_filename("A/B:C*?") == "A_B_C"
     assert _sanitize_filename("Şükrü Çağ") == "Şükrü_Çağ"
+
+
+def test_pdf_i18n_keys_exist():
+    from timetabling.i18n import t
+    assert t("res_dl_pdf", "tr") == "PDF indir"
+    assert t("res_dl_pdf", "en") == "Download PDF"
+    # {dim} interpolation works in both languages
+    assert "Öğretim" in t("res_pdf_pick", "tr", dim="Öğretim elemanı")
+    assert "Instructor" in t("res_pdf_pick", "en", dim="Instructor")

@@ -14,6 +14,11 @@ DAY_LABELS = {
     "en": {"Mo": "Mon", "Tu": "Tue", "We": "Wed", "Th": "Thu", "Fr": "Fri", "Sa": "Sat"},
 }
 
+DAY_LABELS_FULL = {
+    "tr": {"Mo": "Pazartesi", "Tu": "Salı", "We": "Çarşamba", "Th": "Perşembe", "Fr": "Cuma", "Sa": "Cumartesi"},
+    "en": {"Mo": "Monday", "Tu": "Tuesday", "We": "Wednesday", "Th": "Thursday", "Fr": "Friday", "Sa": "Saturday"},
+}
+
 STRINGS = {
     "tr": {
         "lang_label": "Dil / Language",
@@ -65,6 +70,7 @@ STRINGS = {
         "set_caption": "Okulunuzun politikalarını, öğretim elemanı müsaitliğini ve tercih ağırlıklarını "
                        "buradan ayarlayın. Dokunmazsanız varsayılanlar kullanılır.",
         "set_policy_header": "Zaman & politika",
+        "set_policy_desc": "Derslerin planlanabileceği günlük zaman penceresi ve kurumsal kurallar. Bu değerler programdaki her blok için geçerli sert sınırlar oluşturur.",
         "set_day_start": "İlk ders saati",
         "set_day_start_help": "Derslerin planlanabileceği en erken saat. Tüm bloklar bu saatten itibaren başlar. Örn. 9 → 09:00.",
         "set_day_end": "Son ders saati · lisans",
@@ -87,6 +93,7 @@ STRINGS = {
         "set_lunch_start": "Öğle arası başlangıcı",
         "set_lunch_end": "Öğle arası bitişi",
         "set_weights_header": "Tercih ağırlıkları",
+        "set_weights_desc": "Çözücünün sert kısıtların yanı sıra optimize ettiği yumuşak tercihler. 'Güçlü' seçildiğinde ağırlık artar, ancak hiçbiri çözümsüzlüğe yol açmaz.",
         "set_w_evening": "Akşam derslerinden kaçın",
         "set_w_evening_help": "Dersleri sabah/öğlen saatlerine çekmeye çalışır; akşam bloklarını cezalandırır. 'Güçlü' seçilirse akşam yerleşimleri büyük ölçüde azalır.",
         "set_w_cohort_gap": "Öğrenci günlerini sıkıştır",
@@ -99,6 +106,7 @@ STRINGS = {
         "set_w_normal": "normal",
         "set_w_strong": "güçlü",
         "set_blackout_header": "Kapalı slotlar (blackout)",
+        "set_blackout_desc": "Belirli gün ve saatlerde ders planlanmasını engelleyen sert kurallar. Tüm birimler veya yalnızca kadrolu öğretim üyeleri için ayrı ayrı tanımlanabilir.",
         "set_blackout_none": "Tanımlı kapalı slot yok.",
         "set_blackout_day": "Gün",
         "set_blackout_hour": "Saat",
@@ -131,8 +139,8 @@ STRINGS = {
                           "T, P, L, Instructor Name, Instructor Email, ~Students`.",
         "upload_example_expander": "Örnek format (3 satır)",
         "upload_uploader": "Ders listesi (CSV)",
-        "upload_loaded": "{n} satır yüklendi.",
-        "upload_current": "Şu an {n} satır yüklü — değiştirmek için yeniden yükle.",
+        "upload_loaded": "{n} şube yüklendi.",
+        "upload_current": "Şu an {n} şube yüklü — değiştirmek için yeniden yükle.",
         "upload_none": "Henüz dosya yok. Yukarıdan örnek veri seti ile deneyin.",
         "upload_format_label": "Her satır bir şube — beklenen sütunlar:",
         "upload_format_tpl": "T = haftalık teori saati · P = pratik / tartışma saati · L = laboratuvar saati",
@@ -271,6 +279,7 @@ STRINGS = {
         "set_caption": "Configure your school's policy, instructor availability, and "
                        "preference weights here. Leave untouched to use the defaults.",
         "set_policy_header": "Time & policy",
+        "set_policy_desc": "The daily time window and institutional rules that govern all classes. These values create hard bounds applied to every block in the timetable.",
         "set_day_start": "First class hour",
         "set_day_start_help": "Earliest hour any session can be placed. All blocks start from this time onward. E.g. 9 → 09:00.",
         "set_day_end": "Last class hour · undergrad",
@@ -293,6 +302,7 @@ STRINGS = {
         "set_lunch_start": "Lunch start",
         "set_lunch_end": "Lunch end",
         "set_weights_header": "Preference weights",
+        "set_weights_desc": "Soft preferences the solver optimises alongside hard constraints. Setting a weight to 'strong' increases its influence but cannot cause infeasibility.",
         "set_w_evening": "Avoid evening classes",
         "set_w_evening_help": "Tries to pull sessions into morning/midday slots by penalising evening blocks. Choosing 'strong' greatly reduces evening placements.",
         "set_w_cohort_gap": "Compact student days",
@@ -305,6 +315,7 @@ STRINGS = {
         "set_w_normal": "normal",
         "set_w_strong": "strong",
         "set_blackout_header": "Closed slots (blackouts)",
+        "set_blackout_desc": "Hard rules that prevent any session from being placed at a given day and hour. Can be scoped to everyone or to full-time staff only.",
         "set_blackout_none": "No closed slots defined.",
         "set_blackout_day": "Day",
         "set_blackout_hour": "Hour",
@@ -336,8 +347,8 @@ STRINGS = {
                           "T, P, L, Instructor Name, Instructor Email, ~Students`.",
         "upload_example_expander": "Example format (3 rows)",
         "upload_uploader": "Course list (CSV)",
-        "upload_loaded": "Loaded {n} rows.",
-        "upload_current": "{n} rows currently loaded — re-upload to replace.",
+        "upload_loaded": "Loaded {n} sections.",
+        "upload_current": "{n} sections currently loaded — re-upload to replace.",
         "upload_none": "No file yet. Use the sample dataset button above.",
         "upload_format_label": "One row per section — expected columns:",
         "upload_format_tpl": "T = weekly theory hours · P = practice / discussion hours · L = lab hours",

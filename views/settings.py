@@ -8,7 +8,7 @@ from html import escape
 import streamlit as st
 
 from timetabling.ui_style import eyebrow_html
-from timetabling.i18n import t, DAY_LABELS
+from timetabling.i18n import t, DAY_LABELS, DAY_LABELS_FULL
 from timetabling.settings import profile_to_json, profile_from_json
 from timetabling.ui_input import normalize_name
 
@@ -82,6 +82,7 @@ def render(lang: str) -> None:
 
 def _policy(lang: str, s: dict) -> None:
     with st.expander(t("set_policy_header", lang), expanded=True, icon=":material/tune:"):
+        st.caption(t("set_policy_desc", lang))
         c1, c2, c3 = st.columns(3)
         s["day_start"] = c1.number_input(t("set_day_start", lang), min_value=6, max_value=12,
                                          value=int(s["day_start"]), step=1,
@@ -129,6 +130,7 @@ def _policy(lang: str, s: dict) -> None:
 
         st.divider()
         st.markdown(f"**{t('set_weights_header', lang)}**")
+        st.caption(t("set_weights_desc", lang))
         disp = [t(f"set_w_{lv}", lang) for lv in _LEVELS]
         wc = st.columns(2)
         for i, knob in enumerate(_WEIGHT_KNOBS):
@@ -146,6 +148,7 @@ def _policy(lang: str, s: dict) -> None:
 
 def _blackouts(lang: str, s: dict) -> None:
     st.markdown(f"**{t('set_blackout_header', lang)}**")
+    st.caption(t("set_blackout_desc", lang))
     dl = DAY_LABELS.get(lang, DAY_LABELS["en"])
     bl = s.setdefault("blackouts", [])
     if bl:
@@ -170,8 +173,9 @@ def _blackouts(lang: str, s: dict) -> None:
     rev = st.session_state.get("set_rev", 0)
     scope_opts = [t("set_scope_all", lang), t("set_scope_staff", lang)]
     a1, a2, a3, a4 = st.columns([2, 1.2, 2.2, 0.9], vertical_alignment="bottom")
+    dl_full = DAY_LABELS_FULL.get(lang, DAY_LABELS_FULL["en"])
     nd = a1.selectbox(t("set_blackout_day", lang), _work_days(s),
-                      format_func=lambda d: dl.get(d, d), key=f"bl_day_{rev}")
+                      format_func=lambda d: dl_full.get(d, d), key=f"bl_day_{rev}")
     nh = a2.number_input(t("set_blackout_hour", lang), min_value=6, max_value=21,
                          value=12, step=1, key=f"bl_hour_{rev}")
     nscope = a3.segmented_control(t("set_blackout_scope", lang), scope_opts,

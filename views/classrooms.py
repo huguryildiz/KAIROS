@@ -31,10 +31,11 @@ def render(lang: str) -> None:
         (t("kpi_online", lang), "∞", "good"),
     ]), unsafe_allow_html=True)
 
+    source = st.session_state.get("cr_source")
+
     # Upload card — same dropzone look as Step 1. Once a list is loaded (sample or
     # CSV) the card shows a green "loaded" banner with a button to load a different
     # list; until then it shows the dropzone + "Try with sample dataset" button.
-    source = st.session_state.get("cr_source")
     with st.container(key="cr_card"):
         if source:
             st.markdown(success_banner_html(t("cr_loaded", lang, n=len(rooms)), source),
@@ -56,26 +57,6 @@ def render(lang: str) -> None:
                 st.session_state.pop("cr_source", None)
                 st.session_state.pop("cr_report", None)
                 st.rerun()
-            # Detected-column chips + valid/total badges for the loaded list — the
-            # same component as the course import preview (Review step), so the
-            # Classrooms step shows how the uploaded CSV's columns mapped to
-            # Room / Capacity / Type (green = matched by header, dashed = positional).
-            report = st.session_state.get("cr_report")
-            if report:
-                st.markdown(detected_columns_html(report["detected_columns"], lang),
-                            unsafe_allow_html=True)
-                st.markdown(import_stats_html(report["stats"], lang),
-                            unsafe_allow_html=True)
-            # Preview of the actual loaded inventory (scrollable). Replaces the
-            # static example table, which now only appears in the empty state.
-            _cr = [t("tbl_room", lang), t("tbl_cap", lang), t("tbl_type", lang)]
-            st.markdown(
-                data_table_html(
-                    _cr,
-                    [[r.get("Room", ""), r.get("Capacity", r.get("Cap", "")),
-                      r.get("Type", "")] for r in rooms],
-                    max_height=300, numeric=(_cr[1],)),
-                unsafe_allow_html=True)
         else:
             # Empty state: same two-button row as Step 1 — left = "Upload CSV" CTA
             # (a visual primary button with an invisible file-uploader overlaid on
@@ -127,3 +108,22 @@ def render(lang: str) -> None:
                     [["A216", "25", "normal"], ["A211-PC-L", "99", "pc"]],
                     max_height=160, numeric=(_cr[1],)),
                 unsafe_allow_html=True)
+
+    # Detected-column chips + valid/total badges + inventory preview — shown below
+    # the card (not inside it) so the dashed border wraps only the banner + button,
+    # matching the course upload module's success-state layout.
+    if source:
+        report = st.session_state.get("cr_report")
+        if report:
+            st.markdown(detected_columns_html(report["detected_columns"], lang),
+                        unsafe_allow_html=True)
+            st.markdown(import_stats_html(report["stats"], lang),
+                        unsafe_allow_html=True)
+        _cr = [t("tbl_room", lang), t("tbl_cap", lang), t("tbl_type", lang)]
+        st.markdown(
+            data_table_html(
+                _cr,
+                [[r.get("Room", ""), r.get("Capacity", r.get("Cap", "")),
+                  r.get("Type", "")] for r in rooms],
+                max_height=300, numeric=(_cr[1],)),
+            unsafe_allow_html=True)

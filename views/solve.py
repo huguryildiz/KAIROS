@@ -1,9 +1,9 @@
-"""Step 4 — Solve: fixed time budget, run the pipeline. Upload-gated."""
+"""Step 5 — Solve: fixed time budget, run the pipeline. Upload-gated."""
 from html import escape
 
 import streamlit as st
 
-from timetabling.config import Config
+from timetabling.settings import build_config
 from timetabling.ui_input import (build_sections_from_courselist,
                                   build_instructors_from_courselist, build_rooms_from_ui)
 from timetabling.route import mark_virtual
@@ -12,16 +12,17 @@ from timetabling.i18n import t
 from timetabling.ui_style import eyebrow_html
 
 # Fixed solve budget (seconds). The largest real period (~800 sections) converges in
-# ~5–10.5 min via the repair solver (README benchmark); 20 min is a hard upper bound with
-# ~2x headroom for larger inputs. Wired into both the CP-SAT and repair paths as a deadline.
+# ~5–10.5 min via the repair solver (README benchmark); 50 min is a hard upper bound with
+# ~5x headroom for larger inputs, kept under Cloud Run's --timeout 3600 (~10 min margin for
+# container startup + response streaming). Wired into both the CP-SAT and repair paths as a deadline.
 # period is a label only (tags the schedule dict); the uploaded courselist defines what
 # gets scheduled, so it is fixed here rather than chosen in the UI.
-_SOLVE_SECONDS = 1200
+_SOLVE_SECONDS = 3000
 _PERIOD = "001"
 
 
 def render(lang: str) -> None:
-    st.markdown(eyebrow_html(4, t("step_solve", lang), "solve"),
+    st.markdown(eyebrow_html(5, t("step_solve", lang), "solve"),
                 unsafe_allow_html=True)
 
     courses = st.session_state.get("courses", [])
@@ -62,12 +63,38 @@ def render(lang: str) -> None:
         '})();</script>',
         unsafe_allow_html=True,
     )
+    # JS: beforeunload guard + elapsed/remaining timer.
+    # Polls for .solve-running every second; sets window.onbeforeunload while it
+    # is present (solve in progress) and clears it once the page rerenders.
+    # A window.__kw flag prevents duplicate loops when Streamlit reruns the script.
+    _lbl_elapsed = "geçti · kalan ~" if lang == "tr" else "elapsed · ~"
+    _lbl_min = "dk" if lang == "tr" else "min"
+    _lbl_sec = "sn" if lang == "tr" else "s"
+    st.markdown(
+        f'<script>(function(){{'
+        f'if(window.__kw)return;window.__kw=true;'
+        f'var B={_SOLVE_SECONDS},t0=null;'
+        f'function f(s){{return s<60?s+\' {_lbl_sec}\':Math.floor(s/60)+\' {_lbl_min} \'+(s%60)+\' {_lbl_sec}\';}}  '
+        f'function tick(){{'
+        f'var el=document.querySelector(".solve-running");'
+        f'if(el){{'
+        f'window.onbeforeunload=function(e){{e.preventDefault();e.returnValue="";}};'
+        f'if(!t0)t0=Date.now();'
+        f'var es=Math.round((Date.now()-t0)/1000),rm=Math.max(0,B-es);'
+        f'var sp=el.querySelector(".solve-eta");'
+        f'if(sp)sp.textContent="· "+f(es)+" {_lbl_elapsed} "+f(rm);'
+        f'}}else{{window.onbeforeunload=null;t0=null;}}'
+        f'setTimeout(tick,1000);}}'
+        f'tick();'
+        f'}})();</script>',
+        unsafe_allow_html=True,
+    )
     _, _col, _ = st.columns([1.5, 3, 1.5])
     ph = _col.empty()
     if ph.button(t("solve_button", lang), type="primary", key="solve_btn",
                  use_container_width=True):
-        cfg = Config(solve_time_limit_s=float(_SOLVE_SECONDS),
-                     repair_time_limit_s=float(_SOLVE_SECONDS))
+        cfg = build_config(st.session_state["settings"],
+                           st.session_state["availability"], _SOLVE_SECONDS)
         secs, _ = build_sections_from_courselist(courses, _PERIOD, cfg)
         instr = build_instructors_from_courselist(courses)
         rooms = build_rooms_from_ui(st.session_state["classrooms"], cfg)
@@ -76,6 +103,7 @@ def render(lang: str) -> None:
             f'<div class="solve-running">'
             f'<span class="solve-spin"></span>'
             f'{escape(t("solve_spinner", lang, n=len(secs)))}'
+            f'<span class="solve-eta"></span>'
             f'</div>',
             unsafe_allow_html=True,
         )

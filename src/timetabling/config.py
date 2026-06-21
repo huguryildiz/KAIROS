@@ -18,6 +18,11 @@ class Config:
     # blackouts: (day, hour) hour-slots that are closed
     friday_blackout: tuple = (("Fr", 13),)                 # 13:00-14:00
     seminar_blackout: tuple = (("Th", 14), ("Th", 15))     # Thu 14:00-16:00, full-time only
+    # per-instructor unavailability (UI School-Settings populates this; CLI leaves it empty).
+    # frozenset of (instructor_id/email, day, hour) — read in gen_candidates like a per-id blackout.
+    instr_unavailable: frozenset = frozenset()
+    # AM/PM boundary hour for half-day instructor availability (UI setting)
+    midday_split_hour: int = 13
     # toggles
     saturday_enabled: bool = False
     include_grad: bool = False

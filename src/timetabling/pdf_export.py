@@ -91,3 +91,40 @@ def build_grid_pdf(schedule: dict, title: str, lang: str = DEFAULT_LANG,
         pdf.set_xy(x0, y0 + _ROW_H)
 
     return bytes(pdf.output())
+
+
+def _sanitize_filename(name: str) -> str:
+    """Filesystem-safe name: keep letters (incl. Turkish) + digits, spaces→'_'."""
+    name = (name or "").strip()
+    name = re.sub(r"\s+", "_", name)
+    name = re.sub(r"[^\w\-]", "_", name, flags=re.UNICODE)  # \w keeps Türkçe
+    name = re.sub(r"_+", "_", name).strip("_")
+    return name or "schedule"
+
+
+def build_pdf_bundle(schedule: dict, view_field: str, entities: List[str],
+                     dim_label: str, lang: str = DEFAULT_LANG
+                     ) -> Tuple[bytes, str, str]:
+    """One PDF per entity. 1 → (pdf, '<entity>.pdf', application/pdf);
+    2+ → (zip, 'schedule_<view_field>.zip', application/zip)."""
+    show_instructor = view_field != "instructor_name"
+    pdfs: List[Tuple[str, bytes]] = []
+    seen: dict = {}
+    for ent in entities:
+        view = filter_assignments(schedule, view_field, ent)
+        data = build_grid_pdf(view, f"{dim_label}: {ent}", lang,
+                              show_instructor=show_instructor)
+        base = _sanitize_filename(str(ent))
+        seen[base] = seen.get(base, 0) + 1
+        fname = base if seen[base] == 1 else f"{base}_{seen[base]}"
+        pdfs.append((f"{fname}.pdf", data))
+
+    if len(pdfs) == 1:
+        name, data = pdfs[0]
+        return data, name, "application/pdf"
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name, data in pdfs:
+            zf.writestr(name, data)
+    return buf.getvalue(), f"schedule_{view_field}.zip", "application/zip"

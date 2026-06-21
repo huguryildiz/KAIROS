@@ -41,3 +41,35 @@ def test_build_grid_pdf_handles_turkish_and_empty():
     # Turkish glyphs in title + empty assignment list must not raise.
     data = build_grid_pdf({"assignments": []}, "Boş çizelge — İçğöşü", "tr")
     assert bytes(data[:4]) == b"%PDF"
+
+
+def test_build_pdf_bundle_single_entity_returns_pdf():
+    from timetabling.pdf_export import build_pdf_bundle
+    data, fname, mime = build_pdf_bundle(
+        _sample_schedule(), "instructor_name", ["Şükrü Çağ"],
+        "Öğretim elemanı", "tr")
+    assert mime == "application/pdf"
+    assert fname.endswith(".pdf")
+    assert bytes(data[:4]) == b"%PDF"
+
+
+def test_build_pdf_bundle_multi_entity_returns_zip():
+    from timetabling.pdf_export import build_pdf_bundle
+    data, fname, mime = build_pdf_bundle(
+        _sample_schedule(), "instructor_name",
+        ["Şükrü Çağ", "Ayşe Yılmaz"], "Öğretim elemanı", "tr")
+    assert mime == "application/zip"
+    assert fname == "schedule_instructor_name.zip"
+    zf = zipfile.ZipFile(io.BytesIO(data))
+    names = zf.namelist()
+    assert len(names) == 2
+    for n in names:
+        assert n.endswith(".pdf")
+        assert zf.read(n)[:4] == b"%PDF"
+
+
+def test_build_pdf_bundle_sanitizes_and_dedupes_names():
+    from timetabling.pdf_export import _sanitize_filename
+    assert _sanitize_filename("Ahmet Acar") == "Ahmet_Acar"
+    assert _sanitize_filename("A/B:C*?") == "A_B_C"
+    assert _sanitize_filename("Şükrü Çağ") == "Şükrü_Çağ"

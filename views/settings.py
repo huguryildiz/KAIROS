@@ -10,6 +10,7 @@ import streamlit as st
 from timetabling.ui_style import eyebrow_html
 from timetabling.i18n import t, DAY_LABELS
 from timetabling.settings import profile_to_json, profile_from_json
+from timetabling.ui_input import normalize_name
 
 _LEVELS = ("off", "normal", "strong")
 _MIDDAY = 13  # hardcoded AM/PM boundary; no longer a user-facing setting
@@ -34,22 +35,27 @@ def _email_labels(courses) -> tuple[list[str], dict[str, str]]:
     Availability is keyed by email, so the map lets callers recover the email from
     the selected label without parsing.
     """
-    email_to_name: dict[str, str] = {}
+    # Identity key = email when present, else the normalized display name — the
+    # same key build_sections uses for instructor_ids, so availability matches.
+    id_to_name: dict[str, str] = {}
     for r in courses:
         emails = [e.strip() for e in str(r.get("Instructor Email", "")).split(",") if e.strip()]
         names = [n.strip() for n in str(r.get("Instructor Name", "")).split(",")]
-        for i, email in enumerate(emails):
-            if email not in email_to_name:
-                name = names[i] if i < len(names) else ""
-                email_to_name[email] = name
+        if emails:
+            for i, email in enumerate(emails):
+                id_to_name.setdefault(email, names[i] if i < len(names) else "")
+        else:
+            for n in names:
+                if n.strip():
+                    id_to_name.setdefault(normalize_name(n), n.strip())
 
     labels: list[str] = []
     label_to_email: dict[str, str] = {}
-    for email in sorted(email_to_name):
-        name = email_to_name[email]
-        label = f"{name} ({email})" if name else email
+    for key in sorted(id_to_name):
+        name = id_to_name[key]
+        label = f"{name} ({key})" if (name and name.lower() != key) else (name or key)
         labels.append(label)
-        label_to_email[label] = email
+        label_to_email[label] = key
     return labels, label_to_email
 
 

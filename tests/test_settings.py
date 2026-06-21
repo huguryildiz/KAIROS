@@ -164,3 +164,15 @@ def test_profile_partial_merges_defaults():
     assert s["day_end"] == DEFAULT_SETTINGS["day_end"]
     assert s["weights"] == DEFAULT_SETTINGS["weights"]
     assert a == {}
+
+
+def test_availability_labels_keyed_by_email_or_name():
+    from views.settings import _email_labels
+    courses = [
+        {"Instructor Name": "A. Yilmaz", "Instructor Email": "a@x.edu"},
+        {"Instructor Name": "Mustafa Yuksel (S)", "Instructor Email": ""},
+    ]
+    labels, label_to_id = _email_labels(courses)
+    ids = set(label_to_id.values())
+    assert "a@x.edu" in ids                 # email identity when present
+    assert "mustafa yuksel" in ids          # normalized-name identity when no email

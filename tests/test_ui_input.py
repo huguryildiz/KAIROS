@@ -152,3 +152,26 @@ def test_fixed_column_sets_section_fields():
              "Lecturer Email": "a@x.edu", "Fixed": "We 10"}]
     secs, _ = build_sections_from_courselist(rows, "001", Config())
     assert secs[0].fixed_day == "We" and secs[0].fixed_start == 10
+
+
+def test_end_to_end_ui_path_settings_and_columns():
+    """settings -> build_config -> ui_input columns -> run_pipeline, all honored, 0 violations."""
+    from timetabling.settings import build_config, DEFAULT_SETTINGS
+    cfg = build_config(DEFAULT_SETTINGS, {"a@x.edu": [["Mo", "AM"], ["Mo", "PM"]]}, 10.0)
+    rows = [
+        {"Course Code": "CS 101", "Section No": "01", "T": "2", "P": "0", "L": "0",
+         "Lecturer Email": "a@x.edu", "~Students": "20", "Fixed": "We 10"},
+        {"Course Code": "CS 201", "Section No": "01", "T": "2", "P": "0", "L": "0",
+         "Lecturer Email": "b@x.edu", "~Students": "15", "Room Type": "lab"},
+    ]
+    secs, _ = build_sections_from_courselist(rows, "001", cfg)
+    instr = build_instructors_from_courselist(rows)
+    rooms = build_rooms_from_ui([{"Room": "R1", "Cap": "50", "Lab": ""},
+                                 {"Room": "LAB1", "Cap": "50", "Lab": "x"}], cfg)
+    mark_virtual(secs, rooms, cfg)
+    res = run_pipeline("001", secs, rooms, instr, cfg, solver="cpsat")
+    assert res.violations == []
+    a101 = next(a for a in res.assignments if a.section_id == "CS 101_01")
+    assert a101.day == "We" and a101.start == 10          # Fixed pin honored
+    a201 = next(a for a in res.assignments if a.section_id == "CS 201_01")
+    assert a201.room == "LAB1"                              # Room Type=lab -> lab room

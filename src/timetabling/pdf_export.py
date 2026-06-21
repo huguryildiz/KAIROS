@@ -124,7 +124,7 @@ def _draw_block(pdf: FPDF, a: dict, x: float, y: float, w: float, h: float,
     accent = _hex_to_rgb(color)
     fill = _tint(color, 0.13)                  # ~13% color over white (matches UI)
     code_rgb = _blend(accent, (32, 34, 44), 0.72)   # dark tint of the color
-    r, bar_w = 2.4, 2.4                        # card corner radius / left-bar width
+    r, bar_w = 2.4, 1.4                        # card corner radius / left-bar width
     # 1) Whole card filled with the accent — supplies the rounded left corners.
     pdf.set_fill_color(*accent)
     pdf.rect(x, y, w, h, style="F", round_corners=True, corner_radius=r)
@@ -156,7 +156,7 @@ def _draw_block(pdf: FPDF, a: dict, x: float, y: float, w: float, h: float,
     if room:
         lines.append((room, "", 6.0, False, _blend(accent, (70, 74, 86), 0.6)))
 
-    pad_l, pad_t = 5.0, 1.6
+    pad_l, pad_t = 4.0, 1.6
     tw = w - pad_l - 1.8
     with pdf.rect_clip(x, y, w, h):
         cy = y + pad_t

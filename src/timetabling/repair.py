@@ -169,6 +169,10 @@ REPAIR_MAX_ROOMS = 24
 POLISH_SWEEPS = 4
 POLISH_TL = 6.0
 POLISH_BUDGET_S = 240.0
+# soft-polish: after placement converges, re-seat already-placed blocks into lower-soft
+# slots. Accept-guarded -> never lowers placement. Budget shared under the deadline.
+SOFT_POLISH_TL = 6.0
+SOFT_POLISH_BUDGET_S = 600.0
 
 
 def competitors(state: State, batch, cand_by_block) -> set:
@@ -369,6 +373,15 @@ def repair_round(state: State, batch, cand_by_block, cfg=None, eligible=None,
     old_count = sum(1 for bid in free if bid in state.placed)
     if len(new_assign) < old_count:
         return 0
+    # soft-aware accept guard: when soft shaping is active and placement is not improved,
+    # only commit a PROVEN-OPTIMAL re-seat. A timed-out (FEASIBLE) solve can return a
+    # same-placement solution that is worse on the joint soft objective than the current
+    # one; committing it would let soft drift upward. OPTIMAL guarantees soft_new <=
+    # soft_current (the current placement is a feasible point, so the optimum dominates
+    # it). Pure placement sweeps (cfg is None) are untouched, preserving the baseline.
+    if (len(new_assign) == old_count and cfg is not None
+            and cfg.soft_shaping_in_repair and st != cp_model.OPTIMAL):
+        return 0
     for bid in free:
         state.release(bid)
     for bid, c in new_assign.items():
@@ -394,6 +407,8 @@ def solve_repair(sections, rooms, instructors, cfg):
                    key=lambda bid: (len(cand_by_block[bid]), -sec_of[bid].students))
 
     eligible = overload_eligible_ids(sections, cfg) if cfg.w_instr_daily_overload else set()
+    staff_ids = frozenset(iid for iid, ins in instructors.items()
+                          if getattr(ins, "is_staff", False))
 
     state = State(sec_of, sec_instr, virtual_names)
     t0 = perf_counter()
@@ -423,6 +438,28 @@ def solve_repair(sections, rooms, instructors, cfg):
         if gained == 0 or sweep >= 25:
             break
 
+    # SOFT-POLISH (generic): placement converged; re-seat worst-soft blocks into lower-soft
+    # slots. repair_round's accept guard guarantees placement never drops. Worst-soft first;
+    # stop when the batch is already clean.
+    soft_polish_rounds = 0
+    if cfg.soft_shaping_in_repair:
+        t_sp = perf_counter()
+        sp_budget = min(SOFT_POLISH_BUDGET_S, max(0.0, deadline - (t_sp - t0)))
+        placed_ids = sorted(
+            (b.block_id for b, _ in blocks if b.block_id in state.placed),
+            key=lambda bid: -_cand_soft(state.placed[bid], sec_of[bid], cfg))
+        for i in range(0, len(placed_ids), BATCH):
+            if perf_counter() - t_sp > sp_budget:
+                break
+            batch = [bid for bid in placed_ids[i:i + BATCH] if bid in state.placed]
+            if not batch:
+                continue
+            if all(_cand_soft(state.placed[bid], sec_of[bid], cfg) == 0 for bid in batch):
+                break
+            repair_round(state, batch, cand_by_block, cfg, tl=SOFT_POLISH_TL,
+                         staff_ids=staff_ids)
+            soft_polish_rounds += 1
+
     # POLISH (overload only): once placement converges, re-optimize the days of
     # overloaded eligible instructors. repair_round never lowers placement (its accept
     # guard), so this strictly reduces overload-hours without costing any placement.
@@ -443,7 +480,8 @@ def solve_repair(sections, rooms, instructors, cfg):
                     break
                 batch = list(state.instr_blocks.get(iid, set()))
                 if batch:
-                    repair_round(state, batch, cand_by_block, cfg, eligible, tl=POLISH_TL)
+                    repair_round(state, batch, cand_by_block, cfg, eligible,
+                                 tl=POLISH_TL, staff_ids=staff_ids)
                     polish_rounds += 1
             cur = sum(max(0, h - cap) for (iid, day), h in state.instr_day_hours.items()
                       if iid in eligible)
@@ -466,6 +504,7 @@ def solve_repair(sections, rooms, instructors, cfg):
         "wall_time": round(perf_counter() - t0, 1),
         "sweeps": sweep,
         "polish_rounds": polish_rounds,
+        "soft_polish_rounds": soft_polish_rounds,
         "placed": len(state.placed),
         "total": total,
     }

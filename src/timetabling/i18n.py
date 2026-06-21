@@ -50,7 +50,7 @@ STRINGS = {
         "kpi_sections": "Şube",
         "kpi_courses": "Ders",
         "kpi_depts": "Bölüm",
-        "kpi_instructors": "Eğitmen",
+        "kpi_instructors": "Öğr. Elemanı",
         "kpi_rooms": "Derslik",
         "kpi_labs": "Laboratuvar",
         "kpi_maxcap": "Maks. kapasite",
@@ -148,9 +148,12 @@ STRINGS = {
         # course table column headers
         "tbl_course_code": "Ders Kodu",
         "tbl_course_name": "Ders Adı",
+        "tbl_dept": "Fakülte",
         "tbl_section_no": "Şube No",
         "tbl_lecturer_name": "Öğretim Elemanı",
         "tbl_lecturer_email": "E-posta",
+        "tbl_capacity": "Kontenjan",
+        "tbl_room_type": "Oda Türü",
         "tbl_students": "~Öğrenci",
         # classroom table column headers
         "tbl_room": "Oda",
@@ -189,12 +192,13 @@ STRINGS = {
         "import_status_err_hours": "Geçersiz T/P/L",
         # classrooms
         "cr_header": "Derslikler",
-        "cr_caption": "Derslik listeni CSV ile yükle veya örnek veri setini dene. Lab, oda "
-                      "adından (-L / -PC) algılanır. Online sanal oda çözüm anında otomatik eklenir.",
+        "cr_caption": "Derslik listeni CSV ile yükle veya örnek veri setini dene. Tür "
+                      "(lab / pc / studio) verilmezse oda adından (-L / -PC) türetilir. "
+                      "Online sanal oda çözüm anında otomatik eklenir.",
         "cr_upload_expander": "⬆ CSV ile derslik listesi yükle",
-        "cr_upload_hint": "Sütunlar: Room, Cap (ve isteğe bağlı Lab). Ham veri formatı "
-                          "ROOM, ROOM_CAP da kabul edilir; Lab verilmezse oda adından "
-                          "(-L / -PC) türetilir.",
+        "cr_upload_hint": "Sütunlar: Room, Capacity, Type (normal / lab / pc / studio). Ham "
+                          "veri formatı ROOM, ROOM_CAP da kabul edilir; Type verilmezse oda "
+                          "adından (-L / -PC) türetilir.",
         "cr_upload_uploader": "Derslik CSV'si seç",
         "cr_upload_loaded": "{n} derslik yüklendi.",
         "cr_upload_error": "Geçersiz CSV: 'Room' (veya 'ROOM') sütunu bulunamadı.",
@@ -209,6 +213,7 @@ STRINGS = {
         "solve_need_upload": "Önce bir ders listesi yükle (Ders yükle sayfası).",
         "solve_ready": "{c} ders satırı · {r} derslik hazır.",
         "solve_button": "Programı çöz",
+        "solve_blocked": "Çözmeden önce yukarıdaki veri hatalarını düzeltin.",
         "solve_spinner": "{n} şube çözülüyor…",
         "solve_done": "{a} blok yerleşti · {v} sert çakışma · {u} yerleşemeyen.",
         "solve_see_results": "Sonuçlara git →",
@@ -357,9 +362,12 @@ STRINGS = {
         # course table column headers
         "tbl_course_code": "Course Code",
         "tbl_course_name": "Course Name",
+        "tbl_dept": "Faculty",
         "tbl_section_no": "Section No",
         "tbl_lecturer_name": "Instructor Name",
         "tbl_lecturer_email": "Instructor Email",
+        "tbl_capacity": "Section Cap.",
+        "tbl_room_type": "Room Type",
         "tbl_students": "~Students",
         # classroom table column headers
         "tbl_room": "Room",
@@ -398,13 +406,13 @@ STRINGS = {
         "import_status_err_code": "Missing course code",
         "import_status_err_hours": "Invalid T/P/L",
         "cr_header": "Classrooms",
-        "cr_caption": "Upload your room list as a CSV or try the sample dataset. Lab is detected "
-                      "from the room name (-L / -PC). The Online virtual room is added "
-                      "automatically at solve time.",
+        "cr_caption": "Upload your room list as a CSV or try the sample dataset. When Type "
+                      "(lab / pc / studio) is omitted it is derived from the room name "
+                      "(-L / -PC). The Online virtual room is added automatically at solve time.",
         "cr_upload_expander": "⬆ Upload a room list via CSV",
-        "cr_upload_hint": "Columns: Room, Cap (and optional Lab). The raw data format "
-                          "ROOM, ROOM_CAP is also accepted; when Lab is omitted it is "
-                          "derived from the room name (-L / -PC).",
+        "cr_upload_hint": "Columns: Room, Capacity, Type (normal / lab / pc / studio). The raw "
+                          "data format ROOM, ROOM_CAP is also accepted; when Type is omitted it "
+                          "is derived from the room name (-L / -PC).",
         "cr_upload_uploader": "Choose a rooms CSV",
         "cr_upload_loaded": "{n} room(s) loaded.",
         "cr_upload_error": "Invalid CSV: no 'Room' (or 'ROOM') column found.",
@@ -418,6 +426,7 @@ STRINGS = {
         "solve_need_upload": "Upload a course list first (Upload page).",
         "solve_ready": "{c} course rows · {r} rooms ready.",
         "solve_button": "Solve timetable",
+        "solve_blocked": "Fix the data errors above before solving.",
         "solve_spinner": "Solving {n} sections…",
         "solve_done": "Placed {a} blocks · {v} hard conflicts · {u} unschedulable.",
         "solve_see_results": "See results →",

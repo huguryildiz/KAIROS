@@ -253,6 +253,52 @@ def add_soft_objective(m, x, free, cand_by_block, state, free_set, cfg,
         penalty.append(cfg.w_cohort_conflict * excess)
         ub += cfg.w_cohort_conflict * n_terms
 
+    # --- cohort-gap: minimize per-(cohort, day) idle span (compact-cohort years only) ---
+    compact_years = {str(y) for y in cfg.compact_cohort_years}
+
+    def _is_compact(cohort_key):
+        return cohort_key.rsplit("-", 1)[-1] in compact_years
+
+    frozen_hours = _dd(set)              # (cohort, day) -> {hour} from frozen blocks
+    for bid, c in state.placed.items():
+        if bid in free_set:
+            continue
+        s = state.sec_of[bid]
+        if _is_compact(s.cohort_key):
+            for hh in range(c.start, c.start + c.length):
+                frozen_hours[(s.cohort_key, c.day)].add(hh)
+
+    ch_free = _dd(list)                  # (cohort, day, hour) -> [free vars]
+    for (bid, room, day, start), v in x.items():
+        s = state.sec_of[bid]
+        if _is_compact(s.cohort_key):
+            for hh in range(start, start + length_of[bid]):
+                ch_free[(s.cohort_key, day, hh)].append(v)
+
+    active = _dd(dict)                   # (cohort, day) -> {hour: bool var or constant 1}
+    for (cohort, day, hh), vs in ch_free.items():
+        a = m.NewBoolVar(f"chact|{cohort}|{day}|{hh}")
+        m.AddMaxEquality(a, vs)
+        active[(cohort, day)][hh] = a
+    for (cohort, day), hrs in frozen_hours.items():
+        for hh in hrs:
+            active[(cohort, day)][hh] = 1     # frozen block -> constant-active
+
+    HB = cfg.horizon_end + 1
+    for (cohort, day), hourmap in active.items():
+        hours = sorted(hourmap)
+        if len(hours) < 2:
+            continue
+        load = sum(hourmap[h] for h in hours)
+        first = m.NewIntVar(0, HB, f"first|{cohort}|{day}")
+        last = m.NewIntVar(0, HB, f"last|{cohort}|{day}")
+        m.AddMaxEquality(last, [(h + 1) * hourmap[h] for h in hours])
+        m.AddMinEquality(first, [h * hourmap[h] + HB * (1 - hourmap[h]) for h in hours])
+        gap = m.NewIntVar(0, cfg.horizon_end, f"cgap|{cohort}|{day}")
+        m.Add(gap >= last - first - load)
+        penalty.append(cfg.w_cohort_gap * gap)
+        ub += cfg.w_cohort_gap * cfg.horizon_end
+
     return penalty, ub
 
 

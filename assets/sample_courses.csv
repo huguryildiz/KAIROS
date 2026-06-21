@@ -1,11 +1,11 @@
 Course Code,Course Name,Dept,Section No,Instructor Name,Instructor Email,Part-time,T,P,L,Section Capacity,~Students,Room Type
-CMPE 113,Introduction to Programming,Faculty of Engineering,CMPE 113_01,A. Yilmaz,ayilmaz@uni.edu,,3,0,2,50,48,pc
-CMPE 113,Introduction to Programming,Faculty of Engineering,CMPE 113_02,A. Yilmaz,ayilmaz@uni.edu,,3,0,2,50,45,pc
-CMPE 223,Discrete Structures,Faculty of Engineering,CMPE 223_01,C. Arslan,carslan@uni.edu,,3,0,0,46,40,
-MATH 101,Calculus I,Faculty of Basic Sciences,MATH 101_01,B. Demir,bdemir@uni.edu,,4,0,0,60,58,
-MATH 101,Calculus I,Faculty of Basic Sciences,MATH 101_02,H. Kaya (S),,yes,4,0,0,60,55,
-PSY 201,Developmental Psychology,Faculty of Arts and Sciences,PSY 201_01,S. Aydin,saydin@uni.edu,,3,0,0,40,38,
-ARCH 301,Architectural Design III,Faculty of Architecture,ARCH 301_01,M. Celik,mcelik@uni.edu,,2,0,4,25,22,studio
-ARCH 301,Architectural Design III,Faculty of Architecture,ARCH 301_02,M. Celik,mcelik@uni.edu,,2,0,4,25,20,studio
-EE 202,Circuit Theory,Faculty of Engineering,EE 202_01,K. Sahin,ksahin@uni.edu,,3,0,2,45,42,lab
-ADA 403,Exploratory Data Analysis,Faculty of Econ. and Administ. Sciences,ADA 403_01,O. Gencel,ogencel@uni.edu,,3,0,0,45,40,
+CMPE 113,Introduction to Programming,Faculty of Engineering,CMPE 113_01,Ahmet Yılmaz,ayilmaz@uni.edu,,3,0,2,50,48,pc
+CMPE 113,Introduction to Programming,Faculty of Engineering,CMPE 113_02,Ahmet Yılmaz,ayilmaz@uni.edu,,3,0,2,50,45,pc
+CMPE 223,Discrete Structures,Faculty of Engineering,CMPE 223_01,Cem Arslan,carslan@uni.edu,,3,0,0,46,40,
+MATH 101,Calculus I,Faculty of Basic Sciences,MATH 101_01,Burak Demir,bdemir@uni.edu,,4,0,0,60,58,
+MATH 101,Calculus I,Faculty of Basic Sciences,MATH 101_02,Hakan Kaya (S),,yes,4,0,0,60,55,
+PSY 201,Developmental Psychology,Faculty of Arts and Sciences,PSY 201_01,Selin Aydın,saydin@uni.edu,,3,0,0,40,38,
+ARCH 301,Architectural Design III,Faculty of Architecture,ARCH 301_01,Mehmet Çelik,mcelik@uni.edu,,2,0,4,25,22,studio
+ARCH 301,Architectural Design III,Faculty of Architecture,ARCH 301_02,Mehmet Çelik,mcelik@uni.edu,,2,0,4,25,20,studio
+EE 202,Circuit Theory,Faculty of Engineering,EE 202_01,Kerem Şahin,ksahin@uni.edu,,3,0,2,45,42,lab
+ADA 403,Exploratory Data Analysis,Faculty of Econ. and Administ. Sciences,ADA 403_01,Onur Gencel,ogencel@uni.edu,,3,0,0,45,40,

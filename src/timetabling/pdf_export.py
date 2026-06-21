@@ -44,6 +44,12 @@ def _tint(hex_color: str, strength: float) -> Tuple[int, int, int]:
     return mix(r), mix(g), mix(b)
 
 
+def _blend(rgb_a: Tuple[int, int, int], rgb_b: Tuple[int, int, int],
+           f: float) -> Tuple[int, int, int]:
+    """Blend rgb_a toward rgb_b. f=1 → all a, f=0 → all b."""
+    return tuple(round(a * f + b * (1 - f)) for a, b in zip(rgb_a, rgb_b))
+
+
 def _block_tag(a: dict) -> str:
     """LAB / PRAT tag mirroring the on-screen grid, or '' for plain theory."""
     if "lab" in str(a.get("block_kind", "")).lower():
@@ -116,43 +122,65 @@ def _draw_block(pdf: FPDF, a: dict, x: float, y: float, w: float, h: float,
                 show_instructor: bool) -> None:
     color = block_color(a)
     accent = _hex_to_rgb(color)
-    fill = _tint(color, 0.14)
-    # Card: light tinted fill, subtle border, rounded corners.
-    pdf.set_fill_color(*fill)
-    pdf.set_draw_color(*_tint(color, 0.55))
-    pdf.set_line_width(0.2)
-    pdf.rect(x, y, w, h, style="DF", round_corners=True, corner_radius=1.4)
-    # Colored left accent bar.
+    fill = _tint(color, 0.13)                  # ~13% color over white (matches UI)
+    code_rgb = _blend(accent, (32, 34, 44), 0.72)   # dark tint of the color
+    r, bar_w = 2.4, 2.4                        # card corner radius / left-bar width
+    # 1) Whole card filled with the accent — supplies the rounded left corners.
     pdf.set_fill_color(*accent)
-    pdf.rect(x + 0.5, y + 0.8, 1.4, max(h - 1.6, 0.6), style="F", round_corners=True,
-             corner_radius=0.7)
+    pdf.rect(x, y, w, h, style="F", round_corners=True, corner_radius=r)
+    # 2) Tint over everything EXCEPT the left bar strip → full-height left accent
+    #    bar whose outer-left corners follow the card, inner edge straight.
+    with pdf.rect_clip(x + bar_w, y, w - bar_w, h):
+        pdf.set_fill_color(*fill)
+        pdf.rect(x, y, w, h, style="F", round_corners=True, corner_radius=r)
+    # 3) Soft outline.
+    pdf.set_draw_color(*_tint(color, 0.45))
+    pdf.set_line_width(0.2)
+    pdf.rect(x, y, w, h, style="D", round_corners=True, corner_radius=r)
 
     tag = _block_tag(a)
     section = str(a.get("section_id") or a.get("course_code", ""))
-    code_line = f"{section}  ·{tag}" if tag else section
-    lines = [(code_line, 7.0, True, (24, 24, 24))]
+    lines = [(section, tag, 7.2, True, code_rgb)]
     if show_instructor:
         instr = _instructor_text(a)
         if instr:
-            lines.append((instr, 6.0, False, (70, 70, 70)))
+            lines.append((instr, "", 6.0, False, (96, 100, 112)))
     room = str(a.get("room", "") or "")
     if room:
-        lines.append((room, 6.0, False, accent))
+        lines.append((room, "", 6.0, False, _blend(accent, (70, 74, 86), 0.6)))
 
-    pad_l, pad_t = 3.4, 1.2
-    tw = w - pad_l - 1.6
+    pad_l, pad_t = 5.0, 1.6
+    tw = w - pad_l - 1.8
     with pdf.rect_clip(x, y, w, h):
         cy = y + pad_t
-        for txt, size, bold, rgb in lines:
+        for txt, tg, size, bold, rgb in lines:
             lh = size * 0.46
             if cy + lh > y + h:
                 break
             pdf.set_font("DejaVu", "B" if bold else "", size)
             pdf.set_text_color(*rgb)
             pdf.set_xy(x + pad_l, cy)
-            pdf.cell(tw, lh, _fit(pdf, txt, tw))
-            cy += lh + 0.5
+            shown = _fit(pdf, txt, tw - (9.0 if tg else 0))
+            pdf.cell(pdf.get_string_width(shown) + 0.5, lh, shown)
+            if tg:                              # small bordered tag pill (amber for PRAT)
+                _draw_tag(pdf, tg)
+            cy += lh + 0.6
     pdf.set_text_color(0, 0, 0)
+
+
+def _draw_tag(pdf: FPDF, tag: str) -> None:
+    """Bordered mini-pill drawn inline after the section code (PRAT amber / LAB color)."""
+    rgb = (180, 83, 9) if tag == "PRAT" else (90, 95, 110)
+    pdf.set_font("DejaVu", "B", 4.6)
+    tw = pdf.get_string_width(tag)
+    x, y = pdf.get_x() + 1.4, pdf.get_y()
+    pw, ph = tw + 2.2, 2.7
+    pdf.set_draw_color(*rgb)
+    pdf.set_line_width(0.18)
+    pdf.rect(x, y + 0.5, pw, ph, style="D", round_corners=True, corner_radius=0.6)
+    pdf.set_text_color(*rgb)
+    pdf.set_xy(x, y + 0.4)
+    pdf.cell(pw, ph, tag, align="C")
 
 
 def build_grid_pdf(schedule: dict, title: str, lang: str = DEFAULT_LANG,

@@ -253,7 +253,9 @@ def test_read_raw_and_parse_sample_classrooms_all_ok():
     assert p["stats"]["total"] > 0
     assert p["stats"]["error"] == 0
     assert p["stats"]["valid"] == p["stats"]["total"]
-    # ROOM/ROOM_CAP header -> Room+Capacity matched, Type positional (derived).
+    # Room/Capacity/Type header -> all three matched by header.
     srcs = {d["field"]: d["source"] for d in p["detected_columns"]}
     assert srcs["Room"] == "header" and srcs["Capacity"] == "header"
-    assert srcs["Type"] == "positional"
+    assert srcs["Type"] == "header"
+    # categorical types parsed straight from the column
+    assert {r["Type"] for r in ok_rooms(p)} <= {"normal", "lab", "pc", "studio"}

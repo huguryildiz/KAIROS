@@ -1,101 +1,101 @@
-Course Code,Course Name,Dept,Section No,Instructor Name,Instructor Email,Part-time,T,P,L,Section Capacity,~Students,Room Type
-MATH 413,Differential Equations,Faculty of Basic Sciences,MATH 413_01,Ahmet Acar,aacar@uni.edu,,3,2,0,24,20,
-IE 312,Production Planning,Faculty of Engineering,IE 312_01,Merve Yıldız,myildiz@uni.edu,,4,0,0,60,59,
-EE 413,Electromagnetics,Faculty of Engineering,EE 413_01,Serkan Güneş,sgunes@uni.edu,,2,0,0,90,82,
-ECON 312,Macroeconomics,Faculty of Econ. and Administ. Sciences,ECON 312_01,Onur Taş,otas@uni.edu,,4,0,0,27,22,
-INT 110,Interior Design Studio,Faculty of Architecture,INT 110_01,Hakan Yavuz,hyavuz@uni.edu,,2,0,4,60,52,studio
-MATH 110,Calculus I,Faculty of Basic Sciences,MATH 110_01,Ahmet Acar,aacar@uni.edu,,2,0,0,50,50,
-CMPE 316,Software Engineering,Faculty of Engineering,CMPE 316_01,Murat Şahin,msahin@uni.edu,,3,0,0,35,32,
-PSY 110,Introduction to Psychology,Faculty of Arts and Sciences,PSY 110_01,Tolga Kara,tkara@uni.edu,,4,0,0,80,79,
-MATH 114,Probability,Faculty of Basic Sciences,MATH 114_01,Ahmet Acar,aacar@uni.edu,,3,2,0,25,17,
-CMPE 110,Introduction to Programming,Faculty of Engineering,CMPE 110_01,Murat Şahin,msahin@uni.edu,,3,0,2,90,83,pc
-PHYS 312,Modern Physics,Faculty of Basic Sciences,PHYS 312_01,Pınar Korkmaz,pkorkmaz@uni.edu,,3,0,2,35,27,lab
-MATH 312,Linear Algebra,Faculty of Basic Sciences,MATH 312_01,Murat Erdem,merdem@uni.edu,,3,2,0,30,22,
-ADA 312,Statistical Learning,Faculty of Econ. and Administ. Sciences,ADA 312_01,Esra Aslan,easlan@uni.edu,,4,0,0,35,29,
-HIST 211,Modern History,Faculty of Arts and Sciences,HIST 211_01,Kerem Şen,ksen@uni.edu,,2,0,0,50,42,
-HIST 110,World History,Faculty of Arts and Sciences,HIST 110_01,Elif Yıldız,eyildiz@uni.edu,,3,0,0,30,27,
-PSY 312,Cognitive Psychology,Faculty of Arts and Sciences,PSY 312_01,Tolga Kara,tkara@uni.edu,,2,0,0,24,16,
-ME 110,Statics,Faculty of Engineering,ME 110_01,Okan Acar,oacar@uni.edu,,3,0,2,24,23,lab
-LAW 211,Constitutional Law,Faculty of Law,LAW 211_01,Serkan Korkmaz,skorkmaz@uni.edu,,3,0,0,30,29,
-ENG 312,Creative Writing,Faculty of Arts and Sciences,ENG 312_01,Mehmet Güneş,mgunes@uni.edu,,2,0,0,25,17,
-CMPE 215,Computer Networks,Faculty of Engineering,CMPE 215_01,Murat Şahin,msahin@uni.edu,,3,0,0,90,83,
-ARCH 110,Architectural Design I,Faculty of Architecture,ARCH 110_01,Zeynep Demir,zdemir@uni.edu,,2,0,4,60,58,studio
-CHEM 211,Organic Chemistry,Faculty of Basic Sciences,CHEM 211_01,Sibel Aydın,saydin@uni.edu,,4,0,0,30,23,
-ECON 413,Econometrics,Faculty of Econ. and Administ. Sciences,ECON 413_01,Mehmet Bulut (S),,yes,4,0,0,25,24,
-CMPE 211,Data Structures,Faculty of Engineering,CMPE 211_01,Kerem Gencel,kgencel@uni.edu,,3,0,0,40,34,
-PHYS 110,Physics I,Faculty of Basic Sciences,PHYS 110_01,Onur Koç,okoc@uni.edu,,4,0,0,24,23,
-BUS 110,Introduction to Business,Faculty of Econ. and Administ. Sciences,BUS 110_01,Emre Demir,edemir@uni.edu,,3,2,0,40,39,
-SOC 110,Introduction to Sociology,Faculty of Arts and Sciences,SOC 110_01,Volkan Kılıç,vkilic@uni.edu,,4,0,0,30,22,
-PSY 413,Social Psychology,Faculty of Arts and Sciences,PSY 413_01,Selin Korkmaz,skorkmaz@uni.edu,,4,0,0,45,43,
-ARCH 413,Building Technology,Faculty of Architecture,ARCH 413_01,Gizem Doğan (S),,yes,2,0,4,50,47,studio
-EE 110,Circuit Theory,Faculty of Engineering,EE 110_01,Onur Çelik,ocelik@uni.edu,,3,0,0,60,59,
-EE 114,Control Systems,Faculty of Engineering,EE 114_01,Onur Çelik,ocelik@uni.edu,,2,2,0,60,60,pc
-ENG 110,Academic English,Faculty of Arts and Sciences,ENG 110_01,Mehmet Güneş,mgunes@uni.edu,,4,0,0,27,21,
-CHEM 110,General Chemistry,Faculty of Basic Sciences,CHEM 110_01,Ahmet Taş,atas@uni.edu,,4,0,0,30,24,
-ADA 110,Statistics for Analytics,Faculty of Econ. and Administ. Sciences,ADA 110_01,Zeynep Korkmaz,zkorkmaz@uni.edu,,4,0,0,45,45,
-ME 413,Machine Design,Faculty of Engineering,ME 413_01,Mustafa Polat,mpolat@uni.edu,,4,0,0,50,46,
-EE 211,Signals and Systems,Faculty of Engineering,EE 211_01,Barış Şahin,bsahin@uni.edu,,2,2,0,60,53,pc
-IE 110,Operations Research,Faculty of Engineering,IE 110_01,Ahmet Demir,ademir@uni.edu,,4,0,0,35,32,
-EE 312,Electronics,Faculty of Engineering,EE 312_01,Onur Çelik,ocelik@uni.edu,,2,2,0,60,60,pc
-CHEM 312,Physical Chemistry,Faculty of Basic Sciences,CHEM 312_01,Sibel Aydın,saydin@uni.edu,,4,0,0,24,24,
-INT 211,Materials and Detailing,Faculty of Architecture,INT 211_01,Pınar Arslan,parslan@uni.edu,,2,0,4,50,42,studio
-PSY 211,Developmental Psychology,Faculty of Arts and Sciences,PSY 211_01,Hüseyin Arslan,harslan@uni.edu,,4,0,0,24,16,
-LAW 312,Contract Law,Faculty of Law,LAW 312_01,Burak Aslan,baslan@uni.edu,,4,0,0,25,24,
-COMM 211,Visual Communication,Faculty of Communication,COMM 211_01,Mustafa Yıldız,myildiz@uni.edu,,4,0,0,45,44,
-SOC 312,Research Methods,Faculty of Arts and Sciences,SOC 312_01,Zeynep Şahin,zsahin@uni.edu,,4,0,0,80,80,
-ME 211,Thermodynamics,Faculty of Engineering,ME 211_01,Ayşe Kaya,akaya@uni.edu,,3,0,2,45,37,lab
-CMPE 114,Databases,Faculty of Engineering,CMPE 114_01,Ahmet Güneş,agunes@uni.edu,,3,0,0,30,25,
-COMM 110,Media Studies,Faculty of Communication,COMM 110_01,Tolga Bozkurt,tbozkurt@uni.edu,,2,0,0,45,43,
-PHYS 211,Physics II,Faculty of Basic Sciences,PHYS 211_01,Pınar Korkmaz,pkorkmaz@uni.edu,,4,0,0,50,45,
-BUS 413,Strategic Management,Faculty of Econ. and Administ. Sciences,BUS 413_01,Emre Demir,edemir@uni.edu,,3,0,0,50,49,
-CMPE 312,Algorithms,Faculty of Engineering,CMPE 312_01,Murat Şahin,msahin@uni.edu,,2,2,0,30,22,pc
-ADA 211,Exploratory Data Analysis,Faculty of Econ. and Administ. Sciences,ADA 211_01,Deniz Aksoy (S),,yes,4,0,0,40,39,
-CMPE 413,Operating Systems,Faculty of Engineering,CMPE 413_01,Murat Şahin,msahin@uni.edu,,2,0,0,35,33,
-BUS 312,Financial Accounting,Faculty of Econ. and Administ. Sciences,BUS 312_01,Tuğçe Gencel,tgencel@uni.edu,,2,0,0,80,72,
-ECON 211,Microeconomics,Faculty of Econ. and Administ. Sciences,ECON 211_01,Tolga Demir,tdemir@uni.edu,,2,0,0,90,89,
-BUS 211,Marketing,Faculty of Econ. and Administ. Sciences,BUS 211_01,Emre Demir,edemir@uni.edu,,2,0,0,25,24,
-MATH 211,Calculus II,Faculty of Basic Sciences,MATH 211_01,Murat Erdem,merdem@uni.edu,,4,0,0,35,31,
-ARCH 211,Architectural Design III,Faculty of Architecture,ARCH 211_01,Esra Aksoy,eaksoy@uni.edu,,2,0,4,30,25,studio
-ME 312,Fluid Mechanics,Faculty of Engineering,ME 312_01,Okan Acar,oacar@uni.edu,,4,0,0,60,53,
-SOC 211,Social Theory,Faculty of Arts and Sciences,SOC 211_01,Ali Demir,ademir@uni.edu,,3,0,0,25,19,
-ARCH 312,History of Architecture,Faculty of Architecture,ARCH 312_01,Gizem Doğan (S),,yes,2,0,4,24,24,studio
-ENG 211,Literary Analysis,Faculty of Arts and Sciences,ENG 211_01,Deniz Acar,dacar@uni.edu,,4,0,0,90,86,
-COMM 312,Public Relations,Faculty of Communication,COMM 312_01,Tolga Bozkurt,tbozkurt@uni.edu,,3,2,0,60,54,
-IE 211,Quality Engineering,Faculty of Engineering,IE 211_01,Merve Yıldız,myildiz@uni.edu,,3,0,0,25,24,
-ECON 110,Principles of Economics,Faculty of Econ. and Administ. Sciences,ECON 110_01,Onur Taş,otas@uni.edu,,4,0,0,60,60,
-LAW 110,Introduction to Law,Faculty of Law,LAW 110_01,Elif Arslan,earslan@uni.edu,,4,0,0,45,43,
-MATH 413,Differential Equations,Faculty of Basic Sciences,MATH 413_02,Ahmet Acar,aacar@uni.edu,,2,0,0,40,40,
-IE 312,Production Planning,Faculty of Engineering,IE 312_02,Cem Gencel (S),,yes,4,0,0,90,87,
-EE 413,Electromagnetics,Faculty of Engineering,EE 413_02,Serkan Güneş,sgunes@uni.edu,,3,0,0,40,32,
-ECON 312,Macroeconomics,Faculty of Econ. and Administ. Sciences,ECON 312_02,Mehmet Bulut (S),,yes,4,0,0,30,28,
-INT 110,Interior Design Studio,Faculty of Architecture,INT 110_02,Hakan Yavuz,hyavuz@uni.edu,,2,0,4,45,45,studio
-MATH 110,Calculus I,Faculty of Basic Sciences,MATH 110_02,Ahmet Acar,aacar@uni.edu,,2,0,0,45,42,
-CMPE 316,Software Engineering,Faculty of Engineering,CMPE 316_02,Ahmet Güneş,agunes@uni.edu,,3,0,2,25,19,pc
-PSY 110,Introduction to Psychology,Faculty of Arts and Sciences,PSY 110_02,Tolga Kara,tkara@uni.edu,,3,2,0,30,27,
-MATH 114,Probability,Faculty of Basic Sciences,MATH 114_02,Cem Erdem,cerdem@uni.edu,,2,0,0,35,32,
-CMPE 110,Introduction to Programming,Faculty of Engineering,CMPE 110_02,Murat Şahin,msahin@uni.edu,,3,0,2,90,87,pc
-PHYS 312,Modern Physics,Faculty of Basic Sciences,PHYS 312_02,Onur Koç,okoc@uni.edu,,4,0,0,35,34,
-MATH 312,Linear Algebra,Faculty of Basic Sciences,MATH 312_02,Cem Erdem,cerdem@uni.edu,,2,0,0,90,82,
-ADA 312,Statistical Learning,Faculty of Econ. and Administ. Sciences,ADA 312_02,Deniz Aksoy (S),,yes,2,0,0,24,23,
-HIST 211,Modern History,Faculty of Arts and Sciences,HIST 211_02,Elif Yıldız,eyildiz@uni.edu,,4,0,0,80,76,
-HIST 110,World History,Faculty of Arts and Sciences,HIST 110_02,Elif Uçar,eucar@uni.edu,,3,0,0,80,74,
-PSY 312,Cognitive Psychology,Faculty of Arts and Sciences,PSY 312_02,Selin Korkmaz,skorkmaz@uni.edu,,2,0,0,45,37,
-ME 110,Statics,Faculty of Engineering,ME 110_02,Okan Acar,oacar@uni.edu,,4,0,0,80,77,
-LAW 211,Constitutional Law,Faculty of Law,LAW 211_02,Elif Arslan,earslan@uni.edu,,3,0,0,45,45,
-ENG 312,Creative Writing,Faculty of Arts and Sciences,ENG 312_02,Ali Bozkurt,abozkurt@uni.edu,,4,0,0,40,34,
-CMPE 215,Computer Networks,Faculty of Engineering,CMPE 215_02,Murat Şahin,msahin@uni.edu,,2,2,0,40,35,pc
-ARCH 110,Architectural Design I,Faculty of Architecture,ARCH 110_02,Esra Aksoy,eaksoy@uni.edu,,2,0,4,25,21,studio
-CHEM 211,Organic Chemistry,Faculty of Basic Sciences,CHEM 211_02,Sibel Aydın,saydin@uni.edu,,4,0,0,90,84,
-ECON 413,Econometrics,Faculty of Econ. and Administ. Sciences,ECON 413_02,Mehmet Bulut (S),,yes,3,2,0,35,27,
-CMPE 211,Data Structures,Faculty of Engineering,CMPE 211_02,Murat Şahin,msahin@uni.edu,,3,0,2,45,39,pc
-PHYS 110,Physics I,Faculty of Basic Sciences,PHYS 110_02,Pınar Korkmaz,pkorkmaz@uni.edu,,3,0,2,80,76,lab
-BUS 110,Introduction to Business,Faculty of Econ. and Administ. Sciences,BUS 110_02,Tuğçe Gencel,tgencel@uni.edu,,3,0,0,35,31,
-SOC 110,Introduction to Sociology,Faculty of Arts and Sciences,SOC 110_02,Volkan Kılıç,vkilic@uni.edu,,3,2,0,80,75,
-PSY 413,Social Psychology,Faculty of Arts and Sciences,PSY 413_02,Selin Korkmaz,skorkmaz@uni.edu,,3,2,0,50,47,
-ARCH 413,Building Technology,Faculty of Architecture,ARCH 413_02,Esra Aksoy,eaksoy@uni.edu,,2,0,4,50,48,studio
-EE 110,Circuit Theory,Faculty of Engineering,EE 110_02,Serkan Güneş,sgunes@uni.edu,,3,0,2,35,27,pc
-EE 114,Control Systems,Faculty of Engineering,EE 114_02,Serkan Güneş,sgunes@uni.edu,,2,2,0,80,75,pc
-ENG 110,Academic English,Faculty of Arts and Sciences,ENG 110_02,Mehmet Güneş,mgunes@uni.edu,,4,0,0,90,86,
-CHEM 110,General Chemistry,Faculty of Basic Sciences,CHEM 110_02,Sibel Uçar,sucar@uni.edu,,3,0,2,27,27,lab
-ADA 110,Statistics for Analytics,Faculty of Econ. and Administ. Sciences,ADA 110_02,Zeynep Korkmaz,zkorkmaz@uni.edu,,4,0,0,50,49,
-ME 413,Machine Design,Faculty of Engineering,ME 413_02,Mustafa Polat,mpolat@uni.edu,,4,0,0,90,87,
+COURSE_CODE,COURSE_NAME,DEPT,SECTION,LECTURER,Email,Part-time,T,P,L,Section Capacity,Room Type
+MATH 413,Differential Equations,Department of Mathematics,MATH 413_01,Ahmet Acar,aacar@uni.edu,,3,2,0,24,
+IE 312,Production Planning,Department of Industrial Engineering,IE 312_01,Merve Yıldız,myildiz@uni.edu,,4,0,0,60,
+EE 413,Electromagnetics,Dept.of Electric&Electronics Engineering,EE 413_01,Serkan Güneş,sgunes@uni.edu,,2,0,0,90,
+ECON 312,Macroeconomics,Department of Economics,ECON 312_01,Onur Taş,otas@uni.edu,,4,0,0,27,
+INT 110,Interior Design Studio,Faculty of Architecture,INT 110_01,Hakan Yavuz,hyavuz@uni.edu,,2,0,4,60,studio
+MATH 110,Calculus I,Department of Mathematics,MATH 110_01,Ahmet Acar,aacar@uni.edu,,2,0,0,50,
+CMPE 316,Software Engineering,General Culture Courses Coordinator,CMPE 316_01,Murat Şahin,msahin@uni.edu,,3,0,0,35,
+PSY 110,Introduction to Psychology,Department of Psychology,PSY 110_01,Tolga Kara,tkara@uni.edu,,4,0,0,80,
+MATH 114,Probability,Department of Mathematics,MATH 114_01,Ahmet Acar,aacar@uni.edu,,3,2,0,25,
+CMPE 110,Introduction to Programming,General Culture Courses Coordinator,CMPE 110_01,Murat Şahin,msahin@uni.edu,,3,0,2,90,pc
+PHYS 312,Modern Physics,Basic Sciences,PHYS 312_01,Pınar Korkmaz,pkorkmaz@uni.edu,,3,0,2,35,lab
+MATH 312,Linear Algebra,Department of Mathematics,MATH 312_01,Murat Erdem,merdem@uni.edu,,3,2,0,30,
+ADA 312,Statistical Learning,Faculty of Econ. and Administ. Sciences,ADA 312_01,Esra Aslan,easlan@uni.edu,,4,0,0,35,
+HIST 211,Modern History,Basic Sciences,HIST 211_01,Kerem Şen,ksen@uni.edu,,2,0,0,50,
+HIST 110,World History,Basic Sciences,HIST 110_01,Elif Yıldız,eyildiz@uni.edu,,3,0,0,30,
+PSY 312,Cognitive Psychology,Department of Psychology,PSY 312_01,Tolga Kara,tkara@uni.edu,,2,0,0,24,
+ME 110,Statics,Department of Mechanical Engineering,ME 110_01,Okan Acar,oacar@uni.edu,,3,0,2,24,lab
+LAW 211,Constitutional Law,Faculty of Econ. and Administ. Sciences,LAW 211_01,Serkan Korkmaz,skorkmaz@uni.edu,,3,0,0,30,
+ENG 312,Creative Writing,English Language School,ENG 312_01,Mehmet Güneş,mgunes@uni.edu,,2,0,0,25,
+CMPE 215,Computer Networks,General Culture Courses Coordinator,CMPE 215_01,Murat Şahin,msahin@uni.edu,,3,0,0,90,
+ARCH 110,Architectural Design I,Department of Architecture,ARCH 110_01,Zeynep Demir,zdemir@uni.edu,,2,0,4,60,studio
+CHEM 211,Organic Chemistry,Basic Sciences,CHEM 211_01,Sibel Aydın,saydin@uni.edu,,4,0,0,30,
+ECON 413,Econometrics,Department of Economics,ECON 413_01,Mehmet Bulut (S),,yes,4,0,0,25,
+CMPE 211,Data Structures,General Culture Courses Coordinator,CMPE 211_01,Kerem Gencel,kgencel@uni.edu,,3,0,0,40,
+PHYS 110,Physics I,Basic Sciences,PHYS 110_01,Onur Koç,okoc@uni.edu,,4,0,0,24,
+BUS 110,Introduction to Business,Faculty of Econ. and Administ. Sciences,BUS 110_01,Emre Demir,edemir@uni.edu,,3,2,0,40,
+SOC 110,Introduction to Sociology,Department of Sociology,SOC 110_01,Volkan Kılıç,vkilic@uni.edu,,4,0,0,30,
+PSY 413,Social Psychology,Department of Psychology,PSY 413_01,Selin Korkmaz,skorkmaz@uni.edu,,4,0,0,45,
+ARCH 413,Building Technology,Department of Architecture,ARCH 413_01,Gizem Doğan (S),,yes,2,0,4,50,studio
+EE 110,Circuit Theory,Dept.of Electric&Electronics Engineering,EE 110_01,Onur Çelik,ocelik@uni.edu,,3,0,0,60,
+EE 114,Control Systems,Dept.of Electric&Electronics Engineering,EE 114_01,Onur Çelik,ocelik@uni.edu,,2,2,0,60,pc
+ENG 110,Academic English,English Language School,ENG 110_01,Mehmet Güneş,mgunes@uni.edu,,4,0,0,27,
+CHEM 110,General Chemistry,Basic Sciences,CHEM 110_01,Ahmet Taş,atas@uni.edu,,4,0,0,30,
+ADA 110,Statistics for Analytics,Faculty of Econ. and Administ. Sciences,ADA 110_01,Zeynep Korkmaz,zkorkmaz@uni.edu,,4,0,0,45,
+ME 413,Machine Design,Department of Mechanical Engineering,ME 413_01,Mustafa Polat,mpolat@uni.edu,,4,0,0,50,
+EE 211,Signals and Systems,Dept.of Electric&Electronics Engineering,EE 211_01,Barış Şahin,bsahin@uni.edu,,2,2,0,60,pc
+IE 110,Operations Research,Department of Industrial Engineering,IE 110_01,Ahmet Demir,ademir@uni.edu,,4,0,0,35,
+EE 312,Electronics,Dept.of Electric&Electronics Engineering,EE 312_01,Onur Çelik,ocelik@uni.edu,,2,2,0,60,pc
+CHEM 312,Physical Chemistry,Basic Sciences,CHEM 312_01,Sibel Aydın,saydin@uni.edu,,4,0,0,24,
+INT 211,Materials and Detailing,Faculty of Architecture,INT 211_01,Pınar Arslan,parslan@uni.edu,,2,0,4,50,studio
+PSY 211,Developmental Psychology,Department of Psychology,PSY 211_01,Hüseyin Arslan,harslan@uni.edu,,4,0,0,24,
+LAW 312,Contract Law,Faculty of Econ. and Administ. Sciences,LAW 312_01,Burak Aslan,baslan@uni.edu,,4,0,0,25,
+COMM 211,Visual Communication,Faculty of Communication,COMM 211_01,Mustafa Yıldız,myildiz@uni.edu,,4,0,0,45,
+SOC 312,Research Methods,Department of Sociology,SOC 312_01,Zeynep Şahin,zsahin@uni.edu,,4,0,0,80,
+ME 211,Thermodynamics,Department of Mechanical Engineering,ME 211_01,Ayşe Kaya,akaya@uni.edu,,3,0,2,45,lab
+CMPE 114,Databases,General Culture Courses Coordinator,CMPE 114_01,Ahmet Güneş,agunes@uni.edu,,3,0,0,30,
+COMM 110,Media Studies,Faculty of Communication,COMM 110_01,Tolga Bozkurt,tbozkurt@uni.edu,,2,0,0,45,
+PHYS 211,Physics II,Basic Sciences,PHYS 211_01,Pınar Korkmaz,pkorkmaz@uni.edu,,4,0,0,50,
+BUS 413,Strategic Management,Faculty of Econ. and Administ. Sciences,BUS 413_01,Emre Demir,edemir@uni.edu,,3,0,0,50,
+CMPE 312,Algorithms,General Culture Courses Coordinator,CMPE 312_01,Murat Şahin,msahin@uni.edu,,2,2,0,30,pc
+ADA 211,Exploratory Data Analysis,Faculty of Econ. and Administ. Sciences,ADA 211_01,Deniz Aksoy (S),,yes,4,0,0,40,
+CMPE 413,Operating Systems,General Culture Courses Coordinator,CMPE 413_01,Murat Şahin,msahin@uni.edu,,2,0,0,35,
+BUS 312,Financial Accounting,Faculty of Econ. and Administ. Sciences,BUS 312_01,Tuğçe Gencel,tgencel@uni.edu,,2,0,0,80,
+ECON 211,Microeconomics,Department of Economics,ECON 211_01,Tolga Demir,tdemir@uni.edu,,2,0,0,90,
+BUS 211,Marketing,Faculty of Econ. and Administ. Sciences,BUS 211_01,Emre Demir,edemir@uni.edu,,2,0,0,25,
+MATH 211,Calculus II,Department of Mathematics,MATH 211_01,Murat Erdem,merdem@uni.edu,,4,0,0,35,
+ARCH 211,Architectural Design III,Department of Architecture,ARCH 211_01,Esra Aksoy,eaksoy@uni.edu,,2,0,4,30,studio
+ME 312,Fluid Mechanics,Department of Mechanical Engineering,ME 312_01,Okan Acar,oacar@uni.edu,,4,0,0,60,
+SOC 211,Social Theory,Department of Sociology,SOC 211_01,Ali Demir,ademir@uni.edu,,3,0,0,25,
+ARCH 312,History of Architecture,Department of Architecture,ARCH 312_01,Gizem Doğan (S),,yes,2,0,4,24,studio
+ENG 211,Literary Analysis,English Language School,ENG 211_01,Deniz Acar,dacar@uni.edu,,4,0,0,90,
+COMM 312,Public Relations,Faculty of Communication,COMM 312_01,Tolga Bozkurt,tbozkurt@uni.edu,,3,2,0,60,
+IE 211,Quality Engineering,Department of Industrial Engineering,IE 211_01,Merve Yıldız,myildiz@uni.edu,,3,0,0,25,
+ECON 110,Principles of Economics,Department of Economics,ECON 110_01,Onur Taş,otas@uni.edu,,4,0,0,60,
+LAW 110,Introduction to Law,Faculty of Econ. and Administ. Sciences,LAW 110_01,Elif Arslan,earslan@uni.edu,,4,0,0,45,
+MATH 413,Differential Equations,Department of Mathematics,MATH 413_02,Ahmet Acar,aacar@uni.edu,,2,0,0,40,
+IE 312,Production Planning,Department of Industrial Engineering,IE 312_02,Cem Gencel (S),,yes,4,0,0,90,
+EE 413,Electromagnetics,Dept.of Electric&Electronics Engineering,EE 413_02,Serkan Güneş,sgunes@uni.edu,,3,0,0,40,
+ECON 312,Macroeconomics,Department of Economics,ECON 312_02,Mehmet Bulut (S),,yes,4,0,0,30,
+INT 110,Interior Design Studio,Faculty of Architecture,INT 110_02,Hakan Yavuz,hyavuz@uni.edu,,2,0,4,45,studio
+MATH 110,Calculus I,Department of Mathematics,MATH 110_02,Ahmet Acar,aacar@uni.edu,,2,0,0,45,
+CMPE 316,Software Engineering,General Culture Courses Coordinator,CMPE 316_02,Ahmet Güneş,agunes@uni.edu,,3,0,2,25,pc
+PSY 110,Introduction to Psychology,Department of Psychology,PSY 110_02,Tolga Kara,tkara@uni.edu,,3,2,0,30,
+MATH 114,Probability,Department of Mathematics,MATH 114_02,Cem Erdem,cerdem@uni.edu,,2,0,0,35,
+CMPE 110,Introduction to Programming,General Culture Courses Coordinator,CMPE 110_02,Murat Şahin,msahin@uni.edu,,3,0,2,90,pc
+PHYS 312,Modern Physics,Basic Sciences,PHYS 312_02,Onur Koç,okoc@uni.edu,,4,0,0,35,
+MATH 312,Linear Algebra,Department of Mathematics,MATH 312_02,Cem Erdem,cerdem@uni.edu,,2,0,0,90,
+ADA 312,Statistical Learning,Faculty of Econ. and Administ. Sciences,ADA 312_02,Deniz Aksoy (S),,yes,2,0,0,24,
+HIST 211,Modern History,Basic Sciences,HIST 211_02,Elif Yıldız,eyildiz@uni.edu,,4,0,0,80,
+HIST 110,World History,Basic Sciences,HIST 110_02,Elif Uçar,eucar@uni.edu,,3,0,0,80,
+PSY 312,Cognitive Psychology,Department of Psychology,PSY 312_02,Selin Korkmaz,skorkmaz@uni.edu,,2,0,0,45,
+ME 110,Statics,Department of Mechanical Engineering,ME 110_02,Okan Acar,oacar@uni.edu,,4,0,0,80,
+LAW 211,Constitutional Law,Faculty of Econ. and Administ. Sciences,LAW 211_02,Elif Arslan,earslan@uni.edu,,3,0,0,45,
+ENG 312,Creative Writing,English Language School,ENG 312_02,Ali Bozkurt,abozkurt@uni.edu,,4,0,0,40,
+CMPE 215,Computer Networks,General Culture Courses Coordinator,CMPE 215_02,Murat Şahin,msahin@uni.edu,,2,2,0,40,pc
+ARCH 110,Architectural Design I,Department of Architecture,ARCH 110_02,Esra Aksoy,eaksoy@uni.edu,,2,0,4,25,studio
+CHEM 211,Organic Chemistry,Basic Sciences,CHEM 211_02,Sibel Aydın,saydin@uni.edu,,4,0,0,90,
+ECON 413,Econometrics,Department of Economics,ECON 413_02,Mehmet Bulut (S),,yes,3,2,0,35,
+CMPE 211,Data Structures,General Culture Courses Coordinator,CMPE 211_02,Murat Şahin,msahin@uni.edu,,3,0,2,45,pc
+PHYS 110,Physics I,Basic Sciences,PHYS 110_02,Pınar Korkmaz,pkorkmaz@uni.edu,,3,0,2,80,lab
+BUS 110,Introduction to Business,Faculty of Econ. and Administ. Sciences,BUS 110_02,Tuğçe Gencel,tgencel@uni.edu,,3,0,0,35,
+SOC 110,Introduction to Sociology,Department of Sociology,SOC 110_02,Volkan Kılıç,vkilic@uni.edu,,3,2,0,80,
+PSY 413,Social Psychology,Department of Psychology,PSY 413_02,Selin Korkmaz,skorkmaz@uni.edu,,3,2,0,50,
+ARCH 413,Building Technology,Department of Architecture,ARCH 413_02,Esra Aksoy,eaksoy@uni.edu,,2,0,4,50,studio
+EE 110,Circuit Theory,Dept.of Electric&Electronics Engineering,EE 110_02,Serkan Güneş,sgunes@uni.edu,,3,0,2,35,pc
+EE 114,Control Systems,Dept.of Electric&Electronics Engineering,EE 114_02,Serkan Güneş,sgunes@uni.edu,,2,2,0,80,pc
+ENG 110,Academic English,English Language School,ENG 110_02,Mehmet Güneş,mgunes@uni.edu,,4,0,0,90,
+CHEM 110,General Chemistry,Basic Sciences,CHEM 110_02,Sibel Uçar,sucar@uni.edu,,3,0,2,27,lab
+ADA 110,Statistics for Analytics,Faculty of Econ. and Administ. Sciences,ADA 110_02,Zeynep Korkmaz,zkorkmaz@uni.edu,,4,0,0,50,
+ME 413,Machine Design,Department of Mechanical Engineering,ME 413_02,Mustafa Polat,mpolat@uni.edu,,4,0,0,90,

@@ -182,9 +182,13 @@ def build_rooms_from_ui(classroom_rows: List[Dict], cfg: Config) -> Dict[str, Ro
     return rooms
 
 
-# Email is no longer required (instructors can be keyed by name); capacity is
-# validated per-row by csv_import (Section Capacity OR ~Students).
-_REQUIRED = ("Course Code", "Section No", "T", "P", "L")
+# Per INPUT_SCHEMA.md: required (✓) columns. Email is keyed by name when absent.
+_REQUIRED = (
+    "Course Code", "Course Name", "Dept",
+    "Section No", "Instructor Name",
+    "T", "P", "L",
+    "Section Capacity",
+)
 
 
 def validate_courselist(rows: List[Dict]) -> List[Tuple[str, Dict]]:
@@ -214,3 +218,14 @@ def validate_courselist(rows: List[Dict]) -> List[Tuple[str, Dict]]:
         warns.append(("warn_bad_level", {"n": bad_level}))
     warns.append(("info_part_time", {"n": part_time}))
     return warns
+
+
+# Validation codes that block solving (vs. mere warnings/info). Kept here so the
+# review view and the solve gate agree on what "validated" means.
+COURSELIST_ERROR_CODES = {"warn_no_rows", "warn_missing_cols"}
+
+
+def courselist_is_valid(rows: List[Dict]) -> bool:
+    """True when the uploaded courselist has no blocking validation errors."""
+    return not any(code in COURSELIST_ERROR_CODES
+                   for code, _ in validate_courselist(rows))

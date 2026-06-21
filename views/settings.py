@@ -11,6 +11,7 @@ from timetabling.ui_style import eyebrow_html
 from timetabling.i18n import t, DAY_LABELS, DAY_LABELS_FULL
 from timetabling.settings import profile_to_json, profile_from_json
 from timetabling.ui_input import normalize_name
+from timetabling.drum_picker_widget import time_drum
 
 _LEVELS = ("off", "normal", "strong")
 _MIDDAY = 13  # hardcoded AM/PM boundary; no longer a user-facing setting
@@ -84,12 +85,22 @@ def _policy(lang: str, s: dict) -> None:
     with st.expander(t("set_policy_header", lang), expanded=True, icon=":material/tune:"):
         st.caption(t("set_policy_desc", lang))
         c1, c2, c3 = st.columns(3)
-        s["day_start"] = c1.number_input(t("set_day_start", lang), min_value=6, max_value=12,
-                                         value=int(s["day_start"]), step=1,
-                                         help=t("set_day_start_help", lang), key="set_day_start")
-        s["day_end"] = c2.number_input(t("set_day_end", lang), min_value=13, max_value=21,
-                                       value=int(s["day_end"]), step=1,
-                                       help=t("set_day_end_help", lang), key="set_day_end")
+        _start_opts = [f"{h:02d}:00" for h in range(6, 13)]
+        _end_opts   = [f"{h:02d}:00" for h in range(13, 22)]
+        with c1:
+            raw = time_drum(
+                t("set_day_start", lang), _start_opts,
+                f"{int(s['day_start']):02d}:00", key="set_day_start",
+                help=t("set_day_start_help", lang),
+            )
+            s["day_start"] = int(raw.split(":")[0])
+        with c2:
+            raw = time_drum(
+                t("set_day_end", lang), _end_opts,
+                f"{int(s['day_end']):02d}:00", key="set_day_end",
+                help=t("set_day_end_help", lang),
+            )
+            s["day_end"] = int(raw.split(":")[0])
         s["max_theory_session"] = c3.number_input(t("set_max_theory", lang), min_value=1,
                                                   max_value=6, value=int(s["max_theory_session"]),
                                                   step=1, help=t("set_max_theory_help", lang),
@@ -113,7 +124,7 @@ def _policy(lang: str, s: dict) -> None:
             _gc1, gc2 = st.columns(2)
             s["grad_start"] = gc2.number_input(
                 t("set_grad_start", lang), min_value=6, max_value=20,
-                value=int(s.get("grad_start", 18)), step=1,
+                value=int(s.get("grad_start", 18)), step=1, format="%02d:00",
                 help=t("set_grad_start_help", lang), key="set_grad_start")
 
         s["lunch_enabled"] = st.toggle(t("set_lunch", lang),
@@ -123,10 +134,10 @@ def _policy(lang: str, s: dict) -> None:
             lc1, lc2, _ = st.columns([1, 1, 2])
             s["lunch_start"] = lc1.number_input(t("set_lunch_start", lang), min_value=9,
                                                 max_value=16, value=int(s.get("lunch_start", 12)),
-                                                step=1, key="set_lunch_start")
+                                                step=1, format="%02d:00", key="set_lunch_start")
             s["lunch_end"] = lc2.number_input(t("set_lunch_end", lang), min_value=10,
                                               max_value=17, value=int(s.get("lunch_end", 13)),
-                                              step=1, key="set_lunch_end")
+                                              step=1, format="%02d:00", key="set_lunch_end")
 
         st.divider()
         st.markdown(f"**{t('set_weights_header', lang)}**")
@@ -177,7 +188,7 @@ def _blackouts(lang: str, s: dict) -> None:
     nd = a1.selectbox(t("set_blackout_day", lang), _work_days(s),
                       format_func=lambda d: dl_full.get(d, d), key=f"bl_day_{rev}")
     nh = a2.number_input(t("set_blackout_hour", lang), min_value=6, max_value=21,
-                         value=12, step=1, key=f"bl_hour_{rev}")
+                         value=12, step=1, format="%02d:00", key=f"bl_hour_{rev}")
     nscope = a3.segmented_control(t("set_blackout_scope", lang), scope_opts,
                                   default=scope_opts[0], key=f"bl_scope_{rev}")
     if a4.button(t("set_blackout_add", lang), icon=":material/add:", key=f"bl_add_{rev}", type="primary"):

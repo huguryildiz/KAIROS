@@ -24,12 +24,14 @@ from timetabling.ui_input import (
 )
 
 _ROWS = [
-    {"Course Code": "CMPE 113", "Course Name": "Intro", "Section No": "01",
-     "T": "3", "P": "0", "L": "2", "Instructor Name": "A. Yilmaz",
-     "Instructor Email": "a@x.edu", "~Students": "40"},
-    {"Course Code": "MATH 101", "Course Name": "Calc", "Section No": "02",
-     "T": "4", "P": "0", "L": "0", "Instructor Name": "B. Demir (S)",
-     "Instructor Email": "", "~Students": "30"},
+    {"Course Code": "CMPE 113", "Course Name": "Intro", "Dept": "Faculty of Eng",
+     "Section No": "01", "Instructor Name": "A. Yilmaz",
+     "T": "3", "P": "0", "L": "2",
+     "Section Capacity": "40", "Instructor Email": "a@x.edu", "~Students": "40"},
+    {"Course Code": "MATH 101", "Course Name": "Calc", "Dept": "Faculty of Sci",
+     "Section No": "02", "Instructor Name": "B. Demir (S)",
+     "T": "4", "P": "0", "L": "0",
+     "Section Capacity": "30", "Instructor Email": "", "~Students": "30"},
 ]
 
 
@@ -80,16 +82,21 @@ def test_validate_courselist_missing_column():
 
 def test_validate_courselist_warns_bad_level():
     # valid cohort (MATH-1) but no 3-digit number -> level undeterminable
-    rows = [{"Course Code": "MATH 12", "Section No": "01", "T": "3", "P": "0",
-             "L": "0", "Instructor Email": "a@x.edu"}]
+    rows = [{"Course Code": "MATH 12", "Course Name": "Test", "Dept": "Faculty of Sci",
+             "Section No": "01", "Instructor Name": "A. Yilmaz",
+             "T": "3", "P": "0", "L": "0", "Section Capacity": "30",
+             "Instructor Email": "a@x.edu"}]
     codes = [c for c, _ in validate_courselist(rows)]
     assert "warn_bad_level" in codes
     assert "warn_bad_code" not in codes
 
 
 def test_validate_courselist_unparseable_code_warns_both():
-    rows = [{"Course Code": "???", "Section No": "01", "T": "3", "P": "0",
-             "L": "0", "Instructor Email": "a@x.edu"}]
+    # Dept key present but empty -> bad_code warning still fires
+    rows = [{"Course Code": "???", "Course Name": "Test", "Dept": "",
+             "Section No": "01", "Instructor Name": "A. Yilmaz",
+             "T": "3", "P": "0", "L": "0", "Section Capacity": "30",
+             "Instructor Email": "a@x.edu"}]
     codes = [c for c, _ in validate_courselist(rows)]
     assert "warn_bad_code" in codes
     assert "warn_bad_level" in codes
@@ -140,15 +147,20 @@ def test_dept_column_overrides_department_and_cohort():
 
 
 def test_dept_override_with_unparseable_code_no_bad_code_warning():
-    rows = [{"Course Code": "1234", "Section No": "01", "T": "3", "P": "0",
-             "L": "0", "Instructor Email": "a@x.edu", "Dept": "PSY"}]
+    rows = [{"Course Code": "1234", "Course Name": "Test", "Dept": "PSY",
+             "Section No": "01", "Instructor Name": "A. Yilmaz",
+             "T": "3", "P": "0", "L": "0", "Section Capacity": "30",
+             "Instructor Email": "a@x.edu"}]
     codes = [c for c, _ in validate_courselist(rows)]
     assert "warn_bad_code" not in codes          # Dept supplied -> actionable warning suppressed
 
 
 def test_unparseable_code_without_dept_still_warns():
-    rows = [{"Course Code": "1234", "Section No": "01", "T": "3", "P": "0",
-             "L": "0", "Instructor Email": "a@x.edu"}]
+    # Dept key present but empty -> bad_code warning fires (no Dept to remedy the code)
+    rows = [{"Course Code": "1234", "Course Name": "Test", "Dept": "",
+             "Section No": "01", "Instructor Name": "A. Yilmaz",
+             "T": "3", "P": "0", "L": "0", "Section Capacity": "30",
+             "Instructor Email": "a@x.edu"}]
     codes = [c for c, _ in validate_courselist(rows)]
     assert "warn_bad_code" in codes
 

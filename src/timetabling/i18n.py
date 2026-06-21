@@ -76,11 +76,11 @@ STRINGS = {
         "set_day_start_help": "Derslerin planlanabileceği en erken saat. Tüm bloklar bu saatten itibaren başlar. Örn. 9 → 09:00.",
         "set_day_end": "Son ders saati · lisans",
         "set_day_end_help": "Lisans derslerinin bitmesi gereken en geç saat (kesin kural). Örn. 18 → 18:00.",
-        "set_max_theory": "Teori oturumu üst sınırı",
+        "set_max_theory": "Teori oturumu üst sınırı (sa)",
         "set_max_theory_help": "Tek bir teori oturumunun uzunluk üst sınırı (saat). T=3 olan ders bu değer 2 ise 2+1 oturuma bölünür.",
-        "set_max_block": "Kesintisiz blok üst sınırı",
+        "set_max_block": "Kesintisiz blok üst sınırı (sa)",
         "set_max_block_help": "Herhangi bir bloğun (teori veya lab) aralıksız sürebileceği maksimum saat. Uzun lab blokları bu sınırda bölünür.",
-        "set_daily_cap": "Öğretim elemanı günlük ders yükü",
+        "set_daily_cap": "Öğretim elemanı günlük ders yükü (sa)",
         "set_daily_cap_help": "Bir öğretim elemanının günde vermesini istediğiniz azami ders saati. 0 = sınır yok; üzerine çıkıldığında yumuşak ceza uygulanır.",
         "set_days_cap": "Öğretim elemanı haftalık gün sınırı",
         "set_days_cap_help": "Bir öğretim elemanının haftada en fazla kaç ayrı gün kampüse gelmesini istediğiniz. 0 = sınır yok; üzerine çıkıldığında yumuşak ceza uygulanır (asla zorunlu değildir).",
@@ -190,15 +190,16 @@ STRINGS = {
         "import_status_dup_file": "Dosyada yinelenen",
         "import_status_err_code": "Ders kodu eksik",
         "import_status_err_hours": "Geçersiz T/P/L",
+        "import_min_req": "Asgari şartlar",
+        "import_min_met": "Karşılandı",
+        "import_min_unmet": "Eksik: {cols}",
         # classrooms
         "cr_header": "Derslikler",
         "cr_caption": "Derslik listeni CSV ile yükle veya örnek veri setini dene. Tür "
                       "(lab / pc / studio) verilmezse oda adından (-L / -PC) türetilir. "
                       "Online sanal oda çözüm anında otomatik eklenir.",
         "cr_upload_expander": "⬆ CSV ile derslik listesi yükle",
-        "cr_upload_hint": "Sütunlar: Room, Capacity, Type (normal / lab / pc / studio). Ham "
-                          "veri formatı ROOM, ROOM_CAP da kabul edilir; Type verilmezse oda "
-                          "adından (-L / -PC) türetilir.",
+        "cr_upload_hint": "Sütunlar: Room, Capacity, Type. ROOM/ROOM_CAP da kabul edilir; Type yoksa -L/-PC'den türetilir.",
         "cr_upload_uploader": "Derslik CSV'si seç",
         "cr_upload_loaded": "{n} derslik yüklendi.",
         "cr_upload_error": "Geçersiz CSV: 'Room' (veya 'ROOM') sütunu bulunamadı.",
@@ -291,11 +292,11 @@ STRINGS = {
         "set_day_start_help": "Earliest hour any session can be placed. All blocks start from this time onward. E.g. 9 → 09:00.",
         "set_day_end": "Last class hour · undergrad",
         "set_day_end_help": "Hard cutoff: undergraduate sessions must finish by this hour. E.g. 18 → 18:00.",
-        "set_max_theory": "Max theory session",
+        "set_max_theory": "Max theory session (h)",
         "set_max_theory_help": "Maximum length of a single theory session (hours). A course with T=3 is split into 2+1 sessions when this is 2.",
-        "set_max_block": "Max uninterrupted block",
+        "set_max_block": "Max uninterrupted block (h)",
         "set_max_block_help": "Maximum continuous hours for any block (theory or lab). Long lab blocks are split at this limit.",
-        "set_daily_cap": "Instructor daily load",
+        "set_daily_cap": "Instructor daily load (h)",
         "set_daily_cap_help": "Maximum teaching hours you want an instructor to have per day. 0 = no cap; a soft penalty applies above it.",
         "set_days_cap": "Instructor weekly days",
         "set_days_cap_help": "Maximum distinct days per week you want an instructor to come to campus. 0 = no cap; a soft penalty applies above it (never enforced).",
@@ -405,14 +406,15 @@ STRINGS = {
         "import_status_dup_file": "Duplicate in file",
         "import_status_err_code": "Missing course code",
         "import_status_err_hours": "Invalid T/P/L",
+        "import_min_req": "Minimum requirements",
+        "import_min_met": "Met",
+        "import_min_unmet": "Missing: {cols}",
         "cr_header": "Classrooms",
         "cr_caption": "Upload your room list as a CSV or try the sample dataset. When Type "
                       "(lab / pc / studio) is omitted it is derived from the room name "
                       "(-L / -PC). The Online virtual room is added automatically at solve time.",
         "cr_upload_expander": "⬆ Upload a room list via CSV",
-        "cr_upload_hint": "Columns: Room, Capacity, Type (normal / lab / pc / studio). The raw "
-                          "data format ROOM, ROOM_CAP is also accepted; when Type is omitted it "
-                          "is derived from the room name (-L / -PC).",
+        "cr_upload_hint": "Columns: Room, Capacity, Type. ROOM/ROOM_CAP also accepted; Type inferred from -L/-PC suffix if omitted.",
         "cr_upload_uploader": "Choose a rooms CSV",
         "cr_upload_loaded": "{n} room(s) loaded.",
         "cr_upload_error": "Invalid CSV: no 'Room' (or 'ROOM') column found.",
@@ -463,3 +465,37 @@ def t(key: str, lang: str = DEFAULT_LANG, **kwargs) -> str:
         except (KeyError, IndexError):
             return s
     return s
+
+
+# Localized display names for canonical CSV field names.
+# EN intentionally empty — canonical names are already English.
+_FIELD_LABELS: dict[str, dict[str, str]] = {
+    "tr": {
+        "Course Code":      "Ders Kodu",
+        "Course Name":      "Ders Adı",
+        "Section No":       "Şube No",
+        "T":                "T",
+        "P":                "P",
+        "L":                "L",
+        "Instructor Name":  "Öğretim Elemanı",
+        "Instructor Email": "E-posta",
+        "~Students":        "~Öğrenci",
+        "Section Capacity": "Şube Kapasitesi",
+        "Year":             "Yıl",
+        "Part-time":        "Yarı Zamanlı",
+        "Room Type":        "Derslik Türü",
+        "Fixed":            "Sabit",
+        "Dept":             "Bölüm",
+        # classroom fields
+        "Room":             "Derslik",
+        "Capacity":         "Kapasite",
+        "Type":             "Tür",
+    },
+    "en": {},
+}
+
+
+def field_label(field: str, lang: str = DEFAULT_LANG) -> str:
+    """Return the localized display name for a canonical CSV field name."""
+    lang = lang if lang in _FIELD_LABELS else DEFAULT_LANG
+    return _FIELD_LABELS[lang].get(field, field)

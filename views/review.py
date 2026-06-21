@@ -3,7 +3,7 @@ import pandas as pd
 import streamlit as st
 
 from timetabling.ui_input import (validate_courselist, cohort_from_code,
-                                  parse_emails)
+                                  parse_emails, COURSELIST_ERROR_CODES)
 from timetabling.ui_style import (kpi_chips_html, eyebrow_html, data_table_html,
                                   import_preview_html)
 from timetabling.i18n import t
@@ -32,10 +32,9 @@ def render(lang: str) -> None:
         (t("kpi_instructors", lang), str(len(instr)), ""),
     ]), unsafe_allow_html=True)
 
-    _ERROR_CODES = {"warn_missing_cols", "warn_no_rows"}
     for code, kw in validate_courselist(rows):
         msg = t(code, lang, **kw)
-        if code in _ERROR_CODES:
+        if code in COURSELIST_ERROR_CODES:
             st.error(msg)
         elif code == "info_part_time":
             st.info(msg)

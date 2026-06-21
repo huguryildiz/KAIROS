@@ -304,7 +304,7 @@ ECON 101,Principles of Economics,1,3,0,0,John Smith,john.smith@uni.edu,120
 
 ## Deployment
 
-Kairos ships as a single Docker image — Streamlit, OR-Tools CP-SAT, and PII-free defaults — on **Google Cloud Run**, in the institution's own GCP project, **EU region**, **scale-to-zero**. Access is locked to named Google accounts via IAM; the live deployment is reached through `gcloud run services proxy` or the domain mapping at `schedule.huguryildiz.com`.
+Kairos ships as a single Docker image — Streamlit, OR-Tools CP-SAT, and PII-free defaults — on **Google Cloud Run**, in the institution's own GCP project, **EU region**, **scale-to-zero**. Access is locked to named Google accounts via IAM; the live deployment is reached through `gcloud run services proxy` or the domain mapping at `kairos.huguryildiz.com`.
 
 ```bash
 gcloud run deploy timetabling --source . \

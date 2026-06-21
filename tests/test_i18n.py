@@ -1,9 +1,10 @@
-from timetabling.i18n import t, STRINGS, LANGS
+from timetabling.i18n import t, STRINGS, LANGS, DEFAULT_LANG
 
 
-def test_default_is_turkish():
-    # the bare key resolves to Turkish by default
-    assert t("hero_eyebrow") == STRINGS["tr"]["hero_eyebrow"]
+def test_default_lang_is_english():
+    # the bare key resolves to the configured default (English)
+    assert DEFAULT_LANG == "en"
+    assert t("app_subtitle") == STRINGS["en"]["app_subtitle"]
 
 
 def test_english_when_asked():
@@ -27,11 +28,9 @@ def test_langs_and_parity():
 
 
 def test_new_ui_keys_bilingual():
-    keys = ["app_title", "appbar_waiting", "theme_toggle", "step_review",
+    keys = ["app_title", "theme_toggle", "step_review",
             "review_header", "upload_sample_btn", "kpi_sections", "kpi_rooms",
-            "hero_stat_sections"]
+            "hero_stat_sections", "footer_dev"]
     for k in keys:
         for lang in LANGS:
             assert t(k, lang) and t(k, lang) != k        # present, actually translated
-    assert "793" in t("appbar_loaded", "tr", n=793)
-    assert "793" in t("appbar_loaded", "en", n=793)

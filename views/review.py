@@ -4,16 +4,18 @@ import streamlit as st
 
 from timetabling.ui_input import (validate_courselist, cohort_from_code,
                                   parse_emails)
-from timetabling.ui_style import kpi_chips_html
+from timetabling.ui_style import (kpi_chips_html, eyebrow_html, data_table_html,
+                                  import_preview_html)
 from timetabling.i18n import t
+
+# Right-aligned, tabular-figure columns in the courselist preview.
+_NUMERIC_COLS = ("T", "P", "L", "~Students")
 
 
 def render(lang: str) -> None:
     rows = st.session_state.get("courses", [])
-    st.markdown(
-        f'<div class="eyebrow"><span class="n">2</span>{t("step_review", lang)}</div>',
-        unsafe_allow_html=True)
-    st.subheader(t("review_header", lang))
+    st.markdown(eyebrow_html(2, t("step_review", lang), "review"),
+                unsafe_allow_html=True)
     st.caption(t("review_caption", lang))
 
     n_courses = len({str(r.get("Course Code", "")).strip()
@@ -30,8 +32,28 @@ def render(lang: str) -> None:
         (t("kpi_instructors", lang), str(len(instr)), ""),
     ]), unsafe_allow_html=True)
 
+    _ERROR_CODES = {"warn_missing_cols", "warn_no_rows"}
     for code, kw in validate_courselist(rows):
         msg = t(code, lang, **kw)
-        (st.info if code == "info_part_time" else st.warning)(msg)
+        if code in _ERROR_CODES:
+            st.error(msg)
+        elif code == "info_part_time":
+            st.info(msg)
+        else:
+            st.warning(msg)
 
-    st.dataframe(pd.DataFrame(rows), use_container_width=True, height=340)
+    # VERA-style import preview (per-row status + badges) when an import report
+    # is available; the plain table is the fallback (e.g. rows set elsewhere).
+    report = st.session_state.get("import_report")
+    if report:
+        if report["stats"].get("duplicate", 0) or report["stats"].get("error", 0):
+            st.warning(t("import_skipped_note", lang,
+                         skipped=report["stats"]["duplicate"] + report["stats"]["error"],
+                         valid=report["stats"]["valid"]))
+        st.markdown(import_preview_html(report, lang), unsafe_allow_html=True)
+    else:
+        df = pd.DataFrame(rows)
+        st.markdown(
+            data_table_html(list(df.columns), df.astype(str).values.tolist(),
+                            max_height=340, numeric=_NUMERIC_COLS),
+            unsafe_allow_html=True)

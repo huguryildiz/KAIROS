@@ -43,7 +43,7 @@ def render(lang: str) -> None:
 
 
 def _policy(lang: str, s: dict) -> None:
-    with st.expander(t("set_policy_header", lang), expanded=True):
+    with st.expander(t("set_policy_header", lang), expanded=True, icon=":material/tune:"):
         c1, c2, c3 = st.columns(3)
         s["day_start"] = c1.number_input(t("set_day_start", lang), min_value=6, max_value=12,
                                          value=int(s["day_start"]), step=1, key="set_day_start")
@@ -65,6 +65,7 @@ def _policy(lang: str, s: dict) -> None:
         s["include_grad"] = c8.checkbox(t("set_include_grad", lang),
                                         value=bool(s["include_grad"]), key="set_grad")
 
+        st.divider()
         st.markdown(f"**{t('set_weights_header', lang)}**")
         disp = [t(f"set_w_{lv}", lang) for lv in _LEVELS]
         wc = st.columns(2)
@@ -75,6 +76,7 @@ def _policy(lang: str, s: dict) -> None:
                                          key=f"set_w_{knob}")
             s["weights"][knob] = _LEVELS[disp.index(chosen)]
 
+        st.divider()
         _blackouts(lang, s)
 
 
@@ -111,7 +113,7 @@ def _blackouts(lang: str, s: dict) -> None:
 
 
 def _availability(lang: str) -> None:
-    with st.expander(t("set_avail_header", lang)):
+    with st.expander(t("set_avail_header", lang), icon=":material/event_available:"):
         emails = _emails(st.session_state.get("courses", []))
         if not emails:
             st.caption(t("set_avail_none_instr", lang))
@@ -157,7 +159,7 @@ def _availability(lang: str) -> None:
 
 
 def _profile(lang: str) -> None:
-    with st.expander(t("set_profile_header", lang)):
+    with st.expander(t("set_profile_header", lang), icon=":material/badge:"):
         s = st.session_state["settings"]
         a = st.session_state["availability"]
         st.download_button(t("set_profile_download", lang), data=profile_to_json(s, a),

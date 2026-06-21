@@ -10,6 +10,9 @@ from timetabling.ui_style import dropzone_html, eyebrow_html, upload_error_html,
 
 _SAMPLE = os.path.join(os.path.dirname(__file__), "..", "assets", "sample_courses.csv")
 
+# Keys set by solve/review that should be cleared when the file is replaced
+_DOWNSTREAM_KEYS = ("schedule", "solve_result", "scroll_to")
+
 
 def _ingest(file_or_path) -> dict:
     """Parse a CSV (file/path) the VERA way: alias-aware header detection +
@@ -19,24 +22,56 @@ def _ingest(file_or_path) -> dict:
     st.session_state["courses"] = ok_rows(report)
     st.session_state["import_report"] = report
     st.session_state["scroll_to"] = "review"
+    # Store display name so success state persists across reruns
+    if hasattr(file_or_path, "name"):
+        st.session_state["upload_filename"] = file_or_path.name
+    else:
+        st.session_state["upload_filename"] = os.path.basename(str(file_or_path))
     return report
 
 
 def render(lang: str) -> None:
     st.markdown(eyebrow_html(1, t("step_upload", lang), "upload"),
                 unsafe_allow_html=True)
+    st.caption(t("upload_desc", lang))
+
+    has_upload = bool(st.session_state.get("courses"))
 
     with st.container(key="upload_card"):
-        st.markdown(dropzone_html(lang), unsafe_allow_html=True)
+        if has_upload:
+            # Show only the success state — no upload icon overlay
+            report = st.session_state["import_report"]
+            n = report["stats"]["valid"]
+            filename = st.session_state.get("upload_filename", "")
+            st.markdown(upload_success_html(filename, n, lang), unsafe_allow_html=True)
+            st.markdown(
+                "<style>div[data-testid='stButton']{display:flex;justify-content:center}</style>",
+                unsafe_allow_html=True,
+            )
+            clicked = st.button(t("upload_change_btn", lang), key="change_file",
+                                icon=":material/upload_file:")
+            if clicked:
+                for key in ("courses", "import_report", "upload_filename") + _DOWNSTREAM_KEYS:
+                    st.session_state.pop(key, None)
+                st.rerun()
+        else:
+            # Empty state: custom dropzone icon + invisible file-uploader overlay
+            st.markdown(dropzone_html(lang), unsafe_allow_html=True)
+            up = st.file_uploader("Upload CSV", type=["csv"], label_visibility="collapsed")
+            if up is not None:
+                try:
+                    _ingest(up)
+                    st.rerun()
+                except Exception as exc:
+                    st.markdown(upload_error_html(up.name, exc, lang), unsafe_allow_html=True)
 
-        up = st.file_uploader("Upload CSV", type=["csv"], label_visibility="collapsed")
-        if up is not None:
-            try:
-                report = _ingest(up)
-                n = report["stats"]["valid"]
-                st.markdown(upload_success_html(up.name, n, lang), unsafe_allow_html=True)
-            except Exception as exc:
-                st.markdown(upload_error_html(up.name, exc, lang), unsafe_allow_html=True)
+            if st.button(
+                t("upload_sample_btn", lang),
+                key="load_sample",
+                type="primary",
+            ):
+                _ingest(_SAMPLE)
+                st.rerun()
 
         st.caption(t("upload_format_label", lang))
         st.dataframe(
@@ -54,12 +89,3 @@ def render(lang: str) -> None:
             hide_index=True,
         )
         st.caption(t("upload_format_tpl", lang))
-
-        if st.button(
-            t("upload_sample_btn", lang),
-            key="load_sample",
-            type="primary",
-        ):
-            _ingest(_SAMPLE)
-            st.rerun()
-

@@ -1,4 +1,4 @@
-# UCTP Optimization Model
+# Kairos — UCTP Optimization Model
 
 A formal description of the University Course Timetabling (UCTP) model implemented in
 `src/timetabling/`. This is the ground-truth specification: it mirrors `model_cpsat.py`

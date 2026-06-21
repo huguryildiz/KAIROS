@@ -149,9 +149,9 @@ h1,h2,h3,h4{margin:0;letter-spacing:-.018em;font-weight:700;color:var(--ink);}
    glyph-height-driven, so a single value holds across breakpoints. */
 .tt-appbar{display:flex;align-items:center;gap:14px;transform:translateY(-8px);}
 .tt-brand{display:flex;align-items:center;gap:11px;font-weight:700;}
-.tt-brand .glyph{width:40px;height:40px;border-radius:10px;flex:none;overflow:hidden;box-shadow:var(--sh-1);}
+.tt-brand .glyph{width:32px;height:32px;border-radius:8px;flex:none;overflow:hidden;box-shadow:var(--sh-1);}
 .tt-brand .glyph img{width:100%;height:100%;display:block;border-radius:inherit;}
-.tt-brand .name{font-family:var(--serif);font-weight:600;font-size:1.16rem;letter-spacing:-.005em;background:linear-gradient(95deg,var(--head-1) 0%,var(--head-2) 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;}
+.tt-brand .name{font-family:var(--serif);font-weight:600;font-size:1.3rem;letter-spacing:-.005em;background:linear-gradient(95deg,var(--head-1) 0%,var(--head-2) 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;}
 /* Subtitle keeps a solid muted tone (reset the gradient text-fill). */
 .tt-brand .name small{display:block;font:500 .68rem/1.1 var(--mono);color:var(--muted);letter-spacing:.02em;background:none;-webkit-text-fill-color:var(--muted);}
 
@@ -333,6 +333,8 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
   border-top-color:#fff;border-radius:50%;flex:none;
   animation:solveSpin .7s linear infinite;}
 @keyframes solveSpin{to{transform:rotate(360deg);}}
+.solve-eta{font:500 .76rem/1 var(--font);opacity:.65;margin-left:6px;
+  font-variant-numeric:tabular-nums;white-space:nowrap;}
 /* Solve button — centred, auto-width, shimmer on load; CSS SVG wand casts on click.
    SVG wand: stick (white line, bottom-left→top-right) + gold handle knob + gold 5-pt star at tip.
    transform-origin matches handle position (5/24≈21%, 19/24≈79%) so tip swings on rotate. */
@@ -388,7 +390,7 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
    upload arrow rising out of its tray. Hover/drag (the moment that matters):
    the card lifts and a gradient comet sweeps the perimeter to say "drop here". */
 @property --dz-ang{syntax:"<angle>";initial-value:0deg;inherits:false;}
-.st-key-upload_card{position:relative;border:1.8px dashed var(--primary);border-radius:var(--r-xl);background:var(--surface);text-align:center;padding-bottom:28px;margin:4px 0 6px;box-shadow:var(--sh-1);transition:transform .3s ease,box-shadow .3s ease,border-color .3s ease;animation:dzEnter .55s cubic-bezier(.22,1,.36,1) both;}
+.st-key-upload_card{position:relative;border:1.8px dashed var(--primary);border-radius:var(--r-xl);background:var(--surface);text-align:center;padding-bottom:28px;margin:4px 0 6px;box-shadow:var(--sh-1);transition:transform .3s ease,box-shadow .3s ease,border-color .3s ease,background .25s ease;animation:dzEnter .55s cubic-bezier(.22,1,.36,1) both;}
 .st-key-upload_card>[data-testid="stVerticalBlock"]{gap:0!important;position:relative;z-index:1;}
 /* Gradient comet ring — masked to a 2px outline, revealed + spun on hover. */
 .st-key-upload_card::after{content:"";position:absolute;inset:-2px;border-radius:inherit;padding:2px;pointer-events:none;opacity:0;transition:opacity .35s ease;
@@ -397,6 +399,17 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
   animation:dzSpin 3.4s linear infinite;}
 .st-key-upload_card:hover{transform:translateY(-2px);box-shadow:var(--sh-2);border-color:var(--primary-700);}
 .st-key-upload_card:hover::after{opacity:1;}
+/* JS-toggled drag-over state — more intense than hover */
+.st-key-upload_card.dz-drag-active{border-color:var(--primary)!important;border-style:solid!important;background:var(--primary-50)!important;transform:translateY(-3px)!important;box-shadow:var(--sh-2)!important;}
+.st-key-upload_card.dz-drag-active::after{opacity:1!important;}
+.st-key-upload_card.dz-drag-active .dz-icon{background:var(--primary)!important;border-color:var(--primary)!important;color:#fff!important;transform:scale(1.12) translateY(-4px)!important;box-shadow:var(--sh-3)!important;}
+.st-key-upload_card.dz-drag-active .dz-icon svg{color:#fff!important;stroke:#fff!important;}
+.st-key-upload_card.dz-drag-active .dz-glow{animation:none!important;opacity:1!important;transform:scale(1.5)!important;}
+.st-key-upload_card.dz-drag-active .dz-sub{opacity:0;}
+/* Dual title: idle shown by default, drag title hidden; swap on drag-active */
+.dz-title-drag{display:none;}
+.st-key-upload_card.dz-drag-active .dz-title-idle{display:none!important;}
+.st-key-upload_card.dz-drag-active .dz-title-drag{display:block!important;color:var(--primary)!important;}
 /* Header is purely visual; let clicks fall through to the invisible file-input
    overlay above it so tapping the icon / title opens the browse dialog. */
 .dz-header{padding:40px 32px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;pointer-events:none;}
@@ -424,7 +437,7 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
 /* Overlay the dz-header with a transparent clickable file input */
 .st-key-upload_card [data-testid="stFileUploader"]{position:absolute;top:0;left:0;right:0;height:175px;z-index:5;padding:0!important;margin:0!important;}
 .st-key-upload_card [data-testid="stFileUploaderDropzone"]{position:absolute;inset:0;background:transparent!important;border:none!important;box-shadow:none!important;padding:0!important;cursor:pointer;}
-.st-key-upload_card [data-testid="stFileUploaderDropzone"] *:not(button){display:none!important;}
+.st-key-upload_card [data-testid="stFileUploaderDropzone"] *:not(button){visibility:hidden!important;}
 .st-key-upload_card [data-testid="stFileUploaderDropzone"] button{display:block!important;position:absolute!important;inset:0!important;width:100%!important;height:100%!important;opacity:0!important;cursor:pointer!important;border:none!important;background:transparent!important;}
 .st-key-upload_card [data-testid="stFileUploaderFile"]{display:none!important;}
 .st-key-upload_card [data-testid="stHorizontalBlock"]{padding:0 20px!important;justify-content:center!important;}
@@ -476,22 +489,41 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
    canvas they DO follow CSS. Paint their surfaces with the theme tokens. In
    light mode the token values equal Streamlit's native light colors, so this is
    a no-op there and only takes visible effect in dark. */
+/* Only the OUTER baseweb wrapper carries a border; the inner base-input stays
+   transparent. Painting both (the old rule) drew a box-inside-a-box — the seam
+   that made the stepper read as cheap. One soft --border hairline, not the heavy
+   --faint mid-gray. */
 [data-testid="stTextInput"] [data-baseweb="input"],
-[data-testid="stNumberInput"] [data-baseweb="input"],
+[data-testid="stNumberInput"] [data-baseweb="input"]{
+  background:var(--surface)!important;border:1px solid var(--border)!important;border-radius:12px!important;
+  overflow:hidden!important;box-shadow:0 1px 2px rgba(16,24,40,.05)!important;
+  transition:border-color .18s ease,box-shadow .18s ease;}
 [data-testid="stTextInput"] [data-baseweb="base-input"],
 [data-testid="stNumberInput"] [data-baseweb="base-input"]{
-  background:var(--surface)!important;border:1px solid var(--border)!important;border-radius:10px!important;}
+  background:transparent!important;border:none!important;border-radius:0!important;}
 [data-testid="stTextInput"] input,[data-testid="stNumberInput"] input{
   background:transparent!important;color:var(--ink)!important;-webkit-text-fill-color:var(--ink)!important;}
+[data-testid="stNumberInput"] input{
+  text-align:center!important;font:600 1.05rem/1 var(--font)!important;
+  -webkit-text-fill-color:var(--ink)!important;letter-spacing:-.01em;padding-left:14px!important;}
 [data-testid="stTextInput"] input::placeholder,[data-testid="stNumberInput"] input::placeholder{color:var(--faint)!important;}
 [data-testid="stTextInput"] [data-baseweb="input"]:focus-within,
 [data-testid="stNumberInput"] [data-baseweb="input"]:focus-within{
   border-color:var(--primary)!important;box-shadow:0 0 0 3px var(--primary-50)!important;}
-[data-testid="stNumberInput"] button{background:var(--surface-2)!important;color:var(--ink-2)!important;border-color:var(--border)!important;}
-[data-testid="stNumberInput"] button:hover{background:var(--surface)!important;color:var(--primary)!important;}
+/* ± as flush, borderless segments: no slab, no per-button border. A single
+   hairline (inset shadow) divides value | − | + so it reads as one pill; hover
+   tints with the brand instead of swapping a whole surface. */
+[data-testid="stNumberInput"] button{
+  background:transparent!important;border:none!important;border-radius:0!important;
+  color:var(--muted)!important;width:38px!important;min-width:38px!important;align-self:stretch!important;
+  box-shadow:inset 1px 0 0 var(--border)!important;
+  transition:background .15s ease,color .15s ease;}
+[data-testid="stNumberInput"] button:hover{background:var(--primary-50)!important;color:var(--primary)!important;}
+[data-testid="stNumberInput"] button:active{background:var(--primary-100)!important;color:var(--primary)!important;}
+[data-testid="stNumberInput"] button svg{width:17px!important;height:17px!important;}
 /* Selectbox closed control + its caret. */
 [data-testid="stSelectbox"] [data-baseweb="select"]>div:first-child{
-  background:var(--surface)!important;border:1px solid var(--border)!important;border-radius:10px!important;color:var(--ink)!important;}
+  background:var(--surface)!important;border:1.5px solid var(--faint)!important;border-radius:10px!important;color:var(--ink)!important;}
 [data-testid="stSelectbox"] [data-baseweb="select"] [data-baseweb="select-value-container"] *{color:var(--ink)!important;-webkit-text-fill-color:var(--ink)!important;}
 [data-testid="stSelectbox"] [data-baseweb="select"] svg{fill:var(--muted)!important;}
 /* Selectbox open menu — themed in brand_css() via _popover_css() with literal
@@ -575,6 +607,11 @@ hr{border-color:var(--border) !important;}
   flex:0 0 auto!important;display:flex!important;align-items:center!important;
   justify-content:flex-end!important;}
 
+/* Desktop-only: nudge right controls down to balance the brand's -8px nudge up. */
+@media (min-width:641px){
+  .st-key-topctrls{transform:translateY(4px);}
+}
+
 /* Theme + language toggles — identical premium round icon buttons. Both are
    st.button (the lang switch shows the OTHER language's flag and toggles on
    click, like the theme toggle). Scoped to their widget keys so other
@@ -618,7 +655,7 @@ hr{border-color:var(--border) !important;}
   .st-key-topbar [data-testid="stHorizontalBlock"]{
     display:flex!important;flex-wrap:nowrap!important;
     align-items:center!important;gap:8px!important;}
-  .tt-brand .name{font-size:1.05rem;}
+  .tt-brand .name{font-size:1.15rem;}
   .tt-brand .glyph{width:28px;height:28px;border-radius:8px;}
   /* Step indicator → full row, horizontally scrollable, mockup-style.
      Numbers + labels stay visible; connectors collapse to 1px lines.
@@ -648,7 +685,7 @@ hr{border-color:var(--border) !important;}
   .st-key-upload_card [data-testid="stFileUploaderDropzone"]{
     position:relative!important;inset:auto!important;}
   .st-key-upload_card [data-testid="stFileUploaderDropzone"] *:not(button){
-    display:revert!important;}
+    display:revert!important;visibility:visible!important;}
   .st-key-upload_card [data-testid="stFileUploaderDropzone"] button{
     position:static!important;inset:auto!important;
     width:auto!important;height:auto!important;opacity:1!important;}
@@ -819,15 +856,30 @@ def dropzone_html(lang: str = DEFAULT_LANG) -> str:
     native st.file_uploader inside a .st-key-upload_card container; CSS strips
     the uploader's native chrome so the two read as one unified card."""
     title = escape(t("upload_dropzone_title", lang))
+    drag_title = escape(t("upload_dropzone_drag", lang))
     sub = escape(t("upload_dropzone_sub", lang))
     return (
         f'<div class="dz-header">'
         f'<div class="dz-iconwrap"><span class="dz-glow"></span>'
         f'<div class="dz-icon">{_UPLOAD_TRAY_SVG}'
         f'<span class="dz-arrow">{_UPLOAD_ARROW_SVG}</span></div></div>'
-        f'<p class="dz-title">{title}</p>'
+        f'<p class="dz-title dz-title-idle">{title}</p>'
+        f'<p class="dz-title dz-title-drag">{drag_title}</p>'
         f'<p class="dz-sub">{sub}</p>'
         f'</div>'
+        f'<script>(function(){{'
+        f'if(window.__dzDragInit)return;window.__dzDragInit=true;'
+        f'function card(){{return document.querySelector(".st-key-upload_card");}}'
+        f'document.addEventListener("dragenter",function(e){{'
+        f'var c=card();if(c&&c.contains(e.target))c.classList.add("dz-drag-active");'
+        f'}},true);'
+        f'document.addEventListener("dragleave",function(e){{'
+        f'var c=card();if(c&&!c.contains(e.relatedTarget))c.classList.remove("dz-drag-active");'
+        f'}},true);'
+        f'function clear(){{var c=card();if(c)c.classList.remove("dz-drag-active");}}'
+        f'document.addEventListener("drop",clear,true);'
+        f'document.addEventListener("dragend",clear,true);'
+        f'}})();</script>'
     )
 
 
@@ -846,7 +898,7 @@ def appbar_html(lang: str) -> str:
     """Left side of the app bar: brand logo + name."""
     return (
         f'<div class="tt-appbar"><div class="tt-brand">'
-        f'<div class="glyph">{logo_img_html(34, _ICON_PATH)}</div>'
+        f'<div class="glyph">{logo_img_html(32, _ICON_PATH)}</div>'
         f'<div class="name">{escape(t("app_title", lang))}</div></div>'
         f'</div>'
     )

@@ -10,6 +10,7 @@ class Room:
     is_lab: bool
     is_physical: bool
     is_virtual: bool = False
+    type: str = "normal"        # normal | lab | pc | studio (supply side)
 
 
 @dataclass(frozen=True)
@@ -50,7 +51,8 @@ class Section:
     is_virtual: bool = False
     plan_room: str = ""
     lab_room: str = ""          # pinned lab room (from Plan), "" = lab in a regular room
-    requires_lab_room: bool = False  # section needs a lab-flagged room (UI Room Type column)
+    requires_lab_room: bool = False  # back-compat boolean (required_room_type in lab-family)
+    required_room_type: str = ""     # normal|lab|pc|studio demand; "" = derive from L
     fixed_day: str = ""         # pin the section's first block to this day ("" = unpinned)
     fixed_start: int = -1       # pin the section's first block to this start hour (-1 = unpinned)
 

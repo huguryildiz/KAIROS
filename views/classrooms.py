@@ -98,16 +98,15 @@ def render(lang: str) -> None:
                 st.session_state["cr_source"] = t("cr_sample_name", lang)
                 st.rerun()
 
-            # Format hint + expected-columns example (empty state only; once a list
-            # is loaded the success state shows the actual detected columns instead).
-            st.caption(t("cr_upload_hint", lang))
-            _cr = [t("tbl_room", lang), t("tbl_cap", lang), t("tbl_type", lang)]
-            st.markdown(
-                data_table_html(
-                    _cr,
-                    [["A216", "25", "normal"], ["A211-PC-L", "99", "pc"]],
-                    max_height=160, numeric=(_cr[1],)),
-                unsafe_allow_html=True)
+        # Format hint — always visible (mirrors upload step behaviour).
+        st.caption(t("cr_upload_hint", lang))
+        _cr = [t("tbl_room", lang), t("tbl_cap", lang), t("tbl_type", lang)]
+        st.markdown(
+            data_table_html(
+                _cr,
+                [["A216", "25", "normal"], ["A211-PC-L", "99", "pc"]],
+                max_height=160, numeric=(_cr[1],)),
+            unsafe_allow_html=True)
 
     # Detected-column chips + valid/total badges + inventory preview — shown below
     # the card (not inside it) so the dashed border wraps only the banner + button,
@@ -115,15 +114,19 @@ def render(lang: str) -> None:
     if source:
         report = st.session_state.get("cr_report")
         if report:
-            st.markdown(detected_columns_html(report["detected_columns"], lang),
+            st.markdown(detected_columns_html(report["detected_columns"], lang,
+                                              required=("Room",)),
                         unsafe_allow_html=True)
             st.markdown(import_stats_html(report["stats"], lang),
                         unsafe_allow_html=True)
-        _cr = [t("tbl_room", lang), t("tbl_cap", lang), t("tbl_type", lang)]
+        _cr = [t("tbl_room", lang), t("tbl_cap", lang), t("tbl_type", lang),
+               t("import_col_status", lang)]
         st.markdown(
             data_table_html(
                 _cr,
                 [[r.get("Room", ""), r.get("Capacity", r.get("Cap", "")),
-                  r.get("Type", "")] for r in rooms],
-                max_height=300, numeric=(_cr[1],)),
+                  r.get("Type", ""), "ok"] for r in rooms],
+                max_height=300, numeric=(_cr[1],),
+                pill_cols=(_cr[3],),
+                pill_labels={"ok": t("import_status_ok", lang)}),
             unsafe_allow_html=True)

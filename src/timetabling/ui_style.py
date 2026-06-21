@@ -13,7 +13,7 @@ from html import escape
 from typing import List, Tuple
 
 from .ui_grid import build_week_grid, DAYS_ORDER
-from .i18n import DAY_LABELS, DEFAULT_LANG, t
+from .i18n import DAY_LABELS, DEFAULT_LANG, field_label, t
 
 _LOGO_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "logo.svg")
 _ICON_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "assets", "icon.svg")
@@ -297,8 +297,8 @@ td.tt-time{color:var(--faint);font:500 .72rem/32px var(--mono);text-align:center
    so a wide table stays contained on a phone in portrait. */
 .tt-table-wrap{border:1px solid var(--border);border-radius:var(--r-lg);overflow:auto;width:fit-content;max-width:100%;max-height:var(--tt-table-h,340px);background:var(--surface);box-shadow:var(--sh-1);-webkit-overflow-scrolling:touch;}
 table.tt-data{border-collapse:collapse;width:auto;min-width:280px;margin:0 auto;font:500 .82rem/1.45 var(--font);color:var(--ink-2);}
-table.tt-data thead th{position:sticky;top:0;z-index:1;background:var(--surface-2);color:var(--muted);font:600 .66rem/1 var(--mono);text-transform:uppercase;letter-spacing:.06em;text-align:center;padding:7px 10px;border-bottom:1px solid var(--border);white-space:nowrap;}
-table.tt-data tbody td{padding:5px 10px;border-bottom:1px solid var(--border-2);white-space:nowrap;text-align:center;}
+table.tt-data thead th{position:sticky;top:0;z-index:1;background:var(--surface-2);color:var(--muted);font:600 .66rem/1 var(--mono);text-transform:uppercase;letter-spacing:.06em;text-align:left;padding:7px 10px;border-bottom:1px solid var(--border);white-space:nowrap;}
+table.tt-data tbody td{padding:5px 10px;border-bottom:1px solid var(--border-2);white-space:nowrap;text-align:left;}
 table.tt-data th.num,table.tt-data td.num{text-align:center;font-variant-numeric:tabular-nums;}
 table.tt-data tbody tr:nth-child(even){background:var(--surface-2);}
 table.tt-data tbody tr:hover{background:var(--primary-50);}
@@ -307,7 +307,21 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
 .cr-edit-head{font:600 .92rem/1.3 var(--font);color:var(--ink-2);margin:20px 0 8px;}
 
 /* CSV import preview (VERA-style): detected-column chips, stat badges, status pills */
-.imp-detect{margin:6px 0 16px;}
+.imp-detect-card{background:var(--card);border:1px solid var(--card-bd);border-radius:var(--r);padding:14px 16px 0;box-shadow:var(--sh-1);margin:6px 0 14px;overflow:hidden;}
+.imp-req-row{display:flex;align-items:center;gap:10px;margin:12px -16px 0;padding:10px 16px;}
+.imp-req-row.met{background:var(--good-bg);border-top:1px solid var(--good-bd);}
+.imp-req-row.unmet{background:var(--error-bg);border-top:1px solid var(--error-bd);}
+.imp-req-icon{width:15px;height:15px;flex:none;vertical-align:middle;}
+.imp-req-row.met .imp-req-icon{color:var(--good);}
+.imp-req-row.unmet .imp-req-icon{color:var(--error);}
+.imp-req-lbl{font:700 .62rem/1 var(--mono);text-transform:uppercase;letter-spacing:.12em;flex:none;}
+.imp-req-row.met .imp-req-lbl{color:var(--good);}
+.imp-req-row.unmet .imp-req-lbl{color:var(--error);}
+.imp-req-val{font:600 .8rem/1 var(--font);display:flex;align-items:center;gap:8px;}
+.imp-req-val.met{color:var(--good);}
+.imp-req-val.unmet{color:var(--error);}
+.imp-req-fields{font:500 .7rem/1 var(--mono);opacity:.65;color:inherit;}
+.imp-detect{margin:0 0 4px;}
 .imp-detect-head{display:flex;align-items:center;gap:9px;margin-bottom:11px;}
 .imp-detect-head .lbl{font:700 .64rem/1 var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.13em;}
 .imp-detect-head .imp-detect-count{font:700 .6rem/1 var(--mono);color:var(--primary);background:var(--primary-50);border:1px solid var(--primary-100);border-radius:999px;padding:3px 8px;font-variant-numeric:tabular-nums;}
@@ -338,29 +352,35 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
 
 /* Solve "loading button" — replaces the real Streamlit button while solver runs
    so the spinner text appears in the same visual slot as the button. */
-.solve-running{display:flex;align-items:center;justify-content:center;gap:10px;
+.solve-running{display:inline-flex;align-items:center;justify-content:center;gap:10px;
   padding:.55rem 1rem;min-height:42px;border-radius:10px;
   background:radial-gradient(ellipse at 80% -20%,#7080D8 0%,rgba(112,128,216,0) 60%),
              linear-gradient(135deg,#3A4EA0 0%,#2F42A0 46%,#233178 100%);
   color:#fff;font:600 .9rem/1 var(--font);border:1px solid #2B3A8C;
   box-shadow:0 1px 2px rgba(31,43,103,.3),0 6px 18px -8px rgba(31,43,103,.5);
   opacity:.9;cursor:wait;}
-.solve-spin{width:16px;height:16px;border:2.5px solid rgba(255,255,255,.35);
-  border-top-color:#fff;border-radius:50%;flex:none;
-  animation:solveSpin .7s linear infinite;}
+/* In-progress spinner = the same gear as the button, rotating continuously. */
+.solve-gear{width:18px;height:18px;flex:none;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='white' d='M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z'/%3E%3C/svg%3E") center/contain no-repeat;
+  animation:solveSpin .9s linear infinite;}
 @keyframes solveSpin{to{transform:rotate(360deg);}}
 .solve-eta{font:500 .76rem/1 var(--font);opacity:.65;margin-left:6px;
   font-variant-numeric:tabular-nums;white-space:nowrap;}
-/* Solve button — centred, auto-width, shimmer on load; CSS SVG wand casts on click.
-   SVG wand: stick (white line, bottom-left→top-right) + gold handle knob + gold 5-pt star at tip.
-   transform-origin matches handle position (5/24≈21%, 19/24≈79%) so tip swings on rotate. */
-.st-key-solve_btn{display:flex;justify-content:center;}
+/* Solve button — LEFT-aligned, auto-width, shimmer on load; CSS SVG gear nudges on click
+   (the continuous gear rotation appears in the .solve-gear loading state while solving).
+   transform-origin centred so the gear spins about its own hub. */
+.st-key-solve_btn{display:flex;justify-content:flex-start;}
 .st-key-solve_btn button{position:relative;overflow:hidden;padding:12px 40px!important;display:inline-flex!important;align-items:center;justify-content:center;gap:7px;}
-.st-key-solve_btn button::before{content:"";display:inline-block;flex:none;width:20px;height:20px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cline x1='19' y1='5' x2='5' y2='19' stroke='white' stroke-width='2.5' stroke-linecap='round'/%3E%3Ccircle cx='5' cy='19' r='2.2' fill='%23B8860B'/%3E%3Cpolygon points='19,1.5 19.9,3.7 22.3,3.9 20.5,5.5 21.1,7.8 19,6.6 16.9,7.8 17.5,5.5 15.7,3.9 18.1,3.7' fill='%23FFD700'/%3E%3C/svg%3E") center/contain no-repeat;transform-origin:21% 79%;}
+.st-key-solve_btn button::before{content:"";display:inline-block;flex:none;width:20px;height:20px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='white' d='M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z'/%3E%3C/svg%3E") center/contain no-repeat;transform-origin:50% 50%;}
 .st-key-solve_btn button::after{content:"";position:absolute;top:-50%;left:-80%;width:45%;height:200%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.26),transparent);transform:skewX(-12deg);animation:wandShimmer 1.6s ease-in-out 0.1s 3;}
 .st-key-solve_btn button.wand-casting::before{animation:wandCast 0.5s ease-in-out;}
 @keyframes wandShimmer{0%{left:-80%}100%{left:140%}}
 @keyframes wandCast{0%{transform:rotate(0deg)}20%{transform:rotate(-22deg)}55%{transform:rotate(15deg)}80%{transform:rotate(-5deg)}100%{transform:rotate(0deg)}}
+/* Solve watcher iframe (views/solve.py) — a height:0 components.html iframe whose JS
+   arms the "Leave site?" guard + live ETA countdown. Collapse its container so the
+   0-height iframe leaves no flex-gap row between the caption and the button. A
+   display:none iframe still loads and runs its script, so the watcher keeps polling. */
+.st-key-solve_watch{display:none!important;}
 
 /* Expander — default Streamlit expander renders a white card in dark mode;
    repaint surface, border and label to match the theme. */
@@ -1453,16 +1473,22 @@ def metric_cards_html(cards: List[Tuple[str, str, str]]) -> str:
 
 
 def data_table_html(columns: List[str], rows: List[List], max_height: int = 340,
-                    numeric: Tuple[str, ...] = ()) -> str:
+                    numeric: Tuple[str, ...] = (),
+                    pill_cols: Tuple[str, ...] = (),
+                    pill_labels: dict = None) -> str:
     """Read-only themed table for tabular previews (uploaded courselist, room
     inventory). Rendered as our own HTML/CSS so it follows the in-app light/dark
     theme — unlike ``st.dataframe``, whose glide-grid canvas is painted from
     Streamlit's *native* (light) theme and cannot be re-themed from CSS.
 
     ``columns`` are header labels; ``rows`` are row sequences aligned to them.
-    ``numeric`` lists column labels to right-align with tabular figures. The
-    wrapper scrolls internally (both axes), capped at ``max_height`` px."""
+    ``numeric`` lists column labels to right-align with tabular figures.
+    ``pill_cols`` lists column labels whose cell values are CSS class names rendered
+    as colored status pills; ``pill_labels`` maps class name → display text.
+    The wrapper scrolls internally (both axes), capped at ``max_height`` px."""
     num = set(numeric)
+    pills = set(pill_cols)
+    _labels = pill_labels or {}
     head = "".join(
         f'<th class="num">{escape(str(c))}</th>' if c in num else f'<th>{escape(str(c))}</th>'
         for c in columns)
@@ -1471,12 +1497,19 @@ def data_table_html(columns: List[str], rows: List[List], max_height: int = 340,
     else:
         trs = []
         for r in rows:
-            tds = "".join(
-                (f'<td class="num">{escape("" if v is None else str(v))}</td>'
-                 if (i < len(columns) and columns[i] in num)
-                 else f'<td>{escape("" if v is None else str(v))}</td>')
-                for i, v in enumerate(r))
-            trs.append(f"<tr>{tds}</tr>")
+            tds_parts = []
+            for i, v in enumerate(r):
+                col = columns[i] if i < len(columns) else ""
+                v_str = "" if v is None else str(v)
+                if col in pills:
+                    label = _labels.get(v_str, v_str)
+                    tds_parts.append(
+                        f'<td><span class="st-pill {escape(v_str)}">{escape(label)}</span></td>')
+                elif col in num:
+                    tds_parts.append(f'<td class="num">{escape(v_str)}</td>')
+                else:
+                    tds_parts.append(f'<td>{escape(v_str)}</td>')
+            trs.append(f'<tr>{"".join(tds_parts)}</tr>')
         body = "".join(trs)
     return (f'<div style="display:flex;justify-content:center">'
             f'<div class="tt-table-wrap" style="--tt-table-h:{int(max_height)}px">'
@@ -1495,30 +1528,81 @@ _IMP_COLS = ("Course Code", "Course Name", "Section No", "T", "P", "L",
 _IMP_NUM = {"T", "P", "L", "~Students"}
 
 
-def detected_columns_html(detected: list, lang: str = DEFAULT_LANG) -> str:
-    """The "detected columns" chip row: one chip per canonical field, green when
-    matched by header alias, dashed-orange ("positional" tag) when it fell back to
-    column order. Shared by the course import preview and the Classrooms step.
+_REQUIRED_COURSE_FIELDS = (
+    "Course Code", "Course Name", "Dept",
+    "Section No", "Instructor Name",
+    "T", "P", "L",
+    "Section Capacity",
+)
+
+
+def detected_columns_html(detected: list, lang: str = DEFAULT_LANG,
+                          required: tuple | None = None) -> str:
+    """The "detected columns" chip row inside a card, with a minimum-requirements
+    banner. Green chips = header-matched; dashed-orange = positional fallback.
     ``detected`` = ``[{field, label, source}]`` from ``csv_import.map_columns``."""
     if not detected:
         return ""
+
+    if required is None:
+        required = _REQUIRED_COURSE_FIELDS
 
     def _chip(d):
         is_pos = d["source"] != "header"
         tag = (f'<span class="tag">{t("import_positional", lang)}</span>'
                if is_pos else "")
+        field_display = escape(field_label(str(d["field"]), lang))
         return (f'<span class="col{" pos" if is_pos else ""}">'
                 f'<i class="dot"></i>'
-                f'<b>{escape(str(d["field"]))}</b>'
+                f'<b>{field_display}</b>'
                 f'<span class="arw">→</span>'
                 f'<em>{escape(str(d["label"]))}</em>{tag}</span>')
 
     chips = "".join(_chip(d) for d in detected)
     n_match = sum(1 for d in detected if d["source"] == "header")
     count = f'<span class="imp-detect-count">{n_match}/{len(detected)}</span>'
-    return (f'<div class="imp-detect"><div class="imp-detect-head">'
+
+    detected_fields = {d["field"] for d in detected}
+    missing_req = [f for f in required if f not in detected_fields]
+    tone = "unmet" if missing_req else "met"
+    _icon_met = ('<svg class="imp-req-icon" viewBox="0 0 16 16" fill="none" '
+                 'xmlns="http://www.w3.org/2000/svg">'
+                 '<circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/>'
+                 '<path d="M4.5 8.5l2.5 2.5 4-5" stroke="currentColor" '
+                 'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
+                 '</svg>')
+    _icon_unmet = ('<svg class="imp-req-icon" viewBox="0 0 16 16" fill="none" '
+                   'xmlns="http://www.w3.org/2000/svg">'
+                   '<circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/>'
+                   '<path d="M5.5 5.5l5 5M10.5 5.5l-5 5" stroke="currentColor" '
+                   'stroke-width="1.5" stroke-linecap="round"/>'
+                   '</svg>')
+    req_fields_str = escape(" · ".join(field_label(f, lang) for f in required))
+    if missing_req:
+        icon = _icon_unmet
+        missing_tr = escape(", ".join(field_label(f, lang) for f in missing_req))
+        req_val = (f'<span class="imp-req-val unmet">'
+                   f'<span class="imp-req-fields">{req_fields_str}</span>'
+                   f'{t("import_min_unmet", lang, cols=missing_tr)}'
+                   f'</span>')
+    else:
+        icon = _icon_met
+        req_val = (f'<span class="imp-req-val met">'
+                   f'<span class="imp-req-fields">{req_fields_str}</span>'
+                   f'{t("import_min_met", lang)}'
+                   f'</span>')
+
+    req_row = (f'<div class="imp-req-row {tone}">'
+               f'{icon}'
+               f'<span class="imp-req-lbl">{t("import_min_req", lang)}</span>'
+               f'{req_val}</div>')
+
+    return (f'<div class="imp-detect-card">'
+            f'<div class="imp-detect"><div class="imp-detect-head">'
             f'<span class="lbl">{t("import_detected", lang)}</span>'
-            f'{count}</div><div class="imp-cols">{chips}</div></div>')
+            f'{count}</div><div class="imp-cols">{chips}</div></div>'
+            f'{req_row}'
+            f'</div>')
 
 
 def import_stats_html(stats: dict, lang: str = DEFAULT_LANG) -> str:

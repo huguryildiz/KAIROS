@@ -34,3 +34,12 @@ def test_new_ui_keys_bilingual():
     for k in keys:
         for lang in LANGS:
             assert t(k, lang) and t(k, lang) != k        # present, actually translated
+
+
+def test_settings_keys_bilingual():
+    keys = ["step_settings", "set_caption", "set_policy_header", "set_avail_header",
+            "set_profile_header", "set_w_evening", "set_blackout_header",
+            "set_day_start", "set_avail_save", "set_daily_cap"]
+    for k in keys:
+        for lang in LANGS:
+            assert t(k, lang) and t(k, lang) != k

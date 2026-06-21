@@ -16,7 +16,7 @@ _SAMPLE = os.path.join(os.path.dirname(__file__), "..", "assets", "sample_classr
 
 
 def render(lang: str) -> None:
-    st.markdown(eyebrow_html(3, t("step_classrooms", lang), "classrooms"),
+    st.markdown(eyebrow_html(None, t("step_classrooms", lang), "classrooms", sub=True),
                 unsafe_allow_html=True)
     st.caption(t("cr_caption", lang))
 

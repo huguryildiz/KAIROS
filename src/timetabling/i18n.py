@@ -58,8 +58,9 @@ STRINGS = {
         # hero (landing)
         "hero_title_html": "Her ders, <em>çakışmasız</em> bir haftalık programda.",
         "hero_body": "Ders listeni yükle, dersliklerini tanımla. Gerisini motor halleder: "
-                     "her şube otomatik olarak gün, saat ve dersliğe yerleşir — oda, eğitmen "
+                     "her şube otomatik olarak gün, saat ve dersliğe yerleşir — oda, öğretim elemanı "
                      "ve laboratuvar çakışması olmadan.",
+        "step_data": "Veri",
         "step_upload": "Ders yükle",
         "upload_desc": "Ders listenizi CSV olarak yükleyin; her satır bir şube.",
         "step_classrooms": "Derslikler",
@@ -162,14 +163,14 @@ STRINGS = {
         "warn_no_rows": "Yüklenen dosyada satır yok.",
         "warn_missing_cols": "Eksik zorunlu sütun(lar): {cols}",
         "warn_zero_hours": "{n} satırda T+P+L=0 (3 saatlik teori bloğuna varsayıldı).",
-        "warn_blank_email": "{n} satırda eğitmen e-postası boş (eğitmen çakışma kontrolü dışı).",
+        "warn_blank_email": "{n} satırda öğretim elemanı e-postası boş (öğretim elemanı çakışma kontrolü dışı).",
         "warn_bad_code": "{n} satırda ders kodundan bölüm/kohort çözümlenemedi "
                          "(kohort = UNK). Bu satırlar için kohort çakışması ve öğrenci "
                          "boşluk optimizasyonu uygulanmaz; çözüm yine de üretilir. "
                          "Düzeltmek için CSV'ye 'Dept' (bölüm) sütunu ekleyin.",
         "warn_bad_level": "{n} satırda ders kodundan sınıf düzeyi belirlenemedi. Düzeye "
                           "dayalı sıralama (alt sınıflar güne erken) bu satırlara uygulanmaz.",
-        "info_part_time": "{n} eğitmen '(S)' ile yarı zamanlı algılandı.",
+        "info_part_time": "{n} öğretim elemanı '(S)' ile yarı zamanlı algılandı.",
         # CSV import preview (VERA-style)
         "import_detected": "Algılanan sütunlar",
         "import_positional": "konuma göre",
@@ -269,6 +270,7 @@ STRINGS = {
         "hero_body": "Upload your course list and define your rooms. The engine handles the rest — "
                      "every section lands on a day, time, and room, with no room, instructor, "
                      "or lab clashes.",
+        "step_data": "Data",
         "step_upload": "Upload courses",
         "upload_desc": "Upload your course list as CSV — one row per section.",
         "step_classrooms": "Classrooms",

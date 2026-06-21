@@ -30,7 +30,7 @@ def _ingest(file_or_path) -> dict:
 
 
 def render(lang: str) -> None:
-    st.markdown(eyebrow_html(1, t("step_upload", lang), "upload"),
+    st.markdown(eyebrow_html(None, t("step_upload", lang), "upload", sub=True),
                 unsafe_allow_html=True)
     st.caption(t("upload_desc", lang))
 

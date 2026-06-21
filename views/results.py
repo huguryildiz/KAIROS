@@ -18,7 +18,7 @@ def render(lang: str) -> None:
     res = st.session_state.get("result")
     if res is None:
         return
-    st.markdown(eyebrow_html(6, t("step_results", lang), "results"),
+    st.markdown(eyebrow_html(4, t("step_results", lang), "results"),
                 unsafe_allow_html=True)
 
     sched = res.schedule

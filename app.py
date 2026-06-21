@@ -10,7 +10,8 @@ import streamlit as st
 from timetabling.defaults import DEFAULT_CLASSROOMS
 from timetabling.settings import default_settings
 from timetabling.ui_style import (brand_css, appbar_html, stepper_html,
-                                  hero_html, footer_html, dropzone_drag_js)
+                                  hero_html, footer_html, dropzone_drag_js,
+                                  eyebrow_html)
 from timetabling.ui_app import (get_lang, get_theme, theme_toggle,
                                 lang_selector_bar, hero_chips)
 from timetabling.i18n import t
@@ -95,12 +96,8 @@ with st.container(key="topbar"):
             lang = lang_selector_bar()
 
     steps = [
-        {"key": "upload", "label": t("step_upload", lang),
+        {"key": "data", "label": t("step_data", lang),
          "status": "done" if has_courses else "active"},
-        {"key": "review", "label": t("step_review", lang),
-         "status": "done" if has_courses else "locked"},
-        {"key": "classrooms", "label": t("step_classrooms", lang),
-         "status": "done" if has_courses else "locked"},
         {"key": "settings", "label": t("step_settings", lang),
          "status": "active" if has_courses else "locked"},
         {"key": "solve", "label": t("step_solve", lang), "status": _solve_status()},
@@ -118,14 +115,16 @@ def _anchor(name: str) -> None:
 
 
 # --- Sections (progressive disclosure)
+# Step 1 — Data: one numbered step grouping the course upload, the validation
+# review, and the classroom inventory (each rendered as a number-less sub-header).
+_anchor("data")
+st.markdown(eyebrow_html(1, t("step_data", lang), "data"), unsafe_allow_html=True)
 _anchor("upload")
 upload.render(lang)
 
 if has_courses:
-    st.divider()
     _anchor("review")
     review.render(lang)
-    st.divider()
     _anchor("classrooms")
     classrooms.render(lang)
     st.divider()

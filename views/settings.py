@@ -68,7 +68,7 @@ def _work_days(s) -> list:
 
 
 def render(lang: str) -> None:
-    st.markdown(eyebrow_html(4, t("step_settings", lang), "settings"),
+    st.markdown(eyebrow_html(2, t("step_settings", lang), "settings"),
                 unsafe_allow_html=True)
     st.caption(t("set_caption", lang))
     s = st.session_state["settings"]

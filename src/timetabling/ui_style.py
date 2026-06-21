@@ -202,6 +202,9 @@ h1,h2,h3,h4{margin:0;letter-spacing:-.018em;font-weight:700;color:var(--ink);}
 .eyebrow:hover .anchor{opacity:.65;}
 .eyebrow .anchor:hover{opacity:1;color:var(--primary);}
 .eyebrow .anchor svg{width:17px;height:17px;}
+/* Sub-header: a smaller, number-less section header for the sub-sections grouped
+   under one numbered step (e.g. course list / review / classrooms under Data). */
+.eyebrow.sub{font-size:1.12rem;font-weight:600;margin:18px 0 8px;gap:8px;}
 
 /* Hero */
 .tt-hero{position:relative;overflow:hidden;border-radius:var(--r-xl);margin:4px 0 22px;padding:34px 38px;color:#fff;background:radial-gradient(680px 320px at 88% -30%, #5C6CC6 0%, rgba(92,108,198,0) 62%),linear-gradient(135deg,#233178 0%,#2B3A8C 46%,#1C2766 100%);box-shadow:var(--sh-3);}
@@ -1313,9 +1316,17 @@ def dropzone_drag_js() -> str:
     )
 
 
-def eyebrow_html(n, label: str, key: str) -> str:
-    """Numbered section header: badge + gradient label + a permalink anchor that
-    targets the section's ``#s-<key>`` scroll anchor (rendered by app._anchor)."""
+def eyebrow_html(n, label: str, key: str, sub: bool = False) -> str:
+    """Section header: badge + gradient label + a permalink anchor that targets the
+    section's ``#s-<key>`` scroll anchor (rendered by app._anchor). With ``sub=True``
+    it renders a smaller, number-less sub-header (used for the sub-sections grouped
+    under a single numbered step, e.g. the unified Data step)."""
+    if sub:
+        return (
+            f'<div class="eyebrow sub"><span class="lbl">{escape(label)}</span>'
+            f'<a class="anchor" href="#s-{escape(key)}" title="{escape(label)}" '
+            f'aria-label="{escape(label)}">{_LINK_SVG}</a></div>'
+        )
     return (
         f'<div class="eyebrow"><span class="n">{escape(str(n))}</span>'
         f'<span class="lbl">{escape(label)}</span>'

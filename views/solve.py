@@ -22,7 +22,7 @@ _PERIOD = "001"
 
 
 def render(lang: str) -> None:
-    st.markdown(eyebrow_html(5, t("step_solve", lang), "solve"),
+    st.markdown(eyebrow_html(3, t("step_solve", lang), "solve"),
                 unsafe_allow_html=True)
 
     courses = st.session_state.get("courses", [])

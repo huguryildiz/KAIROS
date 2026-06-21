@@ -14,7 +14,7 @@ _NUMERIC_COLS = ("T", "P", "L", "~Students")
 
 def render(lang: str) -> None:
     rows = st.session_state.get("courses", [])
-    st.markdown(eyebrow_html(2, t("step_review", lang), "review"),
+    st.markdown(eyebrow_html(None, t("step_review", lang), "review", sub=True),
                 unsafe_allow_html=True)
     st.caption(t("review_caption", lang))
 

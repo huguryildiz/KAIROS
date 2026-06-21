@@ -119,7 +119,7 @@ def _layout_day(blocks: list) -> list:
 
 
 def _draw_block(pdf: FPDF, a: dict, x: float, y: float, w: float, h: float,
-                show_instructor: bool) -> None:
+                show_instructor: bool, cont: bool = False) -> None:
     color = block_color(a)
     accent = _hex_to_rgb(color)
     fill = _tint(color, 0.13)                  # ~13% color over white (matches UI)
@@ -137,6 +137,13 @@ def _draw_block(pdf: FPDF, a: dict, x: float, y: float, w: float, h: float,
     pdf.set_draw_color(*_tint(color, 0.45))
     pdf.set_line_width(0.2)
     pdf.rect(x, y, w, h, style="D", round_corners=True, corner_radius=r)
+    # 4) Continuation hour: a dashed top rule (this session began an hour earlier).
+    if cont:
+        pdf.set_draw_color(*_tint(color, 0.55))
+        pdf.set_line_width(0.25)
+        pdf.set_dash_pattern(dash=1.1, gap=1.1)
+        pdf.line(x + bar_w + 1.0, y + 0.5, x + w - 1.5, y + 0.5)
+        pdf.set_dash_pattern()                 # reset to solid
 
     tag = _block_tag(a)
     section = str(a.get("section_id") or a.get("course_code", ""))
@@ -248,19 +255,22 @@ def build_grid_pdf(schedule: dict, title: str, lang: str = DEFAULT_LANG,
         if d in by_day:
             by_day[d].append(a)
 
+    gap = 0.7                                   # vertical gap between hour cards
     for col, d in enumerate(DAYS_ORDER):
         x_day = grid_x + _TIME_COL_W + col * day_w
         for a, lane, n_lanes in _layout_day(by_day[d]):
-            s = max(int(a.get("start", _HOUR_LO)), _HOUR_LO)
-            e = min(int(a.get("end", s + 1)), _HOUR_HI)
-            if e <= s:
-                continue
+            start = int(a.get("start", _HOUR_LO))
+            s = max(start, _HOUR_LO)
+            e = min(int(a.get("end", start + 1)), _HOUR_HI)
             lane_w = day_w / n_lanes
             bx = x_day + lane * lane_w + 0.6
             bw = lane_w - 1.2
-            byy = body_y + (s - _HOUR_LO) * _ROW_H + 0.6
-            bh = (e - s) * _ROW_H - 1.2
-            _draw_block(pdf, a, bx, byy, bw, bh, show_instructor)
+            # One card per hour the session occupies (mirrors the on-screen grid).
+            for hh in range(s, e):
+                byy = body_y + (hh - _HOUR_LO) * _ROW_H + gap
+                bh = _ROW_H - 2 * gap
+                _draw_block(pdf, a, bx, byy, bw, bh, show_instructor,
+                            cont=(hh > start))
 
     return bytes(pdf.output())
 

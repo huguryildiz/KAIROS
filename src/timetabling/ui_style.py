@@ -9,6 +9,7 @@ HTML builders stay unit-testable.
 from __future__ import annotations
 import base64
 import os
+import re
 from html import escape
 from typing import List, Tuple
 
@@ -65,7 +66,7 @@ _LIGHT_TOKENS = {
     "--card": "#FFFFFF", "--card-bd": "#E5E9F1",
     "--ink": "#131722", "--ink-2": "#39414F", "--muted": "#5B6472", "--faint": "#9AA3B2",
     "--border": "#E5E9F1", "--border-2": "#EEF1F6",
-    "--good": "#0F766E", "--good-bg": "#ECFDF6", "--good-bd": "#A7E3D4",
+    "--good": "#0F766E", "--good-bg": "#ECFDF6", "--good-bd": "#A7E3D4", "--good-mid": "#34D399",
     "--warn": "#B4490F", "--warn-bg": "#FEF4EE", "--warn-bd": "#F3CBB4",
     "--error": "#C81E1E", "--error-bg": "#FEF2F2", "--error-bd": "#FECACA",
     "--info": "#1F4FB8", "--info-bg": "#EEF3FC", "--info-bd": "#C4D6F4",
@@ -91,7 +92,7 @@ _DARK_TOKENS = {**_LIGHT_TOKENS, **{
     "--card": "#1F2740", "--card-bd": "#33405E",
     "--ink": "#EAEEF7", "--ink-2": "#C5CCDD", "--muted": "#8A93A8", "--faint": "#5E6678",
     "--border": "#28314B", "--border-2": "#222A40",
-    "--good": "#34D6AA", "--good-bg": "rgba(52,214,170,.13)", "--good-bd": "rgba(52,214,170,.36)",
+    "--good": "#34D6AA", "--good-bg": "rgba(52,214,170,.13)", "--good-bd": "rgba(52,214,170,.36)", "--good-mid": "#34D6AA",
     "--warn": "#EFA463", "--warn-bg": "rgba(239,164,99,.13)", "--warn-bd": "rgba(239,164,99,.36)",
     "--error": "#F87171", "--error-bg": "rgba(248,113,113,.13)", "--error-bd": "rgba(248,113,113,.36)",
     "--info": "#7E90EE", "--info-bg": "rgba(126,144,238,.12)", "--info-bd": "rgba(126,144,238,.32)",
@@ -220,7 +221,7 @@ h1,h2,h3,h4{margin:0;letter-spacing:-.018em;font-weight:700;color:var(--ink);}
 .chip-stat .v{font:800 1.12rem/1 var(--font);color:#fff;}
 .chip-stat .l{font:600 .62rem/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:#AEBBF0;}
 .chip-stat.good{background:rgba(52,211,153,.14);border-color:rgba(52,211,153,.32);}
-.chip-stat.good .v{color:#6EE7B7;}
+.chip-stat.good .v{color:var(--good-mid);}.chip-stat.good .l{color:var(--good-bd);}
 .chip-stat.bad{background:rgba(248,113,113,.14);border-color:rgba(248,113,113,.34);}
 .chip-stat.bad .v{color:#FCA5A5;}
 
@@ -288,6 +289,7 @@ td.tt-time{color:var(--faint);font:500 .72rem/32px var(--mono);text-align:center
 .tt-blk .who{font:500 .66rem/1.25 var(--font);display:block;margin-top:2px;opacity:.85;}
 .tt-blk .meta{font:500 .64rem/1.2 var(--mono);opacity:.72;display:block;margin-top:1px;}
 .tt-blk .tag{font:600 .52rem/1 var(--mono);letter-spacing:.04em;border:1px solid currentColor;border-radius:4px;padding:1px 4px;margin-left:6px;vertical-align:1px;}
+.tt-blk .tag.prat{color:var(--warn,#b45309);border-color:currentColor;}
 .tt-empty{color:var(--faint);font:500 .9rem/1 var(--font);padding:24px;text-align:center;}
 
 /* Read-only data table (uploaded courselist / room inventory previews). Our own
@@ -311,15 +313,19 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
 .imp-req-row{display:flex;align-items:center;gap:10px;margin:12px -16px 0;padding:10px 16px;}
 .imp-req-row.met{background:var(--good-bg);border-top:1px solid var(--good-bd);}
 .imp-req-row.unmet{background:var(--error-bg);border-top:1px solid var(--error-bd);}
+.imp-req-row.warn{background:var(--warn-bg);border-top:1px solid var(--warn-bd);}
 .imp-req-icon{width:15px;height:15px;flex:none;vertical-align:middle;}
 .imp-req-row.met .imp-req-icon{color:var(--good);}
 .imp-req-row.unmet .imp-req-icon{color:var(--error);}
+.imp-req-row.warn .imp-req-icon{color:var(--warn);}
 .imp-req-lbl{font:700 .62rem/1 var(--mono);text-transform:uppercase;letter-spacing:.12em;flex:none;}
 .imp-req-row.met .imp-req-lbl{color:var(--good);}
 .imp-req-row.unmet .imp-req-lbl{color:var(--error);}
+.imp-req-row.warn .imp-req-lbl{color:var(--warn);}
 .imp-req-val{font:600 .8rem/1 var(--font);display:flex;align-items:center;gap:8px;}
 .imp-req-val.met{color:var(--good);}
 .imp-req-val.unmet{color:var(--error);}
+.imp-req-val.warn{color:var(--warn);}
 .imp-req-fields{font:500 .7rem/1 var(--mono);opacity:.65;color:inherit;}
 .imp-detect{margin:0 0 4px;}
 .imp-detect-head{display:flex;align-items:center;gap:9px;margin-bottom:11px;}
@@ -364,8 +370,11 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
   background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='white' d='M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z'/%3E%3C/svg%3E") center/contain no-repeat;
   animation:solveSpin .9s linear infinite;}
 @keyframes solveSpin{to{transform:rotate(360deg);}}
-.solve-eta{font:500 .76rem/1 var(--font);opacity:.65;margin-left:6px;
-  font-variant-numeric:tabular-nums;white-space:nowrap;}
+/* Remaining-time line — sits BELOW the solve button/pill, left-aligned to match it.
+   Empty until the watcher fills it, so it adds no vertical gap before the solve starts. */
+.solve-eta{display:block;margin-top:8px;font:500 .78rem/1 var(--font);opacity:.7;
+  color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;}
+.solve-eta:empty{display:none;}
 /* Solve button — LEFT-aligned, auto-width, shimmer on load; CSS SVG gear nudges on click
    (the continuous gear rotation appears in the .solve-gear loading state while solving).
    transform-origin centred so the gear spins about its own hub. */
@@ -506,7 +515,7 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
   .stDownloadButton button [data-testid="stIconMaterial"]{transition:none;}
   .stButton button:hover [data-testid="stIconMaterial"],
   .stDownloadButton button:hover [data-testid="stIconMaterial"]{transform:none;}}
-/* Premium download buttons — JSON (indigo) + CSV (emerald).
+/* Premium download buttons — JSON (indigo) + CSV (emerald) + PDF (red).
    st-key-* lives on the PARENT of stDownloadButton, so selectors use the ancestor pattern:
    .st-key-X [data-testid="stDownloadButton"] button — specificity (0,3,1) > generic (0,2,1). */
 .st-key-dl_json [data-testid="stDownloadButton"] button,
@@ -523,6 +532,13 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
 .st-key-dl_csv [data-testid="stDownloadButton"] button:hover{background:linear-gradient(135deg,#2A8A52 0%,#267C4A 46%,#195C38 100%)!important;color:#fff!important;-webkit-text-fill-color:#fff!important;border:1px solid #166235!important;box-shadow:0 4px 14px -4px rgba(17,85,48,.6)!important;transform:translateY(-1px)!important;}
 .st-key-dl_csv [data-testid="stDownloadButton"] button:hover p{color:#fff!important;-webkit-text-fill-color:#fff!important;}
 .st-key-dl_csv [data-testid="stDownloadButton"] button::before{content:"";display:inline-block;width:18px;height:18px;margin-right:8px;vertical-align:middle;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2'/%3E%3Cline x1='3' y1='9' x2='21' y2='9'/%3E%3Cline x1='3' y1='15' x2='21' y2='15'/%3E%3Cline x1='9' y1='3' x2='9' y2='21'/%3E%3C/svg%3E") center/contain no-repeat;}
+.st-key-dl_pdf [data-testid="stDownloadButton"] button,
+.st-key-dl_pdf [data-testid="stBaseButton-secondary"]{background:linear-gradient(135deg,#C0392B 0%,#A93226 46%,#922B21 100%)!important;color:#fff!important;-webkit-text-fill-color:#fff!important;border:1px solid #922B21!important;border-radius:12px!important;font-weight:600!important;letter-spacing:.01em;padding:12px 20px!important;box-shadow:0 1px 3px rgba(146,43,33,.35),0 6px 18px -8px rgba(146,43,33,.55)!important;}
+.st-key-dl_pdf [data-testid="stDownloadButton"] button p,
+.st-key-dl_pdf [data-testid="stBaseButton-secondary"] p{color:#fff!important;-webkit-text-fill-color:#fff!important;}
+.st-key-dl_pdf [data-testid="stDownloadButton"] button:hover{background:linear-gradient(135deg,#D04437 0%,#B93A2E 46%,#A23529 100%)!important;color:#fff!important;-webkit-text-fill-color:#fff!important;border:1px solid #922B21!important;box-shadow:0 4px 14px -4px rgba(146,43,33,.6)!important;transform:translateY(-1px)!important;}
+.st-key-dl_pdf [data-testid="stDownloadButton"] button:hover p{color:#fff!important;-webkit-text-fill-color:#fff!important;}
+.st-key-dl_pdf [data-testid="stDownloadButton"] button::before{content:"";display:inline-block;width:18px;height:18px;margin-right:8px;vertical-align:middle;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/%3E%3Cpolyline points='14 2 14 8 20 8'/%3E%3C/svg%3E") center/contain no-repeat;}
 /* Theme toggle (☀️/🌙) — circular icon button; detailed sizing rules live below with lang_btn */
 .st-key-theme_btn button{background:var(--surface-2)!important;border:1px solid var(--border)!important;color:var(--ink)!important;border-radius:50%!important;padding:0!important;width:32px!important;height:32px!important;}
 .st-key-theme_btn button:hover{background:var(--surface)!important;border-color:var(--primary)!important;}
@@ -656,6 +672,7 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
 .upload-ok .chk svg{width:26px;height:26px;}
 .upload-ok .ok-title{font:700 .98rem/1.2 var(--font);color:var(--good);margin:0;animation:uploadRise .3s .25s ease both;}
 .upload-ok .ok-sub{font:500 .8rem/1.4 var(--font);color:var(--muted);margin:0;animation:uploadRise .3s .35s ease both;}
+.upload-ok .ok-sub .ok-fname{font:500 .8rem/1.4 var(--mono);color:var(--muted);background:none;padding:0;border:none;border-radius:0;}
 .upload-err{display:flex;flex-direction:column;align-items:center;gap:6px;padding:20px 16px 14px;background:var(--error-bg);border:1px solid var(--error-bd);border-radius:var(--r);margin:8px 0;}
 .upload-err .err-icon{width:52px;height:52px;border-radius:50%;background:var(--error-bg);border:2px solid var(--error-bd);display:grid;place-items:center;color:var(--error);animation:uploadPop .45s cubic-bezier(.34,1.56,.64,1) both;}
 .upload-err .err-icon svg{width:26px;height:26px;}
@@ -848,12 +865,17 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
 .hm-leg .bl{background:var(--warn);}
 .hm-leg b{color:var(--warn);font-weight:700;}
 /* Blocked-slots overview — one warm-chipped row per restricted instructor */
-.av-sum{display:flex;flex-direction:column;gap:8px;margin-top:14px;}
-.av-sum-row{display:flex;align-items:center;flex-wrap:wrap;gap:7px;padding:9px 12px;
-  background:var(--surface-2);border:1px solid var(--border-2);border-radius:10px;}
 .av-sum-who{font:600 .78rem/1.3 var(--font);color:var(--ink-2);margin-right:2px;word-break:break-word;}
-.av-chip{font:600 .62rem/1 var(--mono);padding:4px 8px;border-radius:6px;
-  background:var(--warn-bg);border:1px solid var(--warn-bd);color:var(--warn);white-space:nowrap;}
+/* Interactive chip-buttons (replace static .av-chip spans) */
+[class*="st-key-av_row_"]>[data-testid="stVerticalBlock"]{display:flex!important;flex-wrap:wrap!important;align-items:center!important;gap:7px!important;padding:9px 12px!important;background:var(--surface-2)!important;border:1px solid var(--border-2)!important;border-radius:10px!important;margin-bottom:8px!important;}
+[class*="st-key-av_row_"] [data-testid="stMarkdownContainer"]{flex:0 0 auto!important;margin:0!important;}
+[class*="st-key-av_row_"] [data-testid="stMarkdownContainer"] p{margin:0!important;}
+[class*="st-key-av_rm_"],[class*="st-key-av_rm_"]>[data-testid="stButton"]{display:inline-flex!important;flex:0 0 auto!important;}
+[class*="st-key-av_rm_"] [data-testid="stButton"]>button{font:600 .62rem/1 var(--mono)!important;padding:4px 8px!important;border-radius:6px!important;background:var(--warn-bg)!important;border:1px solid var(--warn-bd)!important;color:var(--warn)!important;white-space:nowrap!important;height:auto!important;min-height:0!important;line-height:1!important;transition:background .15s,color .15s,border-color .15s!important;}
+[class*="st-key-av_rm_"] [data-testid="stButton"]>button:hover{background:rgba(239,68,68,.12)!important;border-color:#ef4444!important;color:#b91c1c!important;cursor:pointer!important;}
+[class*="st-key-av_rm_"] [data-testid="stButton"]>button{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:8px!important;}
+[class*="st-key-av_rm_"] [data-testid="stButton"]>button::after{content:"✕";font-size:1rem;font-weight:900;line-height:1;margin-left:auto;color:transparent;transition:color .15s;}
+[class*="st-key-av_rm_"] [data-testid="stButton"]>button:hover::after{color:#ef4444!important;}
 
 /* Misc Streamlit chrome that should follow the theme */
 hr{border-color:var(--border) !important;}
@@ -1101,6 +1123,18 @@ hr{border-color:var(--border) !important;}
   text-align:center;font:500 .74rem/1.5 var(--mono);color:var(--muted);}
 .tt-footer a{color:var(--good);font-weight:600;text-decoration:none;}
 .tt-footer a:hover{text-decoration:underline;text-underline-offset:3px;}
+
+/* Unschedulable section cards (results view). */
+.uns-list{display:flex;flex-direction:column;gap:8px;padding:4px 0;}
+.uns-card{background:var(--error-bg);border:1px solid var(--error-bd);border-radius:12px;
+  padding:12px 16px;display:flex;gap:12px;align-items:flex-start;}
+.uns-dot{width:7px;height:7px;border-radius:50%;background:var(--error);flex:none;margin-top:5px;}
+.uns-body{flex:1;min-width:0;}
+.uns-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px;}
+.uns-id{font:700 .84rem/1 var(--mono);color:var(--ink);}
+.uns-iss{font:500 .74rem/1.45 var(--font);color:var(--muted);display:block;
+  padding-left:10px;position:relative;}
+.uns-iss::before{content:"·";position:absolute;left:1px;color:var(--error);font-weight:700;}
 """
 
 
@@ -1248,7 +1282,7 @@ def success_banner_html(title: str, subtitle: str) -> str:
         f'<div class="upload-ok">'
         f'<div class="chk">{_CHECK_SVG}</div>'
         f'<p class="ok-title">{escape(title)}</p>'
-        f'<p class="ok-sub">{escape(subtitle)}</p>'
+        f'<p class="ok-sub"><code class="ok-fname">{escape(subtitle)}</code></p>'
         f'</div>'
     )
 
@@ -1562,9 +1596,16 @@ def detected_columns_html(detected: list, lang: str = DEFAULT_LANG,
     n_match = sum(1 for d in detected if d["source"] == "header")
     count = f'<span class="imp-detect-count">{n_match}/{len(detected)}</span>'
 
-    detected_fields = {d["field"] for d in detected}
-    missing_req = [f for f in required if f not in detected_fields]
-    tone = "unmet" if missing_req else "met"
+    detected_by_field = {d["field"]: d for d in detected}
+    # A header row exists if at least one column matched by name. Positional
+    # fallback is the *expected* path for a header-less file, but on a file that
+    # does have a header it means we could not recognize a required column's
+    # name and guessed by position — a low-confidence mapping worth flagging.
+    has_header = any(d["source"] == "header" for d in detected)
+    missing_req = [f for f in required if f not in detected_by_field]
+    guessed_req = [] if missing_req else [
+        f for f in required
+        if has_header and detected_by_field[f]["source"] != "header"]
     _icon_met = ('<svg class="imp-req-icon" viewBox="0 0 16 16" fill="none" '
                  'xmlns="http://www.w3.org/2000/svg">'
                  '<circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/>'
@@ -1577,20 +1618,37 @@ def detected_columns_html(detected: list, lang: str = DEFAULT_LANG,
                    '<path d="M5.5 5.5l5 5M10.5 5.5l-5 5" stroke="currentColor" '
                    'stroke-width="1.5" stroke-linecap="round"/>'
                    '</svg>')
+    # Soft "i" glyph: this state is a "please verify", not an error.
+    _icon_warn = ('<svg class="imp-req-icon" viewBox="0 0 16 16" fill="none" '
+                  'xmlns="http://www.w3.org/2000/svg">'
+                  '<circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/>'
+                  '<path d="M8 7.3v4" stroke="currentColor" stroke-width="1.5" '
+                  'stroke-linecap="round"/>'
+                  '<path d="M8 4.6v.1" stroke="currentColor" stroke-width="1.7" '
+                  'stroke-linecap="round"/>'
+                  '</svg>')
     req_fields_str = escape(" · ".join(field_label(f, lang) for f in required))
     if missing_req:
-        icon = _icon_unmet
-        missing_tr = escape(", ".join(field_label(f, lang) for f in missing_req))
-        req_val = (f'<span class="imp-req-val unmet">'
-                   f'<span class="imp-req-fields">{req_fields_str}</span>'
-                   f'{t("import_min_unmet", lang, cols=missing_tr)}'
-                   f'</span>')
+        tone, icon = "unmet", _icon_unmet
+        cols = escape(", ".join(field_label(f, lang) for f in missing_req))
+        msg = t("import_min_unmet", lang, cols=cols)
+    elif guessed_req:
+        # Show the guessed column number so the user can verify at a glance
+        # ("is column 10 really Section Capacity?") without scrolling the table.
+        tone, icon = "warn", _icon_warn
+        def _gcol(f):
+            m = re.search(r"(\d+)", str(detected_by_field[f]["label"]))
+            col = (t("import_col_n", lang, n=m.group(1)) if m
+                   else str(detected_by_field[f]["label"]))
+            return f"{field_label(f, lang)} → {col}"
+        cols = escape(", ".join(_gcol(f) for f in guessed_req))
+        msg = t("import_min_warn", lang, cols=cols)
     else:
-        icon = _icon_met
-        req_val = (f'<span class="imp-req-val met">'
-                   f'<span class="imp-req-fields">{req_fields_str}</span>'
-                   f'{t("import_min_met", lang)}'
-                   f'</span>')
+        tone, icon = "met", _icon_met
+        msg = t("import_min_met", lang)
+    req_val = (f'<span class="imp-req-val {tone}">'
+               f'<span class="imp-req-fields">{req_fields_str}</span>'
+               f'{msg}</span>')
 
     req_row = (f'<div class="imp-req-row {tone}">'
                f'{icon}'
@@ -1656,10 +1714,22 @@ def import_preview_html(report: dict, lang: str = DEFAULT_LANG) -> str:
 def _block_html(a: dict, is_start: bool) -> str:
     color = block_color(a)
     is_lab = "lab" in str(a.get("block_kind", "")).lower()
+    is_prat = not is_lab and (a.get("section_p") or 0) > 0
     klass = "tt-blk" + (" lab" if is_lab else "") + ("" if is_start else " cont")
-    tag = '<span class="tag">LAB</span>' if is_lab else ""
+    if is_lab:
+        tag = '<span class="tag">LAB</span>'
+    elif is_prat:
+        tag = '<span class="tag prat">PRAT</span>'
+    else:
+        tag = ""
     section = escape(str(a.get("section_id") or a.get("course_code", "")))
-    instructor = escape(str(a.get("instructor_name", "")))
+    instr_name = str(a.get("instructor_name", ""))
+    instr_id = str(a.get("instructor_id", ""))
+    # Show "Name (email)" when both are present and email looks like an address
+    if instr_name and instr_id and "@" in instr_id:
+        instructor = escape(f"{instr_name} ({instr_id})")
+    else:
+        instructor = escape(instr_name or instr_id)
     room = escape(str(a.get("room", "")))
     title = " · ".join(str(a.get(k, "")) for k in
                        ("course_code", "instructor_name", "room", "cohort") if a.get(k))
@@ -1670,6 +1740,47 @@ def _block_html(a: dict, is_start: bool) -> str:
         lines.append(f'<span class="meta">{room}</span>')
     return (f'<div class="{klass}" style="--c:{color}" title="{escape(title)}">'
             f'{"".join(lines)}</div>')
+
+
+_UNSCHED_REASON = {
+    "tr": {
+        "no room with sufficient capacity": "Yeterli kapasiteli derslik bulunamadı",
+        "block longer than daily time window": "Blok süresi günlük zaman penceresini aşıyor",
+    },
+    "en": {
+        "no room with sufficient capacity": "No room with sufficient capacity",
+        "block longer than daily time window": "Block longer than daily time window",
+    },
+}
+
+
+def unschedulable_html(items: list, lang: str = DEFAULT_LANG) -> str:
+    """Premium card list for sections that could not be scheduled."""
+    reasons = _UNSCHED_REASON.get(lang, _UNSCHED_REASON["en"])
+    students_label = "öğrenci" if lang == "tr" else "students"
+    cards = []
+    for s in items:
+        sid = escape(str(s.get("section_id", "")))
+        students = s.get("students", 0)
+        issues = s.get("issues", [])
+        seen_reasons: set = set()
+        unique_issues = [(blk, r) for blk, r in issues if not (r in seen_reasons or seen_reasons.add(r))]
+        iss_html = "".join(
+            f'<span class="uns-iss">{escape(reasons.get(reason, reason))}</span>'
+            for _, reason in unique_issues
+        )
+        cards.append(
+            f'<div class="uns-card">'
+            f'<div class="uns-dot"></div>'
+            f'<div class="uns-body">'
+            f'<div class="uns-head">'
+            f'<span class="uns-id">{sid}</span>'
+            f'<span class="pill">{students} {students_label}</span>'
+            f'</div>'
+            f'{iss_html}'
+            f'</div></div>'
+        )
+    return f'<div class="uns-list">{"".join(cards)}</div>'
 
 
 def week_grid_html(schedule: dict, hour_lo: int = 9, hour_hi: int = 21,

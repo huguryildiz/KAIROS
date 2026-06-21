@@ -115,3 +115,19 @@ def test_cohort_gap_term_isolated_from_s_order():
     st.occupy("A_01#T", cands["A_01#T"][0])     # parked on the gappy Monday slot
     repair_round(st, ["A_01#T"], cands, cfg)
     assert st.placed["A_01#T"].day == "Tu"      # cohort_gap term moves it off Monday
+
+
+def test_cohort_pass_preserves_placement_and_conflict():
+    from timetabling.repair import solve_repair
+    from timetabling.model import Room, Instructor
+    cfg = Config(solve_time_limit_s=10)
+    rooms = {"R1": Room("R1", 50, False, True), "R2": Room("R2", 50, False, True)}
+    instr = {f"i{n}": Instructor(f"i{n}", "x", True, "D") for n in range(6)}
+    secs = []
+    for n in range(6):
+        s = _sec(f"S{n}_01", f"i{n}", level=2, code="ADA 20%d" % n)
+        secs.append(s)
+    assigns, stats = solve_repair(secs, rooms, instr, cfg)
+    assert stats["placed"] == len(secs)          # all placed
+    from timetabling.validate import validate
+    assert validate(assigns, secs, rooms, instr, cfg) == []   # 0 hard violations

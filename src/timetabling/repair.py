@@ -192,6 +192,29 @@ def competitors(state: State, batch, cand_by_block) -> set:
     return comp - set(batch)
 
 
+def _soft_total(state, cfg, staff_ids=frozenset()) -> int:
+    """Global weighted soft sum over the current full placement. Single source of truth
+    for the accept guard and the convergence check — mirrors the terms add_soft_objective
+    puts in the model (per-candidate, cohort-conflict, cohort-gap; instr_days/room_count
+    added with their tasks). Cheap (no CP-SAT)."""
+    total = 0
+    compact = {str(y) for y in cfg.compact_cohort_years}
+    coh_courses = defaultdict(set)   # (cohort, day, hour) -> {course}
+    coh_hours = defaultdict(set)     # (cohort, day) -> {hour}   (compact years only)
+    for bid, c in state.placed.items():
+        s = state.sec_of[bid]
+        total += _cand_soft(c, s, cfg)
+        is_compact = s.cohort_key.rsplit("-", 1)[-1] in compact
+        for hh in range(c.start, c.start + c.length):
+            coh_courses[(s.cohort_key, c.day, hh)].add(s.code)
+            if is_compact:
+                coh_hours[(s.cohort_key, c.day)].add(hh)
+    total += cfg.w_cohort_conflict * sum(max(0, len(v) - 1) for v in coh_courses.values())
+    total += cfg.w_cohort_gap * sum((max(h) + 1 - min(h)) - len(h)
+                                    for h in coh_hours.values() if len(h) >= 2)
+    return total
+
+
 def add_soft_objective(m, x, free, cand_by_block, state, free_set, cfg,
                        staff_ids=frozenset()):
     """Build the joint soft penalty over the free neighborhood, accounting for the
@@ -416,23 +439,44 @@ def repair_round(state: State, batch, cand_by_block, cfg=None, eligible=None,
                           if c.room == room and c.day == day and c.start == start)
             new_assign[b] = Candidate(b, room, day, start, length)
 
-    old_count = sum(1 for bid in free if bid in state.placed)
+    old_placed = {bid: state.placed[bid] for bid in free if bid in state.placed}
+    old_count = len(old_placed)
     if len(new_assign) < old_count:
         return 0
-    # soft-aware accept guard: when soft shaping is active and placement is not improved,
-    # only commit a PROVEN-OPTIMAL re-seat. A timed-out (FEASIBLE) solve can return a
-    # same-placement solution that is worse on the joint soft objective than the current
-    # one; committing it would let soft drift upward. OPTIMAL guarantees soft_new <=
-    # soft_current (the current placement is a feasible point, so the optimum dominates
-    # it). Pure placement sweeps (cfg is None) are untouched, preserving the baseline.
-    if (len(new_assign) == old_count and cfg is not None
-            and cfg.soft_shaping_in_repair and st != cp_model.OPTIMAL):
-        return 0
+    # soft-aware accept guard. A timed-out (FEASIBLE, not OPTIMAL) solve can return a
+    # same-placement solution that is WORSE on the joint soft objective than the current
+    # one; the count-only guard would commit it and let soft drift upward (measured). So
+    # when soft shaping is active and placement is not improved, commit only if the GLOBAL
+    # weighted soft sum does not increase, else revert. Frozen blocks are unchanged within
+    # a round, so the global delta equals the free-set delta. Pure placement sweeps
+    # (cfg is None) skip this entirely, preserving the placement baseline exactly.
+    soft_guard = (cfg is not None and cfg.soft_shaping_in_repair
+                  and len(new_assign) == old_count)
+    old_soft = _soft_total(state, cfg) if soft_guard else 0
     for bid in free:
         state.release(bid)
     for bid, c in new_assign.items():
         state.occupy(bid, c)
+    if soft_guard and _soft_total(state, cfg) > old_soft:
+        for bid in new_assign:
+            state.release(bid)
+        for bid, c in old_placed.items():
+            state.occupy(bid, c)
+        return 0
     return len(new_assign) - old_count
+
+
+def _cohort_gap_now(state, block_ids, cfg) -> int:
+    """Current total (cohort, day) idle gap over the given placed blocks."""
+    by_day = defaultdict(set)
+    for bid in block_ids:
+        c = state.placed.get(bid)
+        if c is None:
+            continue
+        for hh in range(c.start, c.start + c.length):
+            by_day[c.day].add(hh)
+    return sum((max(hrs) + 1 - min(hrs)) - len(hrs)
+               for hrs in by_day.values() if len(hrs) >= 2)
 
 
 def solve_repair(sections, rooms, instructors, cfg):
@@ -484,27 +528,27 @@ def solve_repair(sections, rooms, instructors, cfg):
         if gained == 0 or sweep >= 25:
             break
 
-    # SOFT-POLISH (generic): placement converged; re-seat worst-soft blocks into lower-soft
-    # slots. repair_round's accept guard guarantees placement never drops. Worst-soft first;
-    # stop when the batch is already clean.
+    # SOFT-POLISH Pass C (cohort-centric): give each cohort's whole set of blocks to
+    # repair_round so cohort_gap/cohort-conflict can move blocks across days. Worst-gap
+    # cohort first; accept-guarded -> placement never drops. OFF by default: a measured
+    # no-op at production scale (frozen-LNS pinning), kept for a future redesign.
     soft_polish_rounds = 0
-    if cfg.soft_shaping_in_repair:
-        t_sp = perf_counter()
-        sp_budget = min(SOFT_POLISH_BUDGET_S, max(0.0, deadline - (t_sp - t0)))
-        placed_ids = sorted(
-            (b.block_id for b, _ in blocks if b.block_id in state.placed),
-            key=lambda bid: -_cand_soft(state.placed[bid], sec_of[bid], cfg))
-        for i in range(0, len(placed_ids), BATCH):
-            if perf_counter() - t_sp > sp_budget:
+    if cfg.soft_polish_in_repair:
+        by_cohort = defaultdict(list)
+        for b, s in blocks:
+            by_cohort[s.cohort_key].append(b.block_id)
+        t_c = perf_counter()
+        c_budget = min(SOFT_POLISH_BUDGET_S, max(0.0, deadline - (t_c - t0)))
+        cohorts = sorted(by_cohort,
+                         key=lambda ck: -_cohort_gap_now(state, by_cohort[ck], cfg))
+        for ck in cohorts:
+            if perf_counter() - t_c > c_budget:
                 break
-            batch = [bid for bid in placed_ids[i:i + BATCH] if bid in state.placed]
-            if not batch:
-                continue
-            if all(_cand_soft(state.placed[bid], sec_of[bid], cfg) == 0 for bid in batch):
-                break
-            repair_round(state, batch, cand_by_block, cfg, tl=SOFT_POLISH_TL,
-                         staff_ids=staff_ids)
-            soft_polish_rounds += 1
+            batch = [bid for bid in by_cohort[ck] if bid in state.placed]
+            if batch:
+                repair_round(state, batch, cand_by_block, cfg, tl=SOFT_POLISH_TL,
+                             staff_ids=staff_ids)
+                soft_polish_rounds += 1
 
     # POLISH (overload only): once placement converges, re-optimize the days of
     # overloaded eligible instructors. repair_round never lowers placement (its accept

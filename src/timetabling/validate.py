@@ -42,6 +42,14 @@ def validate(assignments: List[Assignment], sections: List[Section],
         if a.kind == "lab" and not is_virt and s.lab_room and a.room != s.lab_room:
             viol.append(Violation("lab_room",
                         f"{a.block_id} lab not in pinned {s.lab_room} (got {a.room})"))
+        if s.requires_lab_room and not is_virt and room is not None and not room.is_lab:
+            viol.append(Violation("room_type",
+                        f"{a.block_id} in {a.room} but section requires a lab room"))
+        if s.fixed_day and s.blocks and a.block_id == s.blocks[0].block_id \
+                and (a.day != s.fixed_day or a.start != s.fixed_start):
+            viol.append(Violation("fixed",
+                        f"{a.block_id} not at fixed {s.fixed_day} {s.fixed_start}:00 "
+                        f"(got {a.day} {a.start})"))
         end_cap = cfg.undergrad_end if s.level <= 4 else cfg.grad_end
         if a.end > end_cap:
             viol.append(Violation("window",
@@ -54,6 +62,13 @@ def validate(assignments: List[Assignment], sections: List[Section],
             if (a.day, hh) in closed:
                 viol.append(Violation("blackout", f"{a.block_id} covers blackout {a.day} {hh}:00"))
                 break
+        if cfg.instr_unavailable:
+            hit = next(((iid, hh) for iid in s.instructor_ids
+                        for hh in range(a.start, a.end)
+                        if (iid, a.day, hh) in cfg.instr_unavailable), None)
+            if hit:
+                viol.append(Violation("instructor_unavailable",
+                            f"{a.block_id}: {hit[0]} unavailable {a.day} {hit[1]}:00"))
         for hh in range(a.start, a.end):
             if not is_virt:
                 room_occ[(a.room, a.day, hh)].append(a.block_id)

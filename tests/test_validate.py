@@ -37,6 +37,40 @@ def test_detects_capacity_and_lab_and_window_and_blackout():
     assert {"capacity", "lab_room", "blackout"} <= kinds
 
 
+def test_instructor_unavailable_violation():
+    s = _sec("S_01", 1, 10, [Block("S_01#T", "S_01", "theory", 2, False)], instr="i1")
+    cfg = Config(instr_unavailable=frozenset({("i1", "Mo", 9), ("i1", "Mo", 10)}))
+    bad = [Assignment("S_01#T", "S_01", "theory", "R1", "Mo", 9, 11)]   # covers closed Mo 9,10
+    kinds = {v.kind for v in validate.validate(bad, [s], ROOMS, INSTR, cfg)}
+    assert "instructor_unavailable" in kinds
+    ok = [Assignment("S_01#T", "S_01", "theory", "R1", "Tu", 9, 11)]
+    kinds2 = {v.kind for v in validate.validate(ok, [s], ROOMS, INSTR, cfg)}
+    assert "instructor_unavailable" not in kinds2
+
+
+def test_fixed_violation():
+    s = _sec("S_01", 1, 10, [Block("S_01#T", "S_01", "theory", 2, False)])
+    s.fixed_day = "We"
+    s.fixed_start = 10
+    bad = [Assignment("S_01#T", "S_01", "theory", "R1", "Mo", 9, 11)]   # off the fixed slot
+    kinds = {v.kind for v in validate.validate(bad, [s], ROOMS, INSTR, Config())}
+    assert "fixed" in kinds
+    ok = [Assignment("S_01#T", "S_01", "theory", "R1", "We", 10, 12)]   # on the fixed slot
+    kinds2 = {v.kind for v in validate.validate(ok, [s], ROOMS, INSTR, Config())}
+    assert "fixed" not in kinds2
+
+
+def test_room_type_violation():
+    s = _sec("S_01", 1, 10, [Block("S_01#T", "S_01", "theory", 2, False)])
+    s.requires_lab_room = True
+    bad = [Assignment("S_01#T", "S_01", "theory", "R1", "Mo", 9, 11)]   # R1 is not a lab
+    kinds = {v.kind for v in validate.validate(bad, [s], ROOMS, INSTR, Config())}
+    assert "room_type" in kinds
+    ok = [Assignment("S_01#T", "S_01", "theory", "LAB-L", "Mo", 9, 11)]  # LAB-L is a lab
+    kinds2 = {v.kind for v in validate.validate(ok, [s], ROOMS, INSTR, Config())}
+    assert "room_type" not in kinds2
+
+
 def test_detects_instructor_conflict():
     s1 = _sec("S1_01", 1, 10, [Block("S1_01#T", "S1_01", "theory", 1, False)],
               instr="i1", cohort="D-1", code="D 101")

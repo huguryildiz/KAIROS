@@ -31,6 +31,11 @@ COURSE_COL_MAP: Dict[str, List[str]] = {
                        "instructor_email"],
     "~Students":      ["students", "ogrenci", "ogrenci_sayisi", "kontenjan",
                        "size", "approx_students"],
+    # Phase 4 optional columns (override string-derivation; absent -> derive as today).
+    "Year":           ["year", "yil", "sinif", "grade", "year_level", "class"],
+    "Part-time":      ["part_time", "parttime", "yari_zamanli", "saatlik", "pt", "adjunct"],
+    "Room Type":      ["room_type", "oda_tipi", "roomtype", "venue_type", "type"],
+    "Fixed":          ["fixed", "fixed_slot", "sabit", "pinned", "pin"],
 }
 
 # Positional fallback order == the canonical column order.

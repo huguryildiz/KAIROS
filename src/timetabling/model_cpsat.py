@@ -22,8 +22,11 @@ def feasible_rooms_for(block: Block, section: Section, rooms: List[Room],
         return [r for r in rooms if r.is_virtual][:1]
     if block.needs_lab and section.lab_room:
         return [r for r in rooms if r.room == section.lab_room]   # pinned lab room
-    # non-lab block, or a lab held in a regular room (no designated lab room)
-    fr = [r for r in rooms if r.is_physical and r.cap >= section.students]
+    if section.requires_lab_room:        # explicit Room Type = lab -> lab-flagged rooms only
+        fr = [r for r in rooms if r.is_physical and r.is_lab and r.cap >= section.students]
+    else:
+        # non-lab block, or a lab held in a regular room (no designated lab room)
+        fr = [r for r in rooms if r.is_physical and r.cap >= section.students]
     fr.sort(key=lambda r: (r.cap, r.room))
     return fr[:cfg.max_rooms_per_block]
 
@@ -59,12 +62,25 @@ def gen_candidates(block: Block, section: Section, instructors: List[Instructor]
     start_lo = cfg.horizon_start if section.level <= 4 else cfg.grad_start
     closed = _blackout_hours(instructors, cfg)
     feasible_rooms = feasible_rooms_for(block, section, rooms, cfg)
+    # Fixed-slot pin: only the section's first block is pinned to (fixed_day, fixed_start).
+    pin = bool(section.fixed_day) and bool(section.blocks) \
+        and block.block_id == section.blocks[0].block_id
+    # Per-instructor availability (same mechanism as the blackout, keyed per id).
+    unavail = cfg.instr_unavailable
+    sec_iids = section.instructor_ids
     cands: List[Candidate] = []
     for r in feasible_rooms:
         for d in cfg.days():
+            if pin and d != section.fixed_day:
+                continue
             for h in range(start_lo, end_cap - block.length + 1):
+                if pin and h != section.fixed_start:
+                    continue
                 span = range(h, h + block.length)
                 if any((d, hh) in closed for hh in span):
+                    continue
+                if unavail and any((iid, d, hh) in unavail
+                                   for iid in sec_iids for hh in span):
                     continue
                 cands.append(Candidate(block.block_id, r.room, d, h, block.length))
     return cands

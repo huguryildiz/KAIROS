@@ -194,6 +194,8 @@ def add_soft_objective(m, x, free, cand_by_block, state, free_set, cfg,
     frozen (non-free) placement as constants. Returns (penalty_terms, penalty_ub) so the
     caller can set BIG > penalty_ub and keep placement lexicographically dominant. Each
     term is gated by its weight, so disabled preferences cost nothing."""
+    from collections import defaultdict as _dd
+
     penalty = []
     ub = 0
     length_of = {bid: (cand_by_block[bid][0].length if cand_by_block[bid] else 0)
@@ -213,6 +215,39 @@ def add_soft_objective(m, x, free, cand_by_block, state, free_set, cfg,
                 if sc > best:
                     best = sc
         ub += best
+
+    # frozen (non-free) placement: distinct courses present per (cohort, day, hour)
+    frozen_courses = _dd(set)
+    for bid, c in state.placed.items():
+        if bid in free_set:
+            continue
+        s = state.sec_of[bid]
+        for hh in range(c.start, c.start + c.length):
+            frozen_courses[(s.cohort_key, c.day, hh)].add(s.code)
+
+    # --- cohort-conflict: penalize each distinct course beyond the first per slot ---
+    cc_free = _dd(lambda: _dd(list))     # (cohort, day, hour) -> course -> [free vars]
+    for (bid, room, day, start), v in x.items():
+        s = state.sec_of[bid]
+        for hh in range(start, start + length_of[bid]):
+            cc_free[(s.cohort_key, day, hh)][s.code].append(v)
+    for slot in set(cc_free) | set(frozen_courses):
+        cohort, day, hh = slot
+        fro = frozen_courses.get(slot, set())
+        busy = []
+        for course, vs in cc_free.get(slot, {}).items():
+            if course in fro:            # already constant-present via a frozen block
+                continue
+            b = m.NewBoolVar(f"cbusy|{cohort}|{course}|{day}|{hh}")
+            m.AddMaxEquality(b, vs)
+            busy.append(b)
+        n_terms = len(fro) + len(busy)
+        if n_terms <= 1:
+            continue
+        excess = m.NewIntVar(0, n_terms, f"cconf|{cohort}|{day}|{hh}")
+        m.Add(excess >= len(fro) + sum(busy) - 1)
+        penalty.append(cfg.w_cohort_conflict * excess)
+        ub += cfg.w_cohort_conflict * n_terms
 
     return penalty, ub
 

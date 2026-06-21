@@ -58,3 +58,21 @@ def test_soft_never_costs_a_placement():
     assert len(st.placed) == 2                   # placement dominates soft
     assert st.placed["A_01#T"].start == 16
     assert st.placed["B_01#T"].start == 9
+
+
+def test_repair_avoids_cohort_conflict_when_placement_equal():
+    # Two different courses in the SAME cohort; B is fixed Mo 9-11. A can go Mo 9-11
+    # (conflict) or Tu 9-11 (no conflict) — equal placement, so soft must pick Tu.
+    cfg = Config()
+    a = _sec("A_01", "i1", level=2, code="ADA 201")
+    b = _sec("B_01", "i2", level=2, code="ADA 202")  # same cohort ADA-2
+    cands = {
+        "A_01#T": [Candidate("A_01#T", "R1", "Mo", 9, 2),
+                   Candidate("A_01#T", "R2", "Tu", 9, 2)],
+        "B_01#T": [Candidate("B_01#T", "R2", "Mo", 9, 2)],
+    }
+    st = _state(a, b)
+    st.occupy("B_01#T", cands["B_01#T"][0])      # B fixed Mo
+    st.occupy("A_01#T", cands["A_01#T"][0])      # A parked Mo (conflicts with B's cohort slot)
+    repair_round(st, ["A_01#T"], cands, cfg)     # B is a frozen competitor
+    assert st.placed["A_01#T"].day == "Tu"       # moved off the conflicting cohort slot

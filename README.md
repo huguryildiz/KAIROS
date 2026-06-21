@@ -22,6 +22,7 @@
   <img src="https://img.shields.io/badge/pandas-0b1220?style=for-the-badge&logo=pandas&logoColor=white" alt="pandas">
   <img src="https://img.shields.io/badge/pytest_132_passing-0b1220?style=for-the-badge&logo=pytest&logoColor=0A9EDC" alt="pytest 132 passing">
   <img src="https://img.shields.io/badge/Google_Cloud_Run-0b1220?style=for-the-badge&logo=googlecloud&logoColor=4285F4" alt="Google Cloud Run">
+  <a href="https://kairos.huguryildiz.com"><img src="https://img.shields.io/badge/kairos.huguryildiz.com-live-4F46E5?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Live"></a>
 </p>
 
 ---

@@ -80,6 +80,14 @@ class Config:
     # apply evening + cohort-conflict soft shaping in the repair greedy construction
     # (default on; --no-soft-shaping turns it off for baseline A/B runs)
     soft_shaping_in_repair: bool = True
+    # run the post-convergence accept-guarded SOFT-POLISH passes (Pass C / Pass I) that
+    # re-seat already-placed blocks to lower the joint soft objective. Default OFF: at
+    # production scale (>800 sections) the frozen-LNS neighborhoods are pinned and the
+    # passes are a measured no-op that still consumes the wall-clock budget (Pass C: ~600s,
+    # 0 gain on the 841 sample, 2026-06-22). The objective machinery, the soft-aware accept
+    # guard (_soft_total) and the per-pass code are kept (invariant-safe, unit-tested) for
+    # a future neighborhood/budget redesign. See docs/TODO.md §4.8.
+    soft_polish_in_repair: bool = False
     evening_from_hour: int = 17   # an hour-slot >= this counts as "evening" for the soft penalty
 
     def days(self) -> list:

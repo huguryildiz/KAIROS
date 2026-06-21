@@ -25,17 +25,26 @@ COURSE_COL_MAP: Dict[str, List[str]] = {
     "T":              ["t", "theory", "teori"],
     "P":              ["p", "practice", "uygulama"],
     "L":              ["l", "lab", "laboratuvar", "laboratory"],
-    "Lecturer Name":  ["lecturer_name", "instructor", "instructor_name",
-                       "ogretim_uyesi", "hoca", "lecturer"],
-    "Lecturer Email": ["lecturer_email", "email", "e_mail", "mail", "eposta",
-                       "instructor_email"],
-    "~Students":      ["students", "ogrenci", "ogrenci_sayisi", "kontenjan",
-                       "size", "approx_students"],
+    "Instructor Name":  ["instructor_name", "instructor", "lecturer_name",
+                         "lecturer", "ogretim_uyesi", "hoca"],
+    "Instructor Email": ["instructor_email", "email", "e_mail", "mail", "eposta",
+                         "lecturer_email"],
+    "~Students":      ["students", "ogrenci", "ogrenci_sayisi", "booked_cap",
+                       "enrolled", "kayitli", "size", "approx_students"],
+    # Section Capacity = the quota (hard room-sizing input). ~Students = actual /
+    # expected enrolment (optional, soft). Distinct fields: SECT_CAP vs BOOKED_CAP.
+    # Kept after ~Students so the original 9-column positional layout is unchanged.
+    "Section Capacity": ["section_capacity", "sect_cap", "section_cap", "kontenjan",
+                         "quota", "kapasite"],
     # Phase 4 optional columns (override string-derivation; absent -> derive as today).
     "Year":           ["year", "yil", "sinif", "grade", "year_level", "class"],
     "Part-time":      ["part_time", "parttime", "yari_zamanli", "saatlik", "pt", "adjunct"],
-    "Room Type":      ["room_type", "oda_tipi", "roomtype", "venue_type", "type"],
+    "Room Type":      ["room_type", "oda_tipi", "roomtype", "venue_type"],
     "Fixed":          ["fixed", "fixed_slot", "sabit", "pinned", "pin"],
+    # DEPT = faculty name (e.g. "Faculty of Econ…") -> Section.faculty, and the
+    # cohort-program fallback when COURSE_CODE is unparseable. Kept LAST so the
+    # positional indices of the columns above stay stable for header-less files.
+    "Dept":           ["dept", "department", "bolum", "faculty", "fakulte", "birim"],
 }
 
 # Positional fallback order == the canonical column order.
@@ -63,17 +72,22 @@ def _is_blank(row: Sequence) -> bool:
     return all(str(c or "").strip() == "" for c in row)
 
 
-def map_columns(raw_rows: List[List]) -> Dict:
+def map_columns(raw_rows: List[List], col_map: Dict[str, List[str]] = COURSE_COL_MAP) -> Dict:
     """Detect header (by alias) + build a canonical->column-index map.
+
+    ``col_map`` is a canonical-field -> header-aliases mapping; the positional
+    fallback order is ``tuple(col_map.keys())``. Defaults to the course list, but
+    pass :data:`CLASSROOM_COL_MAP` to detect a classroom CSV instead.
 
     Returns ``{data_rows, col_index, detected_columns, has_header,
     first_data_idx}``. ``detected_columns`` = ``[{field, label, source}]`` with
     ``source`` in ``{"header", "positional"}``.
     """
+    positional = tuple(col_map.keys())
     if not raw_rows:
-        col_index = {f: i for i, f in enumerate(COURSE_POSITIONAL)}
+        col_index = {f: i for i, f in enumerate(positional)}
         detected = [{"field": f, "label": f"column {i + 1}", "source": "positional"}
-                    for i, f in enumerate(COURSE_POSITIONAL)]
+                    for i, f in enumerate(positional)]
         return {"data_rows": [], "col_index": col_index,
                 "detected_columns": detected, "has_header": False,
                 "first_data_idx": 0}
@@ -88,7 +102,7 @@ def map_columns(raw_rows: List[List]) -> Dict:
     normalized = [normalize_header(c) for c in first_row]
 
     header_idx: Dict[str, int] = {}
-    for canonical, aliases in COURSE_COL_MAP.items():
+    for canonical, aliases in col_map.items():
         idx = next((i for i, h in enumerate(normalized) if h in aliases), -1)
         if idx >= 0:
             header_idx[canonical] = idx
@@ -98,7 +112,7 @@ def map_columns(raw_rows: List[List]) -> Dict:
 
     col_index: Dict[str, int] = {}
     detected: List[Dict] = []
-    for pos, canonical in enumerate(COURSE_POSITIONAL):
+    for pos, canonical in enumerate(positional):
         if has_header and canonical in header_idx:
             idx = header_idx[canonical]
             col_index[canonical] = idx
@@ -169,6 +183,7 @@ def parse_courselist(raw_rows: List[List], existing: Sequence[Dict] = ()) -> Dic
         code = rec["Course Code"]
         sec = rec["Section No"]
         bad_hours = not all(_is_intish(rec[k]) for k in ("T", "P", "L"))
+        cap = str(rec["Section Capacity"] or rec["~Students"]).strip()
         key = _dup_key(code, sec)
 
         if not code:
@@ -176,6 +191,9 @@ def parse_courselist(raw_rows: List[List], existing: Sequence[Dict] = ()) -> Dic
             error += 1
         elif bad_hours:
             rec["status"], rec["status_label"] = "error", "err_hours"
+            error += 1
+        elif not cap:
+            rec["status"], rec["status_label"] = "error", "err_capacity"
             error += 1
         elif key in existing_keys:
             rec["status"], rec["status_label"] = "duplicate", "dup"
@@ -212,6 +230,123 @@ def ok_rows(parsed: Dict) -> List[Dict]:
     """Clean canonical course dicts for the ``ok`` rows (drop bookkeeping fields)."""
     return [{c: r[c] for c in COURSE_POSITIONAL}
             for r in parsed["rows"] if r["status"] == "ok"]
+
+
+# --- Classroom list -------------------------------------------------------
+# Same header-less alias importer as the course list, so the Classrooms step
+# can show the identical "detected columns" chips. Canonical columns (the
+# editor/UI contract) + accepted header aliases (TR/EN). Unmatched columns fall
+# back to positional order. Mirrors the raw data format (ROOM/ROOM_CAP) too.
+CLASSROOM_COL_MAP: Dict[str, List[str]] = {
+    "Room": ["room", "oda", "room_name", "derslik", "sinif", "classroom",
+             "mekan", "salon", "name"],
+    "Capacity": ["capacity", "cap", "room_cap", "kapasite", "size", "seats"],
+    "Type": ["type", "tip", "oda_tipi", "room_type", "kind", "tur", "lab"],
+}
+CLASSROOM_POSITIONAL = tuple(CLASSROOM_COL_MAP.keys())
+
+# Room-type vocabulary (shared with sections' Room Type demand). Lab-family =
+# everything that is not a plain classroom.
+ROOM_TYPES = ("normal", "lab", "pc", "studio")
+# Legacy truthy tokens kept so an old boolean Lab column still reads as lab-family.
+_LAB_TRUTHY = {"1", "true", "yes", "y", "x", "lab", "✓", "evet", "var"}
+
+
+def room_type_from_name(name: str) -> str:
+    """Categorical room type derived from a room-name token: ``-PC`` -> ``pc``,
+    ``-L`` -> ``lab``, ``-STD``/``-STU`` -> ``studio``, else ``normal``."""
+    n = str(name or "")
+    if "-PC" in n:
+        return "pc"
+    if "-STD" in n or "-STU" in n:
+        return "studio"
+    if "-L" in n:
+        return "lab"
+    return "normal"
+
+
+def normalize_room_type(value: str, name: str = "") -> str:
+    """Map an explicit Type cell to the vocabulary; fall back to the name token.
+    Accepts categorical strings, TR/EN synonyms, and the legacy boolean Lab cell."""
+    s = str(value or "").strip().lower()
+    if not s:
+        return room_type_from_name(name)
+    if "pc" in s or "bilgisayar" in s:
+        return "pc"
+    if "studio" in s or "studyo" in s or "stüdyo" in s:
+        return "studio"
+    if s in ROOM_TYPES:
+        return s
+    if "lab" in s or "laboratuvar" in s:
+        return "lab"
+    if s in _LAB_TRUTHY:          # legacy boolean Lab column -> generic lab
+        return "lab"
+    return "normal"
+
+
+def parse_classrooms(raw_rows: List[List], existing: Sequence[Dict] = ()) -> Dict:
+    """Classify every classroom row and return a report mirroring
+    :func:`parse_courselist` (``rows`` / ``stats`` / ``detected_columns`` /
+    ``warning``), so the Classrooms step shows the same detected-column chips and
+    stat badges.
+
+    Columns: ``Room`` (required), ``Capacity`` (int; blank -> 0), ``Type``
+    (categorical ``normal/lab/pc/studio`` from a Type column, else derived from
+    the room name's ``-PC`` / ``-L`` / ``-STD`` token). Duplicate room names
+    (in-file or vs ``existing``) are flagged.
+    """
+    m = map_columns(raw_rows, CLASSROOM_COL_MAP)
+    ci = m["col_index"]
+    row_offset = m["first_data_idx"] + (2 if m["has_header"] else 1)
+
+    existing_keys = {str(e.get("Room", "")).strip().lower()
+                     for e in (existing or []) if str(e.get("Room", "")).strip()}
+    seen: set = set()
+
+    rows: List[Dict] = []
+    valid = duplicate = error = 0
+    for i, raw in enumerate(m["data_rows"]):
+        if _is_blank(raw):
+            continue
+        room = _cell(raw, ci.get("Room"))
+        cap_raw = _cell(raw, ci.get("Capacity"))
+        rtype = normalize_room_type(_cell(raw, ci.get("Type")), room)
+        rec = {"Room": room, "Capacity": cap_raw, "Type": rtype,
+               "row_num": i + row_offset}
+
+        key = room.strip().lower()
+        if not room:
+            rec["status"], rec["status_label"] = "error", "err_room"
+            error += 1
+        elif not _is_intish(cap_raw):
+            rec["status"], rec["status_label"] = "error", "err_cap"
+            error += 1
+        elif key in existing_keys or key in seen:
+            rec["status"], rec["status_label"] = "duplicate", "dup_room"
+            duplicate += 1
+        else:
+            seen.add(key)
+            rec["status"], rec["status_label"] = "ok", "ok"
+            valid += 1
+        rows.append(rec)
+
+    stats = {"valid": valid, "duplicate": duplicate, "error": error,
+             "total": len(rows)}
+    return {"rows": rows, "stats": stats,
+            "detected_columns": m["detected_columns"], "warning": None}
+
+
+def ok_rooms(parsed: Dict) -> List[Dict]:
+    """Clean ``Room``/``Capacity``/``Type`` dicts for the ``ok`` rows (Capacity
+    normalized to an int string; blank -> ``"0"``)."""
+    out = []
+    for r in parsed["rows"]:
+        if r["status"] != "ok":
+            continue
+        cap = str(r["Capacity"]).strip()
+        cap = str(int(cap)) if cap.lstrip("-").isdigit() else "0"
+        out.append({"Room": r["Room"], "Capacity": cap, "Type": r["Type"]})
+    return out
 
 
 def read_raw(file_or_path) -> List[List[str]]:

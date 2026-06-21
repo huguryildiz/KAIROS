@@ -33,7 +33,8 @@ def test_detects_capacity_and_lab_and_window_and_blackout():
     s = _sec("S_01", 1, 99, [Block("S_01#L", "S_01", "lab", 2, True)], instr="i1")
     s.lab_room = "LAB-L"                         # pinned, but assigned to R1 below
     a = [Assignment("S_01#L", "S_01", "lab", "R1", "Fr", 13, 15)]
-    kinds = {v.kind for v in validate.validate(a, [s], ROOMS, INSTR, Config())}
+    cfg = Config(blackout=(("Fr", 13, False),))
+    kinds = {v.kind for v in validate.validate(a, [s], ROOMS, INSTR, cfg)}
     assert {"capacity", "lab_room", "blackout"} <= kinds
 
 

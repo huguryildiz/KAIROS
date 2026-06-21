@@ -45,16 +45,14 @@ def render(lang: str) -> None:
     st.caption(t("res_grid_caption", lang))
 
     st.write("")
-    c3, c4 = st.columns(2)
+    c3, c4, _ = st.columns([1, 1, 2])
     c3.download_button(t("res_dl_json", lang),
                        json.dumps(sched, ensure_ascii=False, indent=2),
                        file_name="schedule.json",
-                       use_container_width=True,
                        key="dl_json")
     c4.download_button(t("res_dl_csv", lang),
                        pd.DataFrame(sched["assignments"]).to_csv(index=False),
                        file_name="schedule.csv",
-                       use_container_width=True,
                        key="dl_csv")
 
     if res.unschedulable:

@@ -59,8 +59,8 @@ def block_color(a: dict) -> str:
 # --------------------------------------------------------------------------- #
 
 _LIGHT_TOKENS = {
-    "--primary": "#2B3A8C", "--primary-700": "#1F2B67",
-    "--primary-50": "#EEF1FB", "--primary-100": "#E0E6F7",
+    "--primary": "#7B82D4", "--primary-700": "#5C64C7",
+    "--primary-50": "#EEEFFE", "--primary-100": "#DCDDF8",
     "--canvas": "#F4F6FA", "--surface": "#FFFFFF", "--surface-2": "#FAFBFD",
     "--card": "#FFFFFF", "--card-bd": "#E5E9F1",
     "--ink": "#131722", "--ink-2": "#39414F", "--muted": "#5B6472", "--faint": "#9AA3B2",
@@ -79,6 +79,7 @@ _LIGHT_TOKENS = {
     "--tt-bg": "#ffffff", "--tt-ink": "#0b1020", "--dz": "#C2CBDC",
     "--appbar-bg": "rgba(255,255,255,.82)", "--stepper-bg": "rgba(244,246,250,.86)",
     "--body-glow": "#E7ECFA",
+    "--cta-bg": "rgba(43,58,140,.85)", "--cta-bd": "rgba(255,255,255,.25)", "--cta-sh": "rgba(43,58,140,.42)",
     "--head-1": "#2B3A8C", "--head-2": "#6D5BD0",
     "--pill-lab-bg": "#F1EEFB", "--pill-lab-bd": "#DAD2F4", "--pill-lab-fg": "#5B4BBE",
 }
@@ -102,6 +103,7 @@ _DARK_TOKENS = {**_LIGHT_TOKENS, **{
     "--head-1": "#9FB0F5", "--head-2": "#C9B6F5",
     "--pill-lab-bg": "rgba(124,107,222,.18)", "--pill-lab-bd": "rgba(124,107,222,.4)",
     "--pill-lab-fg": "#B7ABF2",
+    "--cta-bg": "rgba(55,72,165,.80)", "--cta-bd": "rgba(255,255,255,.18)", "--cta-sh": "rgba(55,72,165,.52)",
 }}
 
 _FONT_IMPORT = ("@import url('https://fonts.googleapis.com/css2?"
@@ -271,7 +273,7 @@ h1,h2,h3,h4{margin:0;letter-spacing:-.018em;font-weight:700;color:var(--ink);}
 .tt-wrap{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;background:var(--surface);box-shadow:var(--sh-1);}
 .tt-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 table.tt{border-collapse:collapse;width:100%;min-width:480px;table-layout:fixed;}
-table.tt th{background:var(--surface-2);color:var(--muted);font:600 .68rem/1 var(--mono);text-transform:uppercase;letter-spacing:.07em;padding:12px 8px;border-bottom:1px solid var(--border);}
+table.tt th{background:var(--surface-2);color:var(--muted);font:600 .68rem/1 var(--mono);text-transform:uppercase;letter-spacing:.07em;padding:12px 8px;border-bottom:1px solid var(--border);text-align:center;vertical-align:middle;}
 table.tt th.tt-time,table.tt td.tt-time{width:62px;}
 table.tt td{border-bottom:1px solid var(--border-2);border-left:1px solid var(--border-2);vertical-align:top;height:32px;padding:3px;}
 td.tt-time{color:var(--faint);font:500 .72rem/32px var(--mono);text-align:center;background:var(--surface-2);}
@@ -290,11 +292,11 @@ td.tt-time{color:var(--faint);font:500 .72rem/32px var(--mono);text-align:center
    paints its canvas from Streamlit's *native* (light) theme and can't be
    re-themed via CSS. Header sticks; the wrapper scrolls internally (both axes)
    so a wide table stays contained on a phone in portrait. */
-.tt-table-wrap{border:1px solid var(--border);border-radius:var(--r-lg);overflow:auto;max-width:100%;max-height:var(--tt-table-h,340px);background:var(--surface);box-shadow:var(--sh-1);-webkit-overflow-scrolling:touch;}
-table.tt-data{border-collapse:collapse;width:100%;font:500 .82rem/1.45 var(--font);color:var(--ink-2);}
-table.tt-data thead th{position:sticky;top:0;z-index:1;background:var(--surface-2);color:var(--muted);font:600 .66rem/1 var(--mono);text-transform:uppercase;letter-spacing:.06em;text-align:left;padding:11px 14px;border-bottom:1px solid var(--border);white-space:nowrap;}
-table.tt-data tbody td{padding:9px 14px;border-bottom:1px solid var(--border-2);white-space:nowrap;}
-table.tt-data th.num,table.tt-data td.num{text-align:right;font-variant-numeric:tabular-nums;}
+.tt-table-wrap{border:1px solid var(--border);border-radius:var(--r-lg);overflow:auto;width:fit-content;max-width:100%;max-height:var(--tt-table-h,340px);background:var(--surface);box-shadow:var(--sh-1);-webkit-overflow-scrolling:touch;}
+table.tt-data{border-collapse:collapse;width:auto;min-width:280px;margin:0 auto;font:500 .82rem/1.45 var(--font);color:var(--ink-2);}
+table.tt-data thead th{position:sticky;top:0;z-index:1;background:var(--surface-2);color:var(--muted);font:600 .66rem/1 var(--mono);text-transform:uppercase;letter-spacing:.06em;text-align:center;padding:7px 10px;border-bottom:1px solid var(--border);white-space:nowrap;}
+table.tt-data tbody td{padding:5px 10px;border-bottom:1px solid var(--border-2);white-space:nowrap;text-align:center;}
+table.tt-data th.num,table.tt-data td.num{text-align:center;font-variant-numeric:tabular-nums;}
 table.tt-data tbody tr:nth-child(even){background:var(--surface-2);}
 table.tt-data tbody tr:hover{background:var(--primary-50);}
 table.tt-data tbody tr:last-child td{border-bottom:none;}
@@ -302,11 +304,22 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
 .cr-edit-head{font:600 .92rem/1.3 var(--font);color:var(--ink-2);margin:20px 0 8px;}
 
 /* CSV import preview (VERA-style): detected-column chips, stat badges, status pills */
-.imp-detect{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0 12px;font:600 .66rem/1 var(--mono);}
-.imp-detect .lbl{color:var(--muted);text-transform:uppercase;letter-spacing:.06em;}
-.imp-detect .col{background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--ink-2);}
-.imp-detect .col em{font-style:normal;color:var(--faint);}
-.imp-detect .col.pos{border-style:dashed;color:var(--muted);}
+.imp-detect{margin:6px 0 16px;}
+.imp-detect-head{display:flex;align-items:center;gap:9px;margin-bottom:11px;}
+.imp-detect-head .lbl{font:700 .64rem/1 var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.13em;}
+.imp-detect-head .imp-detect-count{font:700 .6rem/1 var(--mono);color:var(--primary);background:var(--primary-50);border:1px solid var(--primary-100);border-radius:999px;padding:3px 8px;font-variant-numeric:tabular-nums;}
+.imp-cols{display:flex;flex-wrap:wrap;gap:7px;}
+.imp-cols .col{display:inline-flex;align-items:center;gap:7px;background:var(--good-bg);border:1px solid var(--good-bd);border-radius:10px;padding:6px 11px 6px 10px;box-shadow:var(--sh-1);transition:border-color .18s ease,box-shadow .18s ease,transform .18s ease;}
+.imp-cols .col:hover{transform:translateY(-1px);border-color:var(--good);box-shadow:var(--sh-2);}
+.imp-cols .col .dot{width:6px;height:6px;border-radius:50%;flex:none;background:var(--good);box-shadow:0 0 0 3px var(--good-bg);}
+.imp-cols .col b{font:600 .74rem/1 var(--font);color:var(--ink);letter-spacing:-.01em;}
+.imp-cols .col .arw{font:600 .74rem/1 var(--font);color:var(--faint);}
+.imp-cols .col em{font:500 .72rem/1 var(--mono);font-style:normal;color:var(--muted);}
+.imp-cols .col.pos{border-style:dashed;background:var(--warn-bg);border-color:var(--warn-bd);box-shadow:none;}
+.imp-cols .col.pos .dot{background:var(--warn);box-shadow:0 0 0 3px var(--warn-bg);}
+.imp-cols .col.pos b{color:var(--ink-2);}
+.imp-cols .col.pos em{color:var(--faint);}
+.imp-cols .col .tag{margin-left:1px;font:700 .53rem/1 var(--mono);text-transform:uppercase;letter-spacing:.05em;color:var(--warn);background:var(--warn-bg);border:1px solid var(--warn-bd);border-radius:5px;padding:3px 5px;}
 .imp-stats{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
 .imp-badge{display:inline-flex;align-items:baseline;gap:5px;border-radius:8px;padding:5px 11px;font:600 .72rem/1 var(--font);border:1px solid var(--border);background:var(--surface-2);color:var(--ink-2);}
 .imp-badge .n{font:800 .9rem/1 var(--font);font-variant-numeric:tabular-nums;}
@@ -358,15 +371,118 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
 [data-testid="stExpander"] summary *{color:var(--ink)!important;}
 [data-testid="stExpanderDetails"]{background:var(--surface)!important;}
 
-/* Streamlit widget integration */
-.stButton>button[kind="primary"],.stButton>button[data-testid="stBaseButton-primary"]{background:radial-gradient(ellipse at 80% -20%,#7080D8 0%,rgba(112,128,216,0) 60%),linear-gradient(135deg,#3A4EA0 0%,#2F42A0 46%,#233178 100%)!important;color:#fff!important;-webkit-text-fill-color:#fff!important;border:1px solid #2B3A8C!important;border-radius:10px;font-weight:600;box-shadow:0 1px 2px rgba(31,43,103,.3),0 6px 18px -8px rgba(31,43,103,.5);}
-.stButton>button[kind="primary"] p,.stButton>button[data-testid="stBaseButton-primary"] p{color:#fff!important;-webkit-text-fill-color:#fff!important;}
-.stButton>button[kind="primary"]:hover,.stButton>button[data-testid="stBaseButton-primary"]:hover{filter:brightness(1.06);color:#fff!important;-webkit-text-fill-color:#fff!important;border-color:var(--primary)!important;}
-.stButton>button[kind="primary"]:hover p,.stButton>button[data-testid="stBaseButton-primary"]:hover p{color:#fff!important;-webkit-text-fill-color:#fff!important;}
-/* Secondary + download buttons — explicit surface bg + ink text so they read on both themes (!important beats Streamlit's base theme) */
-.stButton>button:not([kind="primary"]):not([data-testid="stBaseButton-primary"]),.stDownloadButton>button{background:var(--surface)!important;color:var(--ink)!important;border:1px solid var(--border)!important;border-radius:10px;font-weight:500;}
+/* Widget help (?) icon — Streamlit wraps it in a flex:1 / justify-content:flex-end
+   div that shoves it to the far right of the label. Pull it back so it sits
+   immediately to the LEFT of the label text. */
+[data-testid="stWidgetLabel"] > div:has([data-testid="stTooltipIcon"]){
+  flex:0 0 auto!important;order:-1;justify-content:flex-start!important;
+  margin:0 5px 0 0!important;}
+[data-testid="stWidgetLabel"] [data-testid="stTooltipIcon"] [data-testid="stTooltipHoverTarget"],
+[data-testid="stWidgetLabel"] [data-testid="stTooltipIcon"] label{margin:0!important;}
+/* The ? glyph stroke defaults to a very faint tone that vanishes in dark mode;
+   force a visible muted colour that brightens to primary on hover. */
+[data-testid="stTooltipIcon"] svg{stroke:var(--muted)!important;color:var(--muted)!important;}
+[data-testid="stTooltipIcon"]:hover svg{stroke:var(--primary)!important;color:var(--primary)!important;}
+
+/* Help (?) tooltip popover — render as ONE flat floating bubble, NEVER a card
+   nested inside the settings card. The outer popover layer paints nothing; the
+   single visible bubble (inner div) is ONE solid colour. No contrasting border:
+   a filled surface PLUS a 1px grey border reads as two stacked layers (a card
+   inside a frame) — exactly the nested-card look. The bubble floats on its soft
+   even shadow alone, so the whole edge stays a single colour. */
+[data-baseweb="popover"]:has([data-testid="stTooltipContent"]){
+  background:transparent!important;border:none!important;box-shadow:none!important;}
+[data-baseweb="popover"]:has([data-testid="stTooltipContent"]) > div{
+  background:var(--surface-2)!important;border:none!important;
+  border-radius:var(--r-sm)!important;
+  box-shadow:0 6px 24px rgba(20,24,38,.16),0 1px 3px rgba(20,24,38,.10)!important;}
+[data-testid="stTooltipContent"]{text-align:justify!important;text-justify:inter-word;}
+[data-testid="stTooltipContent"],
+[data-testid="stTooltipContent"] *{color:var(--ink-2)!important;background:transparent!important;}
+
+/* ── CTA (primary) button — glassmorphism ─────────────────────────────────── */
+/* Dark-navy glass fill via --cta-bg token. backdrop-blur gives the frosted
+   glass look; white-highlight border (--cta-bd) separates it from background.
+   min-height 44px = WCAG mobile tap target. Hover: brightness lift + y-translate
+   — no border/size change so no layout reflow. Tokens live in _LIGHT_TOKENS /
+   _DARK_TOKENS; change there to restyle all CTAs at once. */
+.stButton>button[kind="primary"],
+.stButton>button[data-testid="stBaseButton-primary"]{
+  background:var(--cta-bg)!important;
+  backdrop-filter:blur(16px) saturate(1.4)!important;
+  -webkit-backdrop-filter:blur(16px) saturate(1.4)!important;
+  color:#fff!important;-webkit-text-fill-color:#fff!important;
+  border:1px solid var(--cta-bd)!important;border-radius:16px;font-weight:700;font-size:1rem;
+  min-height:44px;padding:.75rem 1.5rem!important;
+  box-shadow:0 2px 12px var(--cta-sh),inset 0 1px 0 rgba(255,255,255,.18)!important;
+  transition:filter .18s ease,box-shadow .18s ease,transform .18s ease;}
+.stButton>button[kind="primary"] p,
+.stButton>button[data-testid="stBaseButton-primary"] p{
+  color:#fff!important;-webkit-text-fill-color:#fff!important;font-weight:700;}
+.stButton>button[kind="primary"]:hover,
+.stButton>button[data-testid="stBaseButton-primary"]:hover{
+  filter:brightness(1.12);transform:translateY(-1px);
+  box-shadow:0 6px 20px var(--cta-sh),inset 0 1px 0 rgba(255,255,255,.22)!important;
+  color:#fff!important;-webkit-text-fill-color:#fff!important;}
+.stButton>button[kind="primary"]:hover p,
+.stButton>button[data-testid="stBaseButton-primary"]:hover p{
+  color:#fff!important;-webkit-text-fill-color:#fff!important;}
+.stButton>button[kind="primary"]:active,
+.stButton>button[data-testid="stBaseButton-primary"]:active{
+  transform:translateY(0)!important;filter:brightness(.88)!important;
+  box-shadow:0 1px 4px var(--cta-sh),inset 0 1px 0 rgba(255,255,255,.14)!important;}
+.stButton>button[kind="primary"]:focus-visible,
+.stButton>button[data-testid="stBaseButton-primary"]:focus-visible{
+  outline:2px solid var(--primary)!important;outline-offset:3px!important;}
+/* ── Secondary button ─────────────────────────────────────────────────────── */
+/* Surface card look. Hover uses inset box-shadow (no border width change →
+   no layout shift). :active sinks back to rest level. */
+.stButton>button:not([kind="primary"]):not([data-testid="stBaseButton-primary"]),
+.stDownloadButton>button{
+  background:var(--surface)!important;color:var(--ink)!important;
+  border:1px solid var(--border)!important;border-radius:10px;font-weight:500;
+  min-height:44px;padding:.6rem 1.25rem!important;
+  box-shadow:var(--sh-1)!important;
+  transition:background .18s ease,color .18s ease,box-shadow .18s ease,transform .18s ease;}
 .stDownloadButton>button p{color:var(--ink)!important;-webkit-text-fill-color:var(--ink)!important;}
-.stButton>button:not([kind="primary"]):not([data-testid="stBaseButton-primary"]):hover,.stDownloadButton>button:hover{background:var(--surface-2)!important;border:2px solid var(--primary)!important;color:var(--primary)!important;box-shadow:none!important;}
+.stButton>button:not([kind="primary"]):not([data-testid="stBaseButton-primary"]):hover,
+.stDownloadButton>button:hover{
+  background:var(--primary-50)!important;color:var(--primary)!important;
+  box-shadow:inset 0 0 0 1.5px var(--primary),var(--sh-1)!important;
+  transform:translateY(-1px);}
+.stButton>button:not([kind="primary"]):not([data-testid="stBaseButton-primary"]):active,
+.stDownloadButton>button:active{
+  transform:translateY(0)!important;background:var(--primary-100)!important;
+  box-shadow:inset 0 0 0 1.5px var(--primary)!important;}
+.stButton>button:not([kind="primary"]):not([data-testid="stBaseButton-primary"]):focus-visible,
+.stDownloadButton>button:focus-visible{
+  outline:2px solid var(--primary)!important;outline-offset:3px!important;}
+/* ── Button icon hover animations ───────────────────────────────────────── */
+/* Streamlit material icons sit in [data-testid="stIconMaterial"] inside each
+   button. On hover the icon springs with an elastic overshoot (cubic-bezier
+   mimics a physical bounce) — scale-up + slight tilt — giving every icon
+   button a tactile, alive feel without touching the button's own transform.
+   :active snaps back below 1× so the press registers visually.
+   Covers st.button and st.download_button in both primary and secondary kinds.
+   The wand ::before on .st-key-solve_btn uses a separate wandCast keyframe and
+   is unaffected by these rules. */
+.stButton button [data-testid="stIconMaterial"],
+.stDownloadButton button [data-testid="stIconMaterial"]{
+  display:inline-flex;align-items:center;justify-content:center;
+  transition:transform .3s cubic-bezier(.34,1.56,.64,1);
+  will-change:transform;}
+.stButton button:hover [data-testid="stIconMaterial"],
+.stDownloadButton button:hover [data-testid="stIconMaterial"]{
+  transform:scale(1.22) rotate(-8deg);}
+.stButton button:active [data-testid="stIconMaterial"],
+.stDownloadButton button:active [data-testid="stIconMaterial"]{
+  transform:scale(.9) rotate(0deg);
+  transition:transform .1s ease;}
+@media (prefers-reduced-motion:reduce){
+  .stButton button [data-testid="stIconMaterial"],
+  .stDownloadButton button [data-testid="stIconMaterial"]{transition:none;}
+  .stButton button:hover [data-testid="stIconMaterial"],
+  .stDownloadButton button:hover [data-testid="stIconMaterial"]{transform:none;}}
 /* Premium download buttons — JSON (indigo) + CSV (emerald).
    st-key-* lives on the PARENT of stDownloadButton, so selectors use the ancestor pattern:
    .st-key-X [data-testid="stDownloadButton"] button — specificity (0,3,1) > generic (0,2,1). */
@@ -376,40 +492,42 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
 .st-key-dl_json [data-testid="stBaseButton-secondary"] p{color:#fff!important;-webkit-text-fill-color:#fff!important;}
 .st-key-dl_json [data-testid="stDownloadButton"] button:hover{background:linear-gradient(135deg,#4A5EB0 0%,#3F52B0 46%,#334188 100%)!important;color:#fff!important;-webkit-text-fill-color:#fff!important;border:1px solid #2B3A8C!important;box-shadow:0 4px 14px -4px rgba(31,43,103,.6)!important;transform:translateY(-1px)!important;}
 .st-key-dl_json [data-testid="stDownloadButton"] button:hover p{color:#fff!important;-webkit-text-fill-color:#fff!important;}
+.st-key-dl_json [data-testid="stDownloadButton"] button::before{content:"";display:inline-block;width:18px;height:18px;margin-right:8px;vertical-align:middle;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='16 18 22 12 16 6'/%3E%3Cpolyline points='8 6 2 12 8 18'/%3E%3C/svg%3E") center/contain no-repeat;}
 .st-key-dl_csv [data-testid="stDownloadButton"] button,
 .st-key-dl_csv [data-testid="stBaseButton-secondary"]{background:linear-gradient(135deg,#1A7A42 0%,#186C3A 46%,#115530 100%)!important;color:#fff!important;-webkit-text-fill-color:#fff!important;border:1px solid #166235!important;border-radius:12px!important;font-weight:600!important;letter-spacing:.01em;padding:12px 20px!important;box-shadow:0 1px 3px rgba(17,85,48,.35),0 6px 18px -8px rgba(17,85,48,.55)!important;}
 .st-key-dl_csv [data-testid="stDownloadButton"] button p,
 .st-key-dl_csv [data-testid="stBaseButton-secondary"] p{color:#fff!important;-webkit-text-fill-color:#fff!important;}
 .st-key-dl_csv [data-testid="stDownloadButton"] button:hover{background:linear-gradient(135deg,#2A8A52 0%,#267C4A 46%,#195C38 100%)!important;color:#fff!important;-webkit-text-fill-color:#fff!important;border:1px solid #166235!important;box-shadow:0 4px 14px -4px rgba(17,85,48,.6)!important;transform:translateY(-1px)!important;}
 .st-key-dl_csv [data-testid="stDownloadButton"] button:hover p{color:#fff!important;-webkit-text-fill-color:#fff!important;}
-/* Theme toggle (☀️/🌙) — icon button that follows the surface, not a glaring white box in dark */
-.st-key-theme_btn button{background:var(--surface-2)!important;border:1px solid var(--border)!important;color:var(--ink)!important;border-radius:10px;padding:8px 0;width:100%;}
+.st-key-dl_csv [data-testid="stDownloadButton"] button::before{content:"";display:inline-block;width:18px;height:18px;margin-right:8px;vertical-align:middle;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2'/%3E%3Cline x1='3' y1='9' x2='21' y2='9'/%3E%3Cline x1='3' y1='15' x2='21' y2='15'/%3E%3Cline x1='9' y1='3' x2='9' y2='21'/%3E%3C/svg%3E") center/contain no-repeat;}
+/* Theme toggle (☀️/🌙) — circular icon button; detailed sizing rules live below with lang_btn */
+.st-key-theme_btn button{background:var(--surface-2)!important;border:1px solid var(--border)!important;color:var(--ink)!important;border-radius:50%!important;padding:0!important;width:32px!important;height:32px!important;}
 .st-key-theme_btn button:hover{background:var(--surface)!important;border-color:var(--primary)!important;}
 /* ── Upload dropzone card ── premium animated dropzone.
    Rest: dashed border + soft shadow, a glow breathing behind the icon, the
    upload arrow rising out of its tray. Hover/drag (the moment that matters):
    the card lifts and a gradient comet sweeps the perimeter to say "drop here". */
 @property --dz-ang{syntax:"<angle>";initial-value:0deg;inherits:false;}
-.st-key-upload_card{position:relative;border:1.8px dashed var(--primary);border-radius:var(--r-xl);background:var(--surface);text-align:center;padding-bottom:28px;margin:4px 0 6px;box-shadow:var(--sh-1);transition:transform .3s ease,box-shadow .3s ease,border-color .3s ease,background .25s ease;animation:dzEnter .55s cubic-bezier(.22,1,.36,1) both;}
-.st-key-upload_card>[data-testid="stVerticalBlock"]{gap:0!important;position:relative;z-index:1;}
+:is(.st-key-upload_card,.st-key-cr_card){position:relative;border:1.8px dashed var(--primary);border-radius:var(--r-xl);background:var(--surface);text-align:center;padding-bottom:28px;margin:4px 0 6px;box-shadow:var(--sh-1);transition:transform .3s ease,box-shadow .3s ease,border-color .3s ease,background .25s ease;animation:dzEnter .55s cubic-bezier(.22,1,.36,1) both;}
+:is(.st-key-upload_card,.st-key-cr_card)>[data-testid="stVerticalBlock"]{gap:0!important;position:relative;z-index:1;}
 /* Gradient comet ring — masked to a 2px outline, revealed + spun on hover. */
-.st-key-upload_card::after{content:"";position:absolute;inset:-2px;border-radius:inherit;padding:2px;pointer-events:none;opacity:0;transition:opacity .35s ease;
+:is(.st-key-upload_card,.st-key-cr_card)::after{content:"";position:absolute;inset:-2px;border-radius:inherit;padding:2px;pointer-events:none;opacity:0;transition:opacity .35s ease;
   background:conic-gradient(from var(--dz-ang),transparent 0deg,var(--primary) 55deg,var(--head-2) 110deg,transparent 175deg,transparent 360deg);
   -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;
   animation:dzSpin 3.4s linear infinite;}
-.st-key-upload_card:hover{transform:translateY(-2px);box-shadow:var(--sh-2);border-color:var(--primary-700);}
-.st-key-upload_card:hover::after{opacity:1;}
+:is(.st-key-upload_card,.st-key-cr_card):hover{transform:translateY(-2px);box-shadow:var(--sh-2);border-color:var(--primary-700);}
+:is(.st-key-upload_card,.st-key-cr_card):hover::after{opacity:1;}
 /* JS-toggled drag-over state — more intense than hover */
-.st-key-upload_card.dz-drag-active{border-color:var(--primary)!important;border-style:solid!important;background:var(--primary-50)!important;transform:translateY(-3px)!important;box-shadow:var(--sh-2)!important;}
-.st-key-upload_card.dz-drag-active::after{opacity:1!important;}
-.st-key-upload_card.dz-drag-active .dz-icon{background:var(--primary)!important;border-color:var(--primary)!important;color:#fff!important;transform:scale(1.12) translateY(-4px)!important;box-shadow:var(--sh-3)!important;}
-.st-key-upload_card.dz-drag-active .dz-icon svg{color:#fff!important;stroke:#fff!important;}
-.st-key-upload_card.dz-drag-active .dz-glow{animation:none!important;opacity:1!important;transform:scale(1.5)!important;}
-.st-key-upload_card.dz-drag-active .dz-sub{opacity:0;}
+:is(.st-key-upload_card,.st-key-cr_card).dz-drag-active{border-color:var(--primary)!important;border-style:solid!important;background:var(--primary-50)!important;transform:translateY(-3px)!important;box-shadow:var(--sh-2)!important;}
+:is(.st-key-upload_card,.st-key-cr_card).dz-drag-active::after{opacity:1!important;}
+:is(.st-key-upload_card,.st-key-cr_card).dz-drag-active .dz-icon{background:var(--primary)!important;border-color:var(--primary)!important;color:#fff!important;transform:scale(1.12) translateY(-4px)!important;box-shadow:var(--sh-3)!important;}
+:is(.st-key-upload_card,.st-key-cr_card).dz-drag-active .dz-icon svg{color:#fff!important;stroke:#fff!important;}
+:is(.st-key-upload_card,.st-key-cr_card).dz-drag-active .dz-glow{animation:none!important;opacity:1!important;transform:scale(1.5)!important;}
+:is(.st-key-upload_card,.st-key-cr_card).dz-drag-active .dz-sub{opacity:0;}
 /* Dual title: idle shown by default, drag title hidden; swap on drag-active */
 .dz-title-drag{display:none;}
-.st-key-upload_card.dz-drag-active .dz-title-idle{display:none!important;}
-.st-key-upload_card.dz-drag-active .dz-title-drag{display:block!important;color:var(--primary)!important;}
+:is(.st-key-upload_card,.st-key-cr_card).dz-drag-active .dz-title-idle{display:none!important;}
+:is(.st-key-upload_card,.st-key-cr_card).dz-drag-active .dz-title-drag{display:block!important;color:var(--primary)!important;}
 /* Header is purely visual; let clicks fall through to the invisible file-input
    overlay above it so tapping the icon / title opens the browse dialog. */
 .dz-header{padding:40px 32px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;pointer-events:none;}
@@ -422,26 +540,91 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
 .dz-icon>svg{width:26px;height:26px;}
 .dz-icon .dz-arrow{display:grid;place-items:center;color:var(--primary);animation:dzArrow 2.2s ease-in-out infinite;}
 .dz-icon .dz-arrow svg{width:26px;height:26px;}
-.st-key-upload_card:hover .dz-icon{transform:scale(1.08) translateY(-2px);border-color:var(--primary);box-shadow:var(--sh-2);}
+:is(.st-key-upload_card,.st-key-cr_card):hover .dz-icon{transform:scale(1.08) translateY(-2px);border-color:var(--primary);box-shadow:var(--sh-2);}
 .dz-title{font:700 1.08rem/1.2 var(--font);color:var(--ink);margin:0;transition:color .3s ease;}
-.st-key-upload_card:hover .dz-title{color:var(--primary);}
+:is(.st-key-upload_card,.st-key-cr_card):hover .dz-title{color:var(--primary);}
 .dz-sub{font:500 .85rem/1.4 var(--font);color:var(--muted);margin:0;}
 @keyframes dzEnter{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:none;}}
 @keyframes dzSpin{to{--dz-ang:360deg;}}
 @keyframes dzPulse{0%,100%{transform:scale(.8);opacity:.5;}50%{transform:scale(1.15);opacity:.9;}}
 @keyframes dzArrow{0%,100%{transform:translateY(2px);opacity:.45;}50%{transform:translateY(-3px);opacity:1;}}
 @media (prefers-reduced-motion:reduce){
-  .st-key-upload_card,.dz-glow,.dz-icon .dz-arrow{animation:none;}
-  .st-key-upload_card::after{animation:none;}
+  :is(.st-key-upload_card,.st-key-cr_card),.dz-glow,.dz-icon .dz-arrow{animation:none;}
+  :is(.st-key-upload_card,.st-key-cr_card)::after{animation:none;}
 }
-/* Overlay the dz-header with a transparent clickable file input */
-.st-key-upload_card [data-testid="stFileUploader"]{position:absolute;top:0;left:0;right:0;height:175px;z-index:5;padding:0!important;margin:0!important;}
-.st-key-upload_card [data-testid="stFileUploaderDropzone"]{position:absolute;inset:0;background:transparent!important;border:none!important;box-shadow:none!important;padding:0!important;cursor:pointer;}
-.st-key-upload_card [data-testid="stFileUploaderDropzone"] *:not(button){visibility:hidden!important;}
-.st-key-upload_card [data-testid="stFileUploaderDropzone"] button{display:block!important;position:absolute!important;inset:0!important;width:100%!important;height:100%!important;opacity:0!important;cursor:pointer!important;border:none!important;background:transparent!important;}
-.st-key-upload_card [data-testid="stFileUploaderFile"]{display:none!important;}
-.st-key-upload_card [data-testid="stHorizontalBlock"]{padding:0 20px!important;justify-content:center!important;}
-.st-key-upload_card [data-testid="column"]{padding:0!important;}
+/* Overlay the dz-header with a transparent clickable file input.
+   The uploader is absolute, but Streamlit makes every stElementContainer
+   position:relative — so without this the uploader anchors to its OWN
+   container (which sits BELOW the dz-header) instead of the card, leaving
+   the cloud icon with no dropzone behind it (clicks + file drops miss). Force
+   the uploader's container static so the card becomes the offset parent and
+   the overlay lands on top of the icon. */
+:is(.st-key-upload_card,.st-key-cr_card) [data-testid="stElementContainer"]:has([data-testid="stFileUploader"]){position:static!important;}
+:is(.st-key-upload_card,.st-key-cr_card) [data-testid="stFileUploader"]{position:absolute;top:0;left:0;right:0;height:175px;z-index:5;padding:0!important;margin:0!important;}
+:is(.st-key-upload_card,.st-key-cr_card) [data-testid="stFileUploaderDropzone"]{position:absolute;inset:0;background:transparent!important;border:none!important;box-shadow:none!important;padding:0!important;cursor:pointer;}
+:is(.st-key-upload_card,.st-key-cr_card) [data-testid="stFileUploaderDropzone"] *:not(button){visibility:hidden!important;}
+:is(.st-key-upload_card,.st-key-cr_card) [data-testid="stFileUploaderDropzone"] button{display:block!important;position:absolute!important;inset:0!important;width:100%!important;height:100%!important;opacity:0!important;cursor:pointer!important;border:none!important;background:transparent!important;}
+:is(.st-key-upload_card,.st-key-cr_card) [data-testid="stFileUploaderFile"]{display:none!important;}
+:is(.st-key-upload_card,.st-key-cr_card) [data-testid="stHorizontalBlock"]{padding:0 20px!important;justify-content:center!important;}
+:is(.st-key-upload_card,.st-key-cr_card) :is([data-testid="stColumn"],[data-testid="column"]){padding:0!important;}
+/* Step-1 empty state: two-button row. Left = "Upload CSV" CTA (.up-cta, visual
+   only) with the invisible file_uploader overlaid inside .st-key-up_btn; right =
+   the native sample button. The CTA container is the uploader's offset parent, so
+   the overlay covers ONLY the CTA — the sample button stays clickable. Columns
+   stack vertically on mobile portrait, each overlay following its own column. */
+:is(.st-key-upload_card,.st-key-cr_card) [data-testid="stHorizontalBlock"]:has(:is(.st-key-up_btn,.st-key-cr_up_btn)){padding:22px 20px 6px!important;align-items:center!important;justify-content:center!important;gap:14px!important;flex-wrap:wrap!important;}
+/* Shrink both columns to their button so the pair sits together (centered),
+   not split across two half-width columns. Wraps on narrow phones. */
+:is(.st-key-upload_card,.st-key-cr_card) [data-testid="stHorizontalBlock"]:has(:is(.st-key-up_btn,.st-key-cr_up_btn)) :is([data-testid="stColumn"],[data-testid="column"]){flex:0 0 auto!important;width:auto!important;min-width:0!important;display:flex!important;flex-direction:column!important;justify-content:center!important;}
+/* Pin the CTA container to the button height so its column (which ALSO holds the
+   invisible file-uploader element) is exactly 48px — same as the sample column —
+   otherwise the uploader's residual height makes the CTA sit lower than the sample. */
+:is(.st-key-up_btn,.st-key-cr_up_btn){position:relative;gap:0!important;width:fit-content;max-width:100%;height:48px!important;min-height:48px!important;display:flex;flex-direction:column;justify-content:center;}
+:is(.st-key-up_btn,.st-key-cr_up_btn) [data-testid="stElementContainer"]{margin:0!important;}
+/* The CTA's own element container otherwise collapses to ~32px (Streamlit's emotion
+   class wins on source-order tie), so the 48px .up-cta overflows downward and sits
+   ~8px lower than the sample button. Pin it to 48px so the CTA fits exactly — both
+   buttons then share one vertical center under the row's align-items:center. The
+   uploader's element container (no .up-cta) stays 0-height as the absolute overlay. */
+:is(.st-key-up_btn,.st-key-cr_up_btn) [data-testid="stElementContainer"]:has(.up-cta){height:48px!important;display:flex;align-items:center;}
+/* Streamlit gives stMarkdownContainer a default margin-bottom:-16px, which shrinks
+   the stMarkdown flex item to 32px; align-items:center then offsets the 48px CTA 8px
+   down. Zero the margin and let stMarkdown fill so the CTA sits flush at the top. */
+:is(.st-key-up_btn,.st-key-cr_up_btn) [data-testid="stMarkdownContainer"]{margin-bottom:0!important;}
+:is(.st-key-up_btn,.st-key-cr_up_btn) [data-testid="stMarkdown"]{height:48px!important;display:flex;align-items:center;}
+.up-cta{display:flex;align-items:center;justify-content:center;gap:9px;
+  height:48px;padding:0 22px;border-radius:16px;
+  background:var(--cta-bg);border:1px solid var(--cta-bd);color:#fff;
+  backdrop-filter:blur(16px) saturate(1.4);-webkit-backdrop-filter:blur(16px) saturate(1.4);
+  font:700 1rem/1.2 var(--font);
+  box-shadow:0 2px 12px var(--cta-sh),inset 0 1px 0 rgba(255,255,255,.18);
+  user-select:none;pointer-events:none;transition:transform .2s ease,box-shadow .2s ease,filter .2s ease;}
+/* Force white text on the dark-navy glass — markdown's -webkit-text-fill-color
+   (ink) otherwise wins over plain color, so "CSV Yükle" rendered dark in light mode. */
+.up-cta,.up-cta *{color:#fff!important;-webkit-text-fill-color:#fff!important;}
+.up-cta svg{stroke:#fff!important;}
+/* Hide the file_uploader's widget label leaking the "Upload CSV" string into the box. */
+:is(.st-key-up_btn,.st-key-cr_up_btn) [data-testid="stWidgetLabel"],:is(.st-key-up_btn,.st-key-cr_up_btn) label{display:none!important;}
+.up-cta-ic{position:relative;width:20px;height:20px;display:grid;place-items:center;flex:0 0 auto;}
+.up-cta-ic>svg,.up-cta-arrow{grid-area:1/1;}
+.up-cta-ic>svg{width:20px;height:20px;}
+.up-cta-arrow{display:grid;place-items:center;}
+.up-cta-arrow>svg{width:20px;height:20px;}
+:is(.st-key-up_btn,.st-key-cr_up_btn):hover .up-cta{filter:brightness(1.12);transform:translateY(-1px);box-shadow:0 6px 20px var(--cta-sh),inset 0 1px 0 rgba(255,255,255,.22);}
+:is(.st-key-up_btn,.st-key-cr_up_btn):hover .up-cta-arrow{animation:ctaArrow .9s ease-in-out infinite;}
+@keyframes ctaArrow{0%,100%{transform:translateY(1px);}50%{transform:translateY(-2px);}}
+@media (prefers-reduced-motion:reduce){:is(.st-key-up_btn,.st-key-cr_up_btn):hover .up-cta-arrow{animation:none;}}
+/* Scope the overlay to the CTA box (inset:0); more specific than the whole-card
+   uploader rules above, so it wins regardless of source order. */
+:is(.st-key-upload_card,.st-key-cr_card) :is(.st-key-up_btn,.st-key-cr_up_btn) [data-testid="stFileUploader"]{position:absolute!important;inset:0!important;height:100%!important;width:100%!important;z-index:5;padding:0!important;margin:0!important;}
+:is(.st-key-up_btn,.st-key-cr_up_btn) [data-testid="stFileUploaderDropzone"]{position:absolute!important;inset:0!important;min-height:0!important;background:transparent!important;border:none!important;box-shadow:none!important;padding:0!important;cursor:pointer;}
+:is(.st-key-up_btn,.st-key-cr_up_btn) [data-testid="stFileUploaderDropzone"] *:not(button){visibility:hidden!important;}
+:is(.st-key-up_btn,.st-key-cr_up_btn) [data-testid="stFileUploaderDropzone"] button{display:block!important;position:absolute!important;inset:0!important;width:100%!important;height:100%!important;opacity:0!important;cursor:pointer!important;border:none!important;background:transparent!important;}
+:is(.st-key-up_btn,.st-key-cr_up_btn) [data-testid="stFileUploaderFile"]{display:none!important;}
+/* Sample button keeps its global auto-width (sizes to its label), centered by the
+   .st-key-load_sample flex wrapper — content-width per the button-width rule.
+   Pin it to the CTA's height (48px) so the two buttons align as a matched pair. */
+:is(.st-key-upload_card,.st-key-cr_card) :is(.st-key-load_sample,.st-key-cr_sample) button{height:48px!important;min-height:48px!important;padding-top:0!important;padding-bottom:0!important;}
 /* Upload success / error state */
 @keyframes uploadPop{0%{opacity:0;transform:scale(.6);}65%{transform:scale(1.12);}100%{opacity:1;transform:scale(1);}}
 @keyframes uploadRise{0%{opacity:0;transform:translateY(10px);}100%{opacity:1;transform:translateY(0);}}
@@ -459,20 +642,21 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
 /* Invalid file type: red icon + text for the rejected-file row. Exclude the
    dropzone itself (it is ALSO a <section>) so the empty zone stays transparent
    — otherwise the error bg out-specifies the dropzone rule and paints it red. */
-.st-key-upload_card [data-testid="stFileUploader"] section:not([data-testid="stFileUploaderDropzone"]){background:var(--error-bg)!important;border:1px solid var(--error-bd)!important;border-radius:var(--r-sm)!important;margin:4px 12px!important;}
-.st-key-upload_card [data-testid="stFileUploader"] section:not([data-testid="stFileUploaderDropzone"]) svg{color:var(--error)!important;fill:var(--error)!important;}
-.st-key-upload_card [data-testid="stFileUploader"] section:not([data-testid="stFileUploaderDropzone"]) small{color:var(--error)!important;}
-.st-key-upload_card [data-testid="stFileUploaderDeleteBtn"]{color:var(--error)!important;opacity:.75;}
-.st-key-upload_card [data-testid="stFileUploaderDeleteBtn"]:hover{opacity:1;}
+:is(.st-key-upload_card,.st-key-cr_card) [data-testid="stFileUploader"] section:not([data-testid="stFileUploaderDropzone"]){background:var(--error-bg)!important;border:1px solid var(--error-bd)!important;border-radius:var(--r-sm)!important;margin:4px 12px!important;}
+:is(.st-key-upload_card,.st-key-cr_card) [data-testid="stFileUploader"] section:not([data-testid="stFileUploaderDropzone"]) svg{color:var(--error)!important;fill:var(--error)!important;}
+:is(.st-key-upload_card,.st-key-cr_card) [data-testid="stFileUploader"] section:not([data-testid="stFileUploaderDropzone"]) small{color:var(--error)!important;}
+:is(.st-key-upload_card,.st-key-cr_card) [data-testid="stFileUploaderDeleteBtn"]{color:var(--error)!important;opacity:.75;}
+:is(.st-key-upload_card,.st-key-cr_card) [data-testid="stFileUploaderDeleteBtn"]:hover{opacity:1;}
 /* "Try with sample dataset" — auto-width (fits its label), centered in the card;
    the primary gradient already applies. A light sheen sweeps across on hover so
    the call-to-action feels alive. */
-.st-key-load_sample,.st-key-load_sample .stButton{display:flex;justify-content:center;width:100%;}
-.st-key-load_sample button{position:relative;overflow:hidden;width:auto!important;padding:12px 40px!important;}
-.st-key-load_sample button::after{content:"";position:absolute;top:0;left:-130%;width:60%;height:100%;
+:is(.st-key-load_sample,.st-key-cr_sample),:is(.st-key-load_sample,.st-key-cr_sample) .stButton{display:flex;justify-content:center;width:100%;}
+:is(.st-key-load_sample,.st-key-cr_sample){position:relative;z-index:20;}
+:is(.st-key-load_sample,.st-key-cr_sample) button{position:relative;overflow:hidden;width:auto!important;padding:12px 40px!important;}
+:is(.st-key-load_sample,.st-key-cr_sample) button::after{content:"";position:absolute;top:0;left:-130%;width:60%;height:100%;
   background:linear-gradient(90deg,transparent,rgba(255,255,255,.28),transparent);transform:skewX(-18deg);transition:left .6s ease;}
-.st-key-load_sample button:hover::after{left:150%;}
-@media (prefers-reduced-motion:reduce){.st-key-load_sample button::after{transition:none;}}
+:is(.st-key-load_sample,.st-key-cr_sample) button:hover::after{left:150%;}
+@media (prefers-reduced-motion:reduce){:is(.st-key-load_sample,.st-key-cr_sample) button::after{transition:none;}}
 /* Fallback: plain dropzone (outside upload card) keeps the default look */
 [data-testid="stFileUploaderDropzone"]{background:var(--surface-2);border:1.6px dashed var(--dz);border-radius:var(--r-lg);}
 [data-testid="stFileUploaderDropzone"]:hover{border-color:var(--primary);}
@@ -503,24 +687,71 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
   background:transparent!important;border:none!important;border-radius:0!important;}
 [data-testid="stTextInput"] input,[data-testid="stNumberInput"] input{
   background:transparent!important;color:var(--ink)!important;-webkit-text-fill-color:var(--ink)!important;}
-[data-testid="stNumberInput"] input{
-  text-align:center!important;font:600 1.05rem/1 var(--font)!important;
-  -webkit-text-fill-color:var(--ink)!important;letter-spacing:-.01em;padding-left:14px!important;}
 [data-testid="stTextInput"] input::placeholder,[data-testid="stNumberInput"] input::placeholder{color:var(--faint)!important;}
-[data-testid="stTextInput"] [data-baseweb="input"]:focus-within,
-[data-testid="stNumberInput"] [data-baseweb="input"]:focus-within{
+[data-testid="stTextInput"] [data-baseweb="input"]:focus-within{
   border-color:var(--primary)!important;box-shadow:0 0 0 3px var(--primary-50)!important;}
-/* ± as flush, borderless segments: no slab, no per-button border. A single
-   hairline (inset shadow) divides value | − | + so it reads as one pill; hover
-   tints with the brand instead of swapping a whole surface. */
-[data-testid="stNumberInput"] button{
+[data-testid="stNumberInput"] label{white-space:nowrap!important;}
+
+/* ── Quantity selector — premium rounded pill (st.number_input) ───────────────
+   The native ± steppers ship in a sibling group div AFTER [data-baseweb="input"]
+   (step-down then step-up). We promote stNumberInputContainer to the one rounded
+   pill surface and re-order its children into  −  ·  value  ·  +  : step-down on
+   the left, the centred field in the middle, step-up on the right — a true
+   quantity stepper, not an input with side buttons. Targeted by the STABLE
+   data-testids (stNumberInputContainer / StepDown / StepUp), never the churny
+   emotion classes; the step-button wrapper is reached via :has() so a class
+   rename can't break the layout. */
+[data-testid="stNumberInputContainer"]{
+  display:flex!important;align-items:stretch!important;gap:0!important;
+  max-width:170px!important;background:var(--surface)!important;
+  border:1px solid var(--border)!important;border-radius:999px!important;
+  box-shadow:var(--sh-1)!important;overflow:hidden!important;
+  transition:border-color .18s ease,box-shadow .18s ease;}
+[data-testid="stNumberInputContainer"]:hover{
+  border-color:var(--primary-100)!important;box-shadow:var(--sh-2)!important;}
+[data-testid="stNumberInputContainer"]:focus-within{
+  border-color:var(--primary)!important;
+  box-shadow:0 0 0 3px var(--primary-50),var(--sh-1)!important;}
+/* inner field wrapper: shed the shared text-input chrome (border/shadow/cap) and
+   take the centre slot; neutralise the shared :focus-within ring so the pill — not
+   the bare field inside it — shows focus. */
+[data-testid="stNumberInput"] [data-baseweb="input"]{
   background:transparent!important;border:none!important;border-radius:0!important;
-  color:var(--muted)!important;width:38px!important;min-width:38px!important;align-self:stretch!important;
-  box-shadow:inset 1px 0 0 var(--border)!important;
-  transition:background .15s ease,color .15s ease;}
-[data-testid="stNumberInput"] button:hover{background:var(--primary-50)!important;color:var(--primary)!important;}
-[data-testid="stNumberInput"] button:active{background:var(--primary-100)!important;color:var(--primary)!important;}
-[data-testid="stNumberInput"] button svg{width:17px!important;height:17px!important;}
+  box-shadow:none!important;max-width:none!important;min-width:0!important;
+  flex:1 1 auto!important;order:1!important;}
+[data-testid="stNumberInput"] [data-baseweb="input"]:focus-within{
+  border-color:transparent!important;box-shadow:none!important;}
+[data-testid="stNumberInput"] input{
+  text-align:center!important;font:700 1.06rem/1 var(--font)!important;
+  color:var(--ink)!important;-webkit-text-fill-color:var(--ink)!important;
+  letter-spacing:-.01em;padding:0 2px!important;}
+/* dissolve the step-button wrapper so both buttons become direct flex children
+   of the pill (display:contents), then place one on each end via order. */
+[data-testid="stNumberInputContainer"]>div:has(>[data-testid="stNumberInputStepDown"]){
+  display:contents!important;}
+[data-testid="stNumberInput"] button[data-testid="stNumberInputStepDown"],
+[data-testid="stNumberInput"] button[data-testid="stNumberInputStepUp"]{
+  background:transparent!important;border:none!important;border-radius:0!important;
+  box-shadow:none!important;color:var(--muted)!important;
+  width:44px!important;min-width:44px!important;flex:0 0 44px!important;
+  align-self:stretch!important;display:grid!important;place-items:center!important;
+  cursor:pointer!important;opacity:.8;
+  transition:background .16s ease,color .16s ease,opacity .16s ease,transform .12s ease;}
+[data-testid="stNumberInput"] button[data-testid="stNumberInputStepDown"]{order:0!important;}
+[data-testid="stNumberInput"] button[data-testid="stNumberInputStepUp"]{order:2!important;}
+[data-testid="stNumberInput"] button[data-testid="stNumberInputStepDown"]:hover,
+[data-testid="stNumberInput"] button[data-testid="stNumberInputStepUp"]:hover{
+  background:var(--primary-50)!important;color:var(--primary)!important;opacity:1;}
+[data-testid="stNumberInput"] button[data-testid="stNumberInputStepDown"]:active,
+[data-testid="stNumberInput"] button[data-testid="stNumberInputStepUp"]:active{
+  background:var(--primary-100)!important;color:var(--primary)!important;transform:scale(.9);}
+[data-testid="stNumberInput"] button[data-testid="stNumberInputStepDown"]:disabled,
+[data-testid="stNumberInput"] button[data-testid="stNumberInputStepUp"]:disabled{
+  opacity:.3!important;cursor:not-allowed!important;background:transparent!important;color:var(--muted)!important;}
+[data-testid="stNumberInput"] button svg{width:13px!important;height:13px!important;}
+@media (prefers-reduced-motion:reduce){
+  [data-testid="stNumberInputContainer"],
+  [data-testid="stNumberInput"] button{transition:none!important;}}
 /* Selectbox closed control + its caret. */
 [data-testid="stSelectbox"] [data-baseweb="select"]>div:first-child{
   background:var(--surface)!important;border:1.5px solid var(--faint)!important;border-radius:10px!important;color:var(--ink)!important;}
@@ -532,6 +763,75 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
 [data-testid="stCheckbox"] label,[data-testid="stCheckbox"] label *{color:var(--ink)!important;}
 [data-testid="stCheckbox"] [data-baseweb="checkbox"]>span:first-of-type{border-color:var(--border)!important;}
 
+/* st.toggle — track + thumb themed to follow light/dark tokens.
+   Streamlit renders st.toggle as stCheckbox but with a div (not span) as the
+   first child of label[data-baseweb="checkbox"] — regular checkboxes use span,
+   so `> div:first-child` targets only toggle tracks without touching checkboxes.
+   aria-checked on the input reflects the on-state; :has() propagates it to track. */
+[data-testid="stCheckbox"] label[data-baseweb="checkbox"]>div:first-child{
+  background:var(--faint)!important;border-radius:999px!important;
+  transition:background .2s ease,box-shadow .2s ease;}
+[data-testid="stCheckbox"] label[data-baseweb="checkbox"]:has(input[aria-checked="true"])>div:first-child{
+  background:var(--primary)!important;
+  box-shadow:0 0 0 3px var(--primary-50)!important;}
+[data-testid="stCheckbox"] label[data-baseweb="checkbox"]>div:first-child>div{
+  background:#fff!important;box-shadow:0 1px 4px rgba(0,0,0,.35)!important;}
+
+/* ── Instructor availability heatmap ── when2meet-style hourly grid: time rows ×
+   day columns, tap a cell to block that hour for the instructor. Mirrors the result
+   timetable's hour×day shape so the picker and the schedule read in one language.
+   Each cell is a Streamlit checkbox restyled into a flat tile that fills amber when
+   blocked (:has(input:checked)); the native box + label are hidden — the tile colour
+   is the only signal. Scoped to .st-key-av_hm. Columns are forced nowrap + min-width:0
+   so the grid never stacks on a phone (the cells just shrink to fit). */
+.st-key-av_hm{background:var(--card);border:1px solid var(--card-bd);
+  border-radius:var(--r-lg);box-shadow:var(--sh-1);padding:12px 12px 9px;margin:2px 0 6px;overflow:hidden;}
+.st-key-av_hm [data-testid="stVerticalBlock"]{gap:4px!important;}
+.st-key-av_hm [data-testid="stHorizontalBlock"]{flex-wrap:nowrap!important;gap:4px!important;align-items:stretch;}
+.st-key-av_hm [data-testid="stColumn"],.st-key-av_hm [data-testid="column"]{min-width:0!important;flex:1 1 0!important;}
+/* a column's element wrapper is content-sized by default — stretch it so the cell
+   (checkbox) fills the column rather than collapsing to the hidden box's 16px. */
+.st-key-av_hm [data-testid="stElementContainer"]{width:100%!important;}
+/* first column of every row is the narrow time gutter */
+.st-key-av_hm [data-testid="stHorizontalBlock"]>[data-testid="stColumn"]:first-child,
+.st-key-av_hm [data-testid="stHorizontalBlock"]>[data-testid="column"]:first-child{flex:0 0 46px!important;}
+.hm-dh{text-align:center;font:700 .72rem/1 var(--font);color:var(--ink-2);padding:2px 0 5px;}
+.hm-tl{font:600 .64rem/1 var(--mono);color:var(--faint);text-align:right;padding-right:7px;
+  height:30px;display:flex;align-items:center;justify-content:flex-end;white-space:nowrap;}
+.hm-mid{height:1px;background:var(--warn-bd);opacity:.7;margin:2px 0;border-radius:1px;}
+/* cell = restyled checkbox tile */
+.st-key-av_hm [data-testid="stCheckbox"]{width:100%;}
+.st-key-av_hm [data-testid="stCheckbox"] label{
+  display:flex!important;width:100%;height:30px;border-radius:7px;cursor:pointer;
+  background:var(--surface-2);border:1px solid var(--border);
+  transition:background .13s ease,border-color .13s ease;}
+.st-key-av_hm [data-testid="stCheckbox"] label:hover{border-color:var(--primary-100);background:var(--surface);}
+.st-key-av_hm [data-testid="stCheckbox"] label:focus-within{outline:2px solid var(--primary);outline-offset:1px;}
+/* hide the native box + label text */
+.st-key-av_hm [data-baseweb="checkbox"]>span:first-of-type{display:none!important;}
+.st-key-av_hm [data-testid="stCheckbox"] [data-testid="stWidgetLabel"]{display:none!important;}
+/* blocked = solid amber tile */
+.st-key-av_hm [data-testid="stCheckbox"] label:has(input:checked){
+  background:var(--warn);border-color:var(--warn);box-shadow:0 2px 7px -2px var(--warn);}
+.st-key-av_hm [data-testid="stCheckbox"] label:has(input:checked):hover{background:var(--warn);border-color:var(--warn-bd);}
+@media (prefers-reduced-motion:reduce){.st-key-av_hm [data-testid="stCheckbox"] label{transition:none;}}
+.st-key-av_hm .stButton{margin-top:10px;}
+/* Legend + count line under the grid */
+.hm-leg{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font:500 .74rem/1 var(--font);
+  color:var(--muted);margin:2px 2px 11px;}
+.hm-leg span{display:inline-flex;align-items:center;}
+.hm-leg i{width:13px;height:13px;border-radius:4px;display:inline-block;margin-right:6px;}
+.hm-leg .av{background:var(--surface-2);border:1px solid var(--border);}
+.hm-leg .bl{background:var(--warn);}
+.hm-leg b{color:var(--warn);font-weight:700;}
+/* Blocked-slots overview — one warm-chipped row per restricted instructor */
+.av-sum{display:flex;flex-direction:column;gap:8px;margin-top:14px;}
+.av-sum-row{display:flex;align-items:center;flex-wrap:wrap;gap:7px;padding:9px 12px;
+  background:var(--surface-2);border:1px solid var(--border-2);border-radius:10px;}
+.av-sum-who{font:600 .78rem/1.3 var(--font);color:var(--ink-2);margin-right:2px;word-break:break-word;}
+.av-chip{font:600 .62rem/1 var(--mono);padding:4px 8px;border-radius:6px;
+  background:var(--warn-bg);border:1px solid var(--warn-bd);color:var(--warn);white-space:nowrap;}
+
 /* Misc Streamlit chrome that should follow the theme */
 hr{border-color:var(--border) !important;}
 [data-testid="stWidgetLabel"] p,[data-testid="stCaptionContainer"],.stRadio label{color:var(--ink);}
@@ -539,31 +839,23 @@ hr{border-color:var(--border) !important;}
 [data-baseweb="slider"] [role="slider"]{background:var(--primary) !important;}
 [data-testid="stAlert"]{border-radius:var(--r);}
 
-/* ── Premium language switch (st.segmented_control: 🇹🇷 TR | 🇬🇧 EN) ── */
-/* Track: frameless — just hosts the two round flag buttons, like the theme toggle. */
-[data-testid="stButtonGroup"]{
-  display:inline-flex;width:auto;align-items:center;
-  gap:8px;padding:0;border:0;background:transparent;box-shadow:none;}
-[data-testid="stButtonGroup"]>div{display:inline-flex;align-items:center;gap:4px;}
-/* Segments: round 32px buttons matching the theme toggle; flag emoji is the label. */
+/* ── Default segmented control: readable text pills (e.g. preference weights) ── */
+[data-testid="stButtonGroup"]>div{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;}
 [data-testid="stBaseButton-segmented_control"],
 [data-testid="stBaseButton-segmented_controlActive"]{
   border:1px solid var(--border)!important;background:var(--surface-2)!important;
-  box-shadow:var(--sh-1)!important;
-  border-radius:50%!important;width:32px!important;height:32px!important;
-  min-width:32px!important;min-height:32px!important;padding:0!important;flex:none;
-  display:inline-flex!important;align-items:center;justify-content:center;
-  font:600 1rem/1 var(--font)!important;color:var(--muted)!important;
+  box-shadow:var(--sh-1)!important;border-radius:999px!important;
+  padding:6px 16px!important;width:auto!important;min-width:0!important;
+  white-space:nowrap;display:inline-flex!important;align-items:center;justify-content:center;
+  font:600 .84rem/1 var(--font)!important;color:var(--muted)!important;
   transition:background .16s,color .16s,box-shadow .16s,transform .16s;}
 [data-testid="stBaseButton-segmented_control"] p,
 [data-testid="stBaseButton-segmented_controlActive"] p{
   font:inherit!important;color:inherit!important;letter-spacing:-.005em;}
-/* Inactive hover — lift toward the surface without committing. */
 [data-testid="stBaseButton-segmented_control"]:hover{
   background:var(--surface)!important;color:var(--primary)!important;
   border-color:var(--primary)!important;box-shadow:var(--sh-2)!important;
   transform:translateY(-1px);}
-/* Active segment — primary gradient, white text, soft lift. */
 [data-testid="stBaseButton-segmented_controlActive"]{
   background:linear-gradient(135deg,var(--primary) 0%,#4456B5 100%)!important;
   color:#fff!important;border-color:transparent!important;
@@ -571,21 +863,54 @@ hr{border-color:var(--border) !important;}
     inset 0 1px 0 rgba(255,255,255,.22)!important;}
 [data-testid="stBaseButton-segmented_controlActive"]:hover{filter:brightness(1.05);}
 
+/* ── Premium language switch (st.segmented_control: 🇹🇷 TR | 🇬🇧 EN) ── */
+/* Scoped to the top-bar control group so it never touches other segmented controls. */
+/* Track: frameless — just hosts the two round flag buttons, like the theme toggle. */
+.st-key-topctrls [data-testid="stButtonGroup"]{
+  display:inline-flex;width:auto;align-items:center;
+  gap:8px;padding:0;border:0;background:transparent;box-shadow:none;}
+.st-key-topctrls [data-testid="stButtonGroup"]>div{display:inline-flex;flex-wrap:nowrap;align-items:center;gap:4px;}
+/* Segments: round 32px buttons matching the theme toggle; flag emoji is the label. */
+.st-key-topctrls [data-testid="stBaseButton-segmented_control"],
+.st-key-topctrls [data-testid="stBaseButton-segmented_controlActive"]{
+  border:1px solid var(--border)!important;background:var(--surface-2)!important;
+  box-shadow:var(--sh-1)!important;
+  border-radius:50%!important;width:32px!important;height:32px!important;
+  min-width:32px!important;min-height:32px!important;padding:0!important;flex:none;
+  display:inline-flex!important;align-items:center;justify-content:center;
+  font:600 1rem/1 var(--font)!important;color:var(--muted)!important;
+  transition:background .16s,color .16s,box-shadow .16s,transform .16s;}
+.st-key-topctrls [data-testid="stBaseButton-segmented_control"] p,
+.st-key-topctrls [data-testid="stBaseButton-segmented_controlActive"] p{
+  font:inherit!important;color:inherit!important;letter-spacing:-.005em;}
+/* Inactive hover — lift toward the surface without committing. */
+.st-key-topctrls [data-testid="stBaseButton-segmented_control"]:hover{
+  background:var(--surface)!important;color:var(--primary)!important;
+  border-color:var(--primary)!important;box-shadow:var(--sh-2)!important;
+  transform:translateY(-1px);}
+/* Active segment — primary gradient, white text, soft lift. */
+.st-key-topctrls [data-testid="stBaseButton-segmented_controlActive"]{
+  background:linear-gradient(135deg,var(--primary) 0%,#4456B5 100%)!important;
+  color:#fff!important;border-color:transparent!important;
+  box-shadow:0 1px 2px rgba(31,43,103,.28),0 4px 12px -6px rgba(31,43,103,.5),
+    inset 0 1px 0 rgba(255,255,255,.22)!important;}
+.st-key-topctrls [data-testid="stBaseButton-segmented_controlActive"]:hover{filter:brightness(1.05);}
+
 /* ── Right control group: theme button + lang switch on one tight row ──
-   Flip the container's vertical block to a right-aligned horizontal flex.
+   Flip the container's vertical block to a centered horizontal flex.
    Cover both self and descendant stVerticalBlock targets. Strip all default
    Streamlit padding/margin so controls sit flush. */
 .st-key-topctrls,
 .st-key-topctrls[data-testid="stVerticalBlock"],
 .st-key-topctrls [data-testid="stVerticalBlock"]{
   flex-direction:row!important;align-items:center!important;
-  justify-content:flex-end!important;gap:8px!important;
+  justify-content:center!important;gap:8px!important;
   padding:0!important;margin:0!important;}
 /* Let flex align-items:center on the column do the vertical centring; no manual
    nudge, so the 32px control buttons line up with the 40px-logo brand row. */
 .st-key-topctrls{margin-top:0!important;}
 .st-key-topctrls [data-testid="stElementContainer"]{
-  width:auto!important;padding:0!important;margin:0!important;}
+  width:auto!important;flex:none!important;padding:0!important;margin:0!important;}
 /* Right column direct-child stVerticalBlock (A): center the topctrls block
    vertically within it. Use > (direct child) so we don't override the inner
    flex-row stVerticalBlock (C) that holds the buttons side by side. */
@@ -605,7 +930,7 @@ hr{border-color:var(--border) !important;}
   flex:1 1 auto!important;display:flex!important;align-items:center!important;}
 .st-key-topbar [data-testid="stHorizontalBlock"]>[data-testid="stColumn"]:last-child{
   flex:0 0 auto!important;display:flex!important;align-items:center!important;
-  justify-content:flex-end!important;}
+  justify-content:center!important;}
 
 /* Desktop-only: nudge right controls down to balance the brand's -8px nudge up. */
 @media (min-width:641px){
@@ -613,34 +938,60 @@ hr{border-color:var(--border) !important;}
 }
 
 /* Theme + language toggles — identical premium round icon buttons. Both are
-   st.button (the lang switch shows the OTHER language's flag and toggles on
-   click, like the theme toggle). Scoped to their widget keys so other
-   secondary buttons keep their own style. */
-.st-key-theme_btn button,
-.st-key-lang_btn button{
+   st.button (the lang switch shows the CURRENT language's flag; clicking toggles
+   to the other). Streamlit's own rule has specificity 0031 (!important); we need
+   to match or exceed it. Prefixing with .st-key-topctrls gives us 0031 too, and
+   since our <style> is injected after Streamlit's own sheet, last wins on ties. */
+.st-key-topctrls .st-key-theme_btn button[data-testid],
+.st-key-topctrls .st-key-lang_btn button[data-testid]{
   width:32px!important;height:32px!important;min-width:32px!important;min-height:32px!important;
   padding:0!important;border-radius:50%!important;flex:none;
-  display:inline-flex!important;align-items:center;justify-content:center;
-  font-size:1rem;line-height:1;
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;
+  font-size:1.1rem!important;line-height:1!important;
   background:var(--surface-2)!important;border:1px solid var(--border)!important;
   color:var(--ink-2)!important;box-shadow:var(--sh-1)!important;
   transition:border-color .16s,color .16s,box-shadow .16s,transform .16s;}
-.st-key-theme_btn button:hover,
-.st-key-lang_btn button:hover{
+/* Inner markdown div must not add size — collapse to point. */
+.st-key-topctrls .st-key-theme_btn button[data-testid]>div,
+.st-key-topctrls .st-key-lang_btn button[data-testid]>div{display:contents!important;padding:0!important;margin:0!important;}
+.st-key-topctrls .st-key-theme_btn button[data-testid] p,
+.st-key-topctrls .st-key-lang_btn button[data-testid] p{font-size:1.1rem!important;line-height:1!important;margin:0!important;padding:0!important;}
+.st-key-topctrls .st-key-theme_btn button[data-testid]:hover,
+.st-key-topctrls .st-key-lang_btn button[data-testid]:hover{
   border-color:var(--primary)!important;color:var(--primary)!important;
   box-shadow:var(--sh-2)!important;transform:translateY(-1px);}
+/* Lang button shows the active language — subtle active ring. */
+.st-key-topctrls .st-key-lang_btn button[data-testid]{
+  border-color:var(--primary-100)!important;
+  box-shadow:0 0 0 2px var(--primary-50),var(--sh-1)!important;}
 
-/* Tooltips (button help, widget hints) — default to a light bubble that is
-   unreadable in dark mode; repaint to theme tokens so both modes are legible. */
-[data-baseweb="tooltip"]>div,
-[data-testid="stTooltipContent"]{
+/* Tooltips (hover + help "?") — ONE flat bubble, never a nested card. The help
+   "?" tooltip is a [data-baseweb=tooltip] (NOT a popover). Its single visible
+   surface is the `>div`; stTooltipContent is ONLY the inner text wrapper and
+   must paint NOTHING. Giving the content its own box-shadow/border-radius draws
+   a second rounded rect inset inside the bubble — a transparent node still casts
+   its drop shadow — which is exactly the card-in-card look. So the bubble carries
+   the lone background + soft even shadow, and the content is zeroed out. */
+[data-baseweb="tooltip"]>div{
   background:var(--tt-bg)!important;color:var(--tt-ink)!important;
-  border:1px solid var(--border)!important;border-radius:var(--r-sm)!important;
-  box-shadow:var(--sh-2)!important;
-  font:500 .78rem/1.35 var(--font)!important;padding:7px 11px!important;}
+  border:none!important;border-radius:var(--r-sm)!important;
+  box-shadow:0 6px 22px rgba(20,24,38,.16),0 1px 4px rgba(20,24,38,.10)!important;
+  font:500 .78rem/1.35 var(--font)!important;padding:8px 12px!important;
+  max-width:240px!important;}
 [data-baseweb="tooltip"] [data-testid="stTooltipContent"],
 [data-baseweb="tooltip"] [data-testid="stTooltipContent"] *{
-  color:var(--tt-ink)!important;background:transparent!important;}
+  color:var(--tt-ink)!important;background:transparent!important;
+  border:none!important;border-radius:0!important;box-shadow:none!important;}
+[data-baseweb="tooltip"] [data-testid="stTooltipContent"]{padding:0!important;}
+/* Widget labels: ? icon sits immediately after the label text.
+   Streamlit renders .stTooltipIcon before <label> in the DOM → reorder.
+   justify-content:flex-start prevents the icon drifting to the far right. */
+[data-testid="stWidgetLabel"]{
+  display:flex!important;flex-direction:row!important;
+  align-items:center!important;gap:3px!important;flex-wrap:nowrap!important;
+  justify-content:flex-start!important;}
+[data-testid="stWidgetLabel"] label{order:0;flex:0 1 auto;}
+[data-testid="stWidgetLabel"] .stTooltipIcon{order:1;flex:none;}
 
 /* ── Mobile portrait ── Streamlit stacks the [7,2] app-bar columns full-width
    on narrow screens; tune the brand, context pill, control group and hero so
@@ -680,18 +1031,47 @@ hr{border-color:var(--border) !important;}
   /* Upload card — on mobile the absolute-overlay approach blocks the cloud icon
      because Streamlit's own styles give the dropzone an opaque background.
      Reset to flow layout: dz-header (icon only) shows above the native uploader. */
-  .st-key-upload_card [data-testid="stFileUploader"]{
+  :is(.st-key-upload_card,.st-key-cr_card) [data-testid="stFileUploader"]{
     position:static!important;height:auto!important;}
-  .st-key-upload_card [data-testid="stFileUploaderDropzone"]{
+  :is(.st-key-upload_card,.st-key-cr_card) [data-testid="stFileUploaderDropzone"]{
     position:relative!important;inset:auto!important;}
-  .st-key-upload_card [data-testid="stFileUploaderDropzone"] *:not(button){
+  :is(.st-key-upload_card,.st-key-cr_card) [data-testid="stFileUploaderDropzone"] *:not(button){
     display:revert!important;visibility:visible!important;}
-  .st-key-upload_card [data-testid="stFileUploaderDropzone"] button{
+  :is(.st-key-upload_card,.st-key-cr_card) [data-testid="stFileUploaderDropzone"] button{
     position:static!important;inset:auto!important;
     width:auto!important;height:auto!important;opacity:1!important;}
-  .st-key-upload_card .dz-header{padding:20px 16px 8px;}
-  .st-key-upload_card .dz-title,.st-key-upload_card .dz-sub{display:none!important;}
+  :is(.st-key-upload_card,.st-key-cr_card) .dz-header{padding:20px 16px 8px;}
+  :is(.st-key-upload_card,.st-key-cr_card) .dz-title,:is(.st-key-upload_card,.st-key-cr_card) .dz-sub{display:none!important;}
+  /* EXCEPTION to the flow-layout reset above: both cards' two-button CTA
+     (.st-key-up_btn / .st-key-cr_up_btn) is a COMPACT overlay (not a full dz-header
+     dropzone), so the "opaque dropzone blocks the cloud icon" concern doesn't
+     apply. Re-pin its absolute overlay + hide the native dropzone text on mobile,
+     or Streamlit's "Drop file here / Browse files" text leaks over the CTA and the
+     sample button. Scoped under the card + the CTA container (0,4,0) so it
+     out-specifies the :is(...) reset (0,2,0) and stays later in source order. */
+  :is(.st-key-upload_card,.st-key-cr_card) :is(.st-key-up_btn,.st-key-cr_up_btn) [data-testid="stFileUploader"]{
+    position:absolute!important;inset:0!important;height:100%!important;width:100%!important;}
+  :is(.st-key-upload_card,.st-key-cr_card) :is(.st-key-up_btn,.st-key-cr_up_btn) [data-testid="stFileUploaderDropzone"]{
+    position:absolute!important;inset:0!important;min-height:0!important;}
+  :is(.st-key-upload_card,.st-key-cr_card) :is(.st-key-up_btn,.st-key-cr_up_btn) [data-testid="stFileUploaderDropzone"] *:not(button){
+    visibility:hidden!important;}
+  :is(.st-key-upload_card,.st-key-cr_card) :is(.st-key-up_btn,.st-key-cr_up_btn) [data-testid="stFileUploaderDropzone"] button{
+    position:absolute!important;inset:0!important;width:100%!important;height:100%!important;opacity:0!important;}
 }
+
+/* Blackout slot chips — warm amber "blocked time" tag */
+.bl-chip{display:inline-flex;align-items:center;gap:7px;background:var(--warn-bg);border:1px solid var(--warn-bd);color:var(--warn);border-radius:999px;padding:5px 13px 5px 10px;font:600 .82rem/1 var(--font);white-space:nowrap;}
+.bl-chip .bl-ic{flex:none;font-size:.78em;opacity:.75;letter-spacing:0;}
+.bl-chip .bl-st{font:500 .7rem/1 var(--mono);opacity:.82;margin-left:2px;}
+.bl-row{display:flex;align-items:center;gap:0;padding:3px 0;}
+/* Blackout row: collapse columns so delete button sits right next to chip */
+[data-testid="stHorizontalBlock"]:has(.bl-chip)>[data-testid="stColumn"]{flex:0 0 auto!important;width:auto!important;min-width:0!important;}
+/* Red delete button in blackout rows */
+[data-testid="stHorizontalBlock"]:has(.bl-chip) [data-testid="stColumn"]:last-child button{background:transparent!important;border:none!important;box-shadow:none!important;min-height:28px!important;height:28px!important;padding:0 6px!important;font-size:.9rem!important;font-weight:700!important;line-height:1!important;}
+[data-testid="stHorizontalBlock"]:has(.bl-chip) [data-testid="stColumn"]:last-child button,
+[data-testid="stHorizontalBlock"]:has(.bl-chip) [data-testid="stColumn"]:last-child button p,
+[data-testid="stHorizontalBlock"]:has(.bl-chip) [data-testid="stColumn"]:last-child button span{color:var(--error)!important;}
+[data-testid="stHorizontalBlock"]:has(.bl-chip) [data-testid="stColumn"]:last-child button:hover{background:transparent!important;box-shadow:none!important;opacity:.65!important;}
 
 /* Footer: quiet attribution, centered, mono — sits flush at the page bottom. */
 .tt-footer{margin-top:32px;padding:16px 12px 4px;border-top:1px solid var(--border);
@@ -838,22 +1218,26 @@ def upload_error_html(filename: str, detail: str, lang: str = DEFAULT_LANG) -> s
     )
 
 
-def upload_success_html(filename: str, n_rows: int, lang: str = DEFAULT_LANG) -> str:
-    """Animated success banner shown inside the upload card after a file is loaded."""
-    rows_label = escape(t("upload_loaded", lang, n=n_rows))
-    fname = escape(filename)
+def success_banner_html(title: str, subtitle: str) -> str:
+    """Animated green success banner (check + title + subtitle) shown inside an
+    upload/dropzone card once data has been loaded."""
     return (
         f'<div class="upload-ok">'
         f'<div class="chk">{_CHECK_SVG}</div>'
-        f'<p class="ok-title">{rows_label}</p>'
-        f'<p class="ok-sub">{fname}</p>'
+        f'<p class="ok-title">{escape(title)}</p>'
+        f'<p class="ok-sub">{escape(subtitle)}</p>'
         f'</div>'
     )
 
 
+def upload_success_html(filename: str, n_rows: int, lang: str = DEFAULT_LANG) -> str:
+    """Animated success banner shown inside the upload card after a file is loaded."""
+    return success_banner_html(t("upload_loaded", lang, n=n_rows), filename)
+
+
 def dropzone_html(lang: str = DEFAULT_LANG) -> str:
     """Custom upload card header: icon + title + subtitle. Rendered above the
-    native st.file_uploader inside a .st-key-upload_card container; CSS strips
+    native st.file_uploader inside a :is(.st-key-upload_card,.st-key-cr_card) container; CSS strips
     the uploader's native chrome so the two read as one unified card."""
     title = escape(t("upload_dropzone_title", lang))
     drag_title = escape(t("upload_dropzone_drag", lang))
@@ -867,19 +1251,65 @@ def dropzone_html(lang: str = DEFAULT_LANG) -> str:
         f'<p class="dz-title dz-title-drag">{drag_title}</p>'
         f'<p class="dz-sub">{sub}</p>'
         f'</div>'
-        f'<script>(function(){{'
-        f'if(window.__dzDragInit)return;window.__dzDragInit=true;'
-        f'function card(){{return document.querySelector(".st-key-upload_card");}}'
-        f'document.addEventListener("dragenter",function(e){{'
-        f'var c=card();if(c&&c.contains(e.target))c.classList.add("dz-drag-active");'
-        f'}},true);'
-        f'document.addEventListener("dragleave",function(e){{'
-        f'var c=card();if(c&&!c.contains(e.relatedTarget))c.classList.remove("dz-drag-active");'
-        f'}},true);'
-        f'function clear(){{var c=card();if(c)c.classList.remove("dz-drag-active");}}'
-        f'document.addEventListener("drop",clear,true);'
-        f'document.addEventListener("dragend",clear,true);'
-        f'}})();</script>'
+    )
+
+
+def upload_cta_html(lang: str = DEFAULT_LANG) -> str:
+    """Visual-only primary CTA ("Upload CSV") shown in the left half of the upload
+    card's two-button row. It is purely decorative (``pointer-events:none``): the
+    real click/drag target is the invisible ``st.file_uploader`` overlaid on top of
+    it inside the ``.st-key-up_btn`` container, so clicking the CTA opens the file
+    picker. The right half is the native "sample dataset" st.button."""
+    label = escape(t("upload_cta_btn", lang))
+    return (
+        f'<div class="up-cta">'
+        f'<span class="up-cta-ic">{_UPLOAD_TRAY_SVG}'
+        f'<span class="up-cta-arrow">{_UPLOAD_ARROW_SVG}</span></span>'
+        f'<span>{label}</span></div>'
+    )
+
+
+def dropzone_drag_js() -> str:
+    """JS that lights up an upload card while a file is dragged over it — swaps the
+    title to "release to upload" and tints the background (the visuals live in the
+    ``.dz-drag-active`` CSS rules; this only toggles the class).
+
+    Must be delivered via ``components.html`` (an iframe), NOT ``st.markdown``:
+    Streamlit's DOMPurify strips inline ``<script>`` from markdown, so it would
+    never run. From the iframe it reaches the app through ``window.parent`` and
+    binds capture-phase listeners on the parent document; they re-query the cards
+    on every event, so they keep working across reruns. The iframe is recreated on
+    each rerun, so we first detach the previous run's now-stale handlers (stashed
+    on ``window.parent.__dzHandlers``). Only cards that actually contain an active
+    file-uploader dropzone light up — the post-upload success card is skipped."""
+    return (
+        '<script>(function(){'
+        'var P=window.parent,D=P.document;'
+        'if(P.__dzHandlers){'
+        'D.removeEventListener("dragenter",P.__dzHandlers.on,true);'
+        'D.removeEventListener("dragover",P.__dzHandlers.on,true);'
+        'D.removeEventListener("dragleave",P.__dzHandlers.leave,true);'
+        'D.removeEventListener("drop",P.__dzHandlers.end,true);'
+        'D.removeEventListener("dragend",P.__dzHandlers.end,true);}'
+        'function cards(){return D.querySelectorAll(".st-key-upload_card,.st-key-cr_card");}'
+        'function isFile(e){var t=e.dataTransfer&&e.dataTransfer.types;'
+        'return !!t&&Array.prototype.indexOf.call(t,"Files")>-1;}'
+        # Highlight only when over the real (droppable) uploader zone, so the
+        # "release to upload" invite never appears over the non-droppable
+        # example table / sample button below it.
+        'function zone(t){return t&&t.closest?t.closest(\'[data-testid="stFileUploaderDropzone"]\'):null;}'
+        'function on(e){if(!isFile(e))return;var z=zone(e.target);if(!z)return;'
+        'var c=z.closest(".st-key-upload_card,.st-key-cr_card");if(c)c.classList.add("dz-drag-active");}'
+        'function leave(e){if(zone(e.relatedTarget))return;'
+        'cards().forEach(function(c){c.classList.remove("dz-drag-active");});}'
+        'function end(){cards().forEach(function(c){c.classList.remove("dz-drag-active");});}'
+        'D.addEventListener("dragenter",on,true);'
+        'D.addEventListener("dragover",on,true);'
+        'D.addEventListener("dragleave",leave,true);'
+        'D.addEventListener("drop",end,true);'
+        'D.addEventListener("dragend",end,true);'
+        'P.__dzHandlers={on:on,leave:leave,end:end};'
+        '})();</script>'
     )
 
 
@@ -1037,9 +1467,10 @@ def data_table_html(columns: List[str], rows: List[List], max_height: int = 340,
                 for i, v in enumerate(r))
             trs.append(f"<tr>{tds}</tr>")
         body = "".join(trs)
-    return (f'<div class="tt-table-wrap" style="--tt-table-h:{int(max_height)}px">'
+    return (f'<div style="display:flex;justify-content:center">'
+            f'<div class="tt-table-wrap" style="--tt-table-h:{int(max_height)}px">'
             f'<table class="tt-data"><thead><tr>{head}</tr></thead>'
-            f'<tbody>{body}</tbody></table></div>')
+            f'<tbody>{body}</tbody></table></div></div>')
 
 
 _IMP_STATUS_LABEL = {
@@ -1049,27 +1480,39 @@ _IMP_STATUS_LABEL = {
 }
 # Columns shown in the import preview (canonical field -> i18n-free short header).
 _IMP_COLS = ("Course Code", "Course Name", "Section No", "T", "P", "L",
-             "Lecturer Email", "~Students")
+             "Instructor Name", "Instructor Email", "~Students")
 _IMP_NUM = {"T", "P", "L", "~Students"}
 
 
-def import_preview_html(report: dict, lang: str = DEFAULT_LANG) -> str:
-    """Render the VERA-style import preview: detected-column chips, stat badges
-    and a per-row preview table with colored status pills. ``report`` is the dict
-    from ``csv_import.parse_courselist``."""
-    detected = report.get("detected_columns", [])
-    stats = report.get("stats", {})
-    rows = report.get("rows", [])
+def detected_columns_html(detected: list, lang: str = DEFAULT_LANG) -> str:
+    """The "detected columns" chip row: one chip per canonical field, green when
+    matched by header alias, dashed-orange ("positional" tag) when it fell back to
+    column order. Shared by the course import preview and the Classrooms step.
+    ``detected`` = ``[{field, label, source}]`` from ``csv_import.map_columns``."""
+    if not detected:
+        return ""
 
-    chips = "".join(
-        f'<span class="col{"" if d["source"] == "header" else " pos"}">'
-        f'{escape(str(d["field"]))} <em>→ {escape(str(d["label"]))}'
-        f'{"" if d["source"] == "header" else " (" + t("import_positional", lang) + ")"}'
-        f'</em></span>'
-        for d in detected)
-    detect_html = (f'<div class="imp-detect"><span class="lbl">'
-                   f'{t("import_detected", lang)}</span>{chips}</div>')
+    def _chip(d):
+        is_pos = d["source"] != "header"
+        tag = (f'<span class="tag">{t("import_positional", lang)}</span>'
+               if is_pos else "")
+        return (f'<span class="col{" pos" if is_pos else ""}">'
+                f'<i class="dot"></i>'
+                f'<b>{escape(str(d["field"]))}</b>'
+                f'<span class="arw">→</span>'
+                f'<em>{escape(str(d["label"]))}</em>{tag}</span>')
 
+    chips = "".join(_chip(d) for d in detected)
+    n_match = sum(1 for d in detected if d["source"] == "header")
+    count = f'<span class="imp-detect-count">{n_match}/{len(detected)}</span>'
+    return (f'<div class="imp-detect"><div class="imp-detect-head">'
+            f'<span class="lbl">{t("import_detected", lang)}</span>'
+            f'{count}</div><div class="imp-cols">{chips}</div></div>')
+
+
+def import_stats_html(stats: dict, lang: str = DEFAULT_LANG) -> str:
+    """Valid / duplicate / error / total badge row. Shared by the course import
+    preview and the Classrooms step."""
     def _badge(n, key, tone):
         return (f'<span class="imp-badge {tone}"><span class="n">{n}</span>'
                 f'{t(key, lang)}</span>')
@@ -1079,7 +1522,16 @@ def import_preview_html(report: dict, lang: str = DEFAULT_LANG) -> str:
     if stats.get("error", 0):
         badges.append(_badge(stats["error"], "import_error", "bad"))
     badges.append(_badge(stats.get("total", 0), "import_total", ""))
-    stats_html = f'<div class="imp-stats">{"".join(badges)}</div>'
+    return f'<div class="imp-stats">{"".join(badges)}</div>'
+
+
+def import_preview_html(report: dict, lang: str = DEFAULT_LANG) -> str:
+    """Render the VERA-style import preview: detected-column chips, stat badges
+    and a per-row preview table with colored status pills. ``report`` is the dict
+    from ``csv_import.parse_courselist``."""
+    rows = report.get("rows", [])
+    detect_html = detected_columns_html(report.get("detected_columns", []), lang)
+    stats_html = import_stats_html(report.get("stats", {}), lang)
 
     head = (f'<th class="num">{t("import_col_row", lang)}</th>'
             + "".join((f'<th class="num">{escape(c)}</th>' if c in _IMP_NUM

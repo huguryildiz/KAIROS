@@ -6,6 +6,7 @@ from .config import Config
 from .model import Section, Room, Instructor
 from .derive import course_level, blocks_from_tpl
 from .textnorm import parse_int
+from .csv_import import normalize_room_type
 
 _CODE = re.compile(r"\s*([A-Za-z]+)\D*(\d)")
 
@@ -18,8 +19,8 @@ def cohort_from_code(code: str) -> Tuple[str, str, str]:
     return (dept, year, f"{dept}-{year}")
 
 
-def is_part_time(lecturer_name: str) -> bool:
-    return "(S)" in (lecturer_name or "")
+def is_part_time(instructor_name: str) -> bool:
+    return "(S)" in (instructor_name or "")
 
 
 def parse_emails(s: str) -> List[str]:
@@ -30,11 +31,34 @@ def _truthy(v) -> bool:
     return str(v or "").strip().lower() in ("1", "true", "yes", "y", "x", "lab", "✓")
 
 
-def _is_lab_type(v) -> bool:
-    """A Room Type column value that means 'this section needs a lab-flagged room'."""
+def _room_type_demand(v) -> str:
+    """Required room category from a section's Room Type cell: '' (normal) |
+    lab | pc | studio. Shares the room inventory's type vocabulary."""
     s = str(v or "").strip().lower()
-    return bool(s) and any(tok in s for tok in
-                           ("lab", "pc", "studio", "studyo", "bilgisayar", "laboratuvar"))
+    if "pc" in s or "bilgisayar" in s:
+        return "pc"
+    if "studio" in s or "studyo" in s or "stüdyo" in s:
+        return "studio"
+    if "lab" in s or "laboratuvar" in s:
+        return "lab"
+    return ""
+
+
+def normalize_name(name) -> str:
+    """Stable instructor key from a display name (fallback when no email):
+    drop the (S) part-time marker, collapse whitespace, lowercase."""
+    s = str(name or "").replace("(S)", " ")
+    return re.sub(r"\s+", " ", s).strip().lower()
+
+
+def section_id_for(code: str, sec_no: str) -> str:
+    """Use SECTION directly as the id when it already contains the course code
+    (e.g. 'ADA 403_01'); otherwise compose 'CODE_SEC'."""
+    code = str(code or "").strip()
+    sec_no = str(sec_no or "").strip()
+    if sec_no and code and code.replace(" ", "") in sec_no.replace(" ", ""):
+        return sec_no
+    return f"{code}_{sec_no}" if sec_no else code
 
 
 _DAY_ALIASES = {
@@ -76,30 +100,41 @@ def build_sections_from_courselist(rows: List[Dict], period: str,
         if not code:
             continue
         sec_no = str(r.get("Section No", "")).strip()
-        sid = f"{code}_{sec_no}" if sec_no else code
-        dept, year, cohort = cohort_from_code(code)
+        sid = section_id_for(code, sec_no)
+        dept, year, _ = cohort_from_code(code)
+        faculty = str(r.get("Dept", "")).strip()            # DEPT = faculty name
+        if dept == "UNK" and faculty:                       # unparseable code -> DEPT fallback
+            dept = faculty.upper()
         yr = parse_int(r.get("Year"), 0)        # optional Year column overrides cohort year
-        if yr > 0:
-            cohort = f"{dept}-{yr}"
+        eff_year = yr if yr > 0 else year
+        cohort = f"{dept}-{eff_year}"
         T = parse_int(r.get("T"), 0); P = parse_int(r.get("P"), 0)
         L = parse_int(r.get("L"), 0)
         if (T + P + L) == 0:
             report["missing_hours"] += 1
-        emails = parse_emails(r.get("Lecturer Email", ""))
-        if not emails:
+        emails = parse_emails(r.get("Instructor Email", ""))
+        names = [n.strip() for n in str(r.get("Instructor Name", "")).split(",")]
+        if emails:
+            instructor_ids = emails
+        else:
             report["missing_email"] += 1
-        students = parse_int(r.get("~Students"), 1) or 1
+            instructor_ids = [normalize_name(n) for n in names if n.strip()]
+        # Section Capacity (quota) is the hard size; ~Students (actual) is the fallback.
+        students = (parse_int(r.get("Section Capacity"), 0)
+                    or parse_int(r.get("~Students"), 0) or 1)
+        rtype = _room_type_demand(r.get("Room Type"))       # "" | lab | pc | studio
         fixed_day, fixed_start = parse_fixed(r.get("Fixed"))
         sections.append(Section(
             section_id=sid, period=period, code=code,
             name=str(r.get("Course Name", "")).strip(),
-            level=course_level(code), dept_code=dept, faculty="",
-            cohort_key=cohort, instructor_ids=emails, students=students,
+            level=course_level(code), dept_code=dept, faculty=faculty,
+            cohort_key=cohort, instructor_ids=instructor_ids, students=students,
             T=T, P=P, L=L, Cr=(T + P + L), category="",
             blocks=blocks_from_tpl(sid, T, P, L, T + P + L,
                                    cfg.max_block_len, cfg.max_theory_session),
             plan_room="",
-            requires_lab_room=_is_lab_type(r.get("Room Type")),
+            requires_lab_room=(bool(rtype) or L > 0),
+            required_room_type=rtype,
             fixed_day=fixed_day, fixed_start=fixed_start,
         ))
     return sections, report
@@ -108,19 +143,24 @@ def build_sections_from_courselist(rows: List[Dict], period: str,
 def build_instructors_from_courselist(rows: List[Dict]) -> Dict[str, Instructor]:
     out: Dict[str, Instructor] = {}
     for r in rows:
-        emails = parse_emails(r.get("Lecturer Email", ""))
-        names = [n.strip() for n in str(r.get("Lecturer Name", "")).split(",")]
-        dept, _, _ = cohort_from_code(r.get("Course Code", ""))
+        emails = parse_emails(r.get("Instructor Email", ""))
+        names = [n.strip() for n in str(r.get("Instructor Name", "")).split(",")]
+        faculty = str(r.get("Dept", "")).strip()           # DEPT = faculty name
         # optional Part-time column overrides the "(S)" marker; absent -> fall back to "(S)"
         pt = r.get("Part-time")
         explicit_pt = _truthy(pt) if (pt is not None and str(pt).strip() != "") else None
-        for i, email in enumerate(emails):
-            name = names[i] if i < len(names) else (names[0] if names else "")
-            if email in out:
+        # Identity key = email when present; else the normalized display name.
+        if emails:
+            pairs = [(email, names[i] if i < len(names) else (names[0] if names else ""))
+                     for i, email in enumerate(emails)]
+        else:
+            pairs = [(normalize_name(n), n) for n in names if n.strip()]
+        for key, name in pairs:
+            if key in out:
                 continue
             part_time = explicit_pt if explicit_pt is not None else is_part_time(name)
-            out[email] = Instructor(staff_id=email, name=name,
-                                    is_staff=not part_time, home_dept=dept)
+            out[key] = Instructor(staff_id=key, name=name.strip(),
+                                  is_staff=not part_time, home_dept=faculty)
     return out
 
 
@@ -130,15 +170,21 @@ def build_rooms_from_ui(classroom_rows: List[Dict], cfg: Config) -> Dict[str, Ro
         name = str(r.get("Room", "")).strip()
         if not name:
             continue
-        rooms[name] = Room(room=name, cap=parse_int(r.get("Cap"), 0) or 0,
-                           is_lab=_truthy(r.get("Lab")), is_physical=True,
-                           is_virtual=False)
+        cap_raw = r.get("Capacity") if r.get("Capacity") is not None else r.get("Cap")
+        # Type column (categorical); legacy Lab boolean accepted as a fallback.
+        rtype = normalize_room_type(r.get("Type") if r.get("Type") is not None
+                                    else r.get("Lab"), name)
+        rooms[name] = Room(room=name, cap=parse_int(cap_raw, 0) or 0,
+                           is_lab=(rtype != "normal"), is_physical=True,
+                           is_virtual=False, type=rtype)
     rooms[cfg.online_room] = Room(room=cfg.online_room, cap=10_000, is_lab=False,
-                                  is_physical=False, is_virtual=True)
+                                  is_physical=False, is_virtual=True, type="normal")
     return rooms
 
 
-_REQUIRED = ("Course Code", "Section No", "T", "P", "L", "Lecturer Email")
+# Email is no longer required (instructors can be keyed by name); capacity is
+# validated per-row by csv_import (Section Capacity OR ~Students).
+_REQUIRED = ("Course Code", "Section No", "T", "P", "L")
 
 
 def validate_courselist(rows: List[Dict]) -> List[Tuple[str, Dict]]:
@@ -152,14 +198,19 @@ def validate_courselist(rows: List[Dict]) -> List[Tuple[str, Dict]]:
     zero_hours = sum(1 for r in rows
                      if (parse_int(r.get("T"), 0) + parse_int(r.get("P"), 0)
                          + parse_int(r.get("L"), 0)) == 0)
-    blank_email = sum(1 for r in rows if not parse_emails(r.get("Lecturer Email", "")))
-    bad_code = sum(1 for r in rows if cohort_from_code(r.get("Course Code", ""))[0] == "UNK")
-    part_time = sum(1 for r in rows if is_part_time(r.get("Lecturer Name", "")))
+    blank_email = sum(1 for r in rows if not parse_emails(r.get("Instructor Email", "")))
+    bad_code = sum(1 for r in rows
+                   if cohort_from_code(r.get("Course Code", ""))[0] == "UNK"
+                   and not str(r.get("Dept", "")).strip())   # Dept column remedies a bad code
+    bad_level = sum(1 for r in rows if course_level(r.get("Course Code", "")) == 0)
+    part_time = sum(1 for r in rows if is_part_time(r.get("Instructor Name", "")))
     if zero_hours:
         warns.append(("warn_zero_hours", {"n": zero_hours}))
     if blank_email:
         warns.append(("warn_blank_email", {"n": blank_email}))
     if bad_code:
         warns.append(("warn_bad_code", {"n": bad_code}))
+    if bad_level:
+        warns.append(("warn_bad_level", {"n": bad_level}))
     warns.append(("info_part_time", {"n": part_time}))
     return warns

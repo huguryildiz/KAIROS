@@ -25,7 +25,6 @@ def validate(assignments: List[Assignment], sections: List[Section],
                     viol.append(Violation("placement",
                                 f"{b.block_id} placed {placed.get(b.block_id, 0)} times (expected 1)"))
 
-    closed_all = set(cfg.friday_blackout)
     room_occ = defaultdict(list)
     instr_occ = defaultdict(list)
     section_occ = defaultdict(list)
@@ -55,9 +54,7 @@ def validate(assignments: List[Assignment], sections: List[Section],
             viol.append(Violation("window",
                         f"{a.block_id} ends {a.end} > allowed {end_cap} (level {s.level})"))
         ins_list = [instructors.get(i, Instructor("", "", False, "")) for i in s.instructor_ids]
-        closed = set(closed_all)
-        if any(ins.is_staff for ins in ins_list):
-            closed |= set(cfg.seminar_blackout)
+        closed = cfg.closed_hours(any(ins.is_staff for ins in ins_list))
         for hh in range(a.start, a.end):
             if (a.day, hh) in closed:
                 viol.append(Violation("blackout", f"{a.block_id} covers blackout {a.day} {hh}:00"))

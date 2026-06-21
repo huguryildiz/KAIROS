@@ -1,12 +1,11 @@
 """Step 1 — Upload: CSV dropzone + Load-sample. Writes session_state['courses']."""
 import os
 
-import pandas as pd
 import streamlit as st
 
 from timetabling.csv_import import ok_rows, parse_courselist, read_raw
 from timetabling.i18n import t
-from timetabling.ui_style import dropzone_html, eyebrow_html, upload_error_html, upload_success_html
+from timetabling.ui_style import eyebrow_html, upload_cta_html, upload_error_html, upload_success_html
 
 _SAMPLE = os.path.join(os.path.dirname(__file__), "..", "assets", "sample_courses.csv")
 
@@ -44,8 +43,20 @@ def render(lang: str) -> None:
             n = report["stats"]["valid"]
             filename = st.session_state.get("upload_filename", "")
             st.markdown(upload_success_html(filename, n, lang), unsafe_allow_html=True)
+            # Center the "upload a different file" button horizontally, directly
+            # below the success message. The button's keyed container
+            # (Streamlit adds .st-key-change_file when key="change_file") is a
+            # flex *item* that sizes to its content (~206px) and sits left, so
+            # flex-centering it alone does nothing — it must first be forced to
+            # full width. Then center its content while pinning the inner stButton
+            # + button back to content width so the button hugs its label (per the
+            # button-width rule) instead of stretching edge-to-edge.
             st.markdown(
-                "<style>div[data-testid='stButton']{display:flex;justify-content:center}</style>",
+                "<style>"
+                ".st-key-change_file{display:flex!important;justify-content:center!important;width:100%!important;}"
+                ".st-key-change_file [data-testid='stButton']{width:auto!important;flex:0 0 auto!important;}"
+                ".st-key-change_file button{width:auto!important;}"
+                "</style>",
                 unsafe_allow_html=True,
             )
             clicked = st.button(t("upload_change_btn", lang), key="change_file",
@@ -55,37 +66,58 @@ def render(lang: str) -> None:
                     st.session_state.pop(key, None)
                 st.rerun()
         else:
-            # Empty state: custom dropzone icon + invisible file-uploader overlay
-            st.markdown(dropzone_html(lang), unsafe_allow_html=True)
-            up = st.file_uploader("Upload CSV", type=["csv"], label_visibility="collapsed")
+            # Empty state: two side-by-side buttons. Left = "Upload CSV" CTA (a
+            # visual primary button with an invisible file-uploader overlaid on top,
+            # so it opens the file picker and still accepts drag-drop). Right = the
+            # native "sample dataset" button. Columns stack on mobile portrait.
+            c_up, c_sample = st.columns(2, vertical_alignment="center")
+            with c_up:
+                with st.container(key="up_btn"):
+                    st.markdown(upload_cta_html(lang), unsafe_allow_html=True)
+                    up = st.file_uploader("Upload CSV", type=["csv"],
+                                          label_visibility="collapsed")
+            with c_sample:
+                load_sample = st.button(
+                    t("upload_sample_btn", lang),
+                    key="load_sample",
+                    type="secondary",
+                    icon=":material/dataset:",
+                )
+
             if up is not None:
                 try:
                     _ingest(up)
                     st.rerun()
                 except Exception as exc:
                     st.markdown(upload_error_html(up.name, exc, lang), unsafe_allow_html=True)
-
-            if st.button(
-                t("upload_sample_btn", lang),
-                key="load_sample",
-                type="primary",
-            ):
+            if load_sample:
                 _ingest(_SAMPLE)
                 st.rerun()
 
         st.caption(t("upload_format_label", lang))
-        st.dataframe(
-            pd.DataFrame([
-                {"Course Code": "CMPE 113", "Course Name": "Intro to Programming",
-                 "Section No": "01", "T": "3", "P": "0", "L": "2",
-                 "Lecturer Name": "A. Yilmaz", "Lecturer Email": "ayilmaz@uni.edu",
-                 "~Students": "50"},
-                {"Course Code": "MATH 101", "Course Name": "Calculus I",
-                 "Section No": "01", "T": "4", "P": "0", "L": "0",
-                 "Lecturer Name": "B. Demir", "Lecturer Email": "bdemir@uni.edu",
-                 "~Students": "55"},
-            ]),
-            use_container_width=True,
-            hide_index=True,
+        _h = {k: t(k, lang) for k in (
+            "tbl_course_code", "tbl_course_name", "tbl_section_no",
+            "tbl_lecturer_name", "tbl_lecturer_email", "tbl_students",
+        )}
+        st.markdown(
+            '<div style="display:flex;justify-content:center">'
+            '<div class="tt-table-wrap" style="--tt-table-h:110px">'
+            '<table class="tt-data"><thead><tr>'
+            f'<th>{_h["tbl_course_code"]}</th>'
+            f'<th>{_h["tbl_course_name"]}</th>'
+            f'<th>{_h["tbl_section_no"]}</th>'
+            '<th class="num">T</th><th class="num">P</th><th class="num">L</th>'
+            f'<th>{_h["tbl_lecturer_name"]}</th>'
+            f'<th>{_h["tbl_lecturer_email"]}</th>'
+            f'<th class="num">{_h["tbl_students"]}</th>'
+            '</tr></thead><tbody>'
+            '<tr><td>CMPE 113</td><td>Intro to Programming</td><td>01</td>'
+            '<td class="num">3</td><td class="num">0</td><td class="num">2</td>'
+            '<td>A. Yilmaz</td><td>ayilmaz@uni.edu</td><td class="num">50</td></tr>'
+            '<tr><td>MATH 101</td><td>Calculus I</td><td>01</td>'
+            '<td class="num">4</td><td class="num">0</td><td class="num">0</td>'
+            '<td>B. Demir</td><td>bdemir@uni.edu</td><td class="num">55</td></tr>'
+            '</tbody></table></div></div>',
+            unsafe_allow_html=True,
         )
         st.caption(t("upload_format_tpl", lang))

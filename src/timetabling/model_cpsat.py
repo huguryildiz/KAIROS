@@ -10,10 +10,7 @@ from .model import (Section, Block, Room, Instructor, Candidate, Assignment,
 
 
 def _blackout_hours(instructors, cfg: Config):
-    closed = set(cfg.friday_blackout)
-    if any(ins.is_staff for ins in instructors):
-        closed |= set(cfg.seminar_blackout)
-    return closed
+    return cfg.closed_hours(any(ins.is_staff for ins in instructors))
 
 
 def feasible_rooms_for(block: Block, section: Section, rooms: List[Room],
@@ -255,6 +252,22 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
             model.Add(over >= sum(vs) - cap)
             overload_terms.append(over)
 
+    # soft: per-instructor weekly distinct-day overload — days beyond
+    # cfg.max_instr_weekly_days. instr_day[(iid, day)] is 1 iff the instructor teaches
+    # that day, so their sum == distinct teaching days for the week.
+    weekday_overload_terms = []
+    if cfg.w_instr_weekly_overload:
+        wcap = cfg.max_instr_weekly_days
+        by_instr = defaultdict(list)
+        for (iid, day), d in instr_day.items():
+            by_instr[iid].append(d)
+        for iid, ds in by_instr.items():
+            if len(ds) <= wcap:
+                continue
+            over = model.NewIntVar(0, len(ds), f"iwover|{iid}")
+            model.Add(over >= sum(ds) - wcap)
+            weekday_overload_terms.append(over)
+
     obj = []
     obj += [cfg.w_evening * v for v in evening_vars]
     obj += [cfg.w_room_count * y for y in room_used.values()]
@@ -268,6 +281,7 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
     obj += [cfg.w_nonadjacent * t for t in nonadj_terms]
     obj += [cfg.w_cohort_conflict * t for t in cohort_conflict_terms]
     obj += [cfg.w_instr_daily_overload * t for t in overload_terms]
+    obj += [cfg.w_instr_weekly_overload * t for t in weekday_overload_terms]
     if obj:
         model.Minimize(sum(obj))
 

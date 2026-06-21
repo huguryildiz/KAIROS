@@ -43,7 +43,7 @@ def hero_chips(lang: str):
                  for r in courses if r.get("Course Code")}
         instr = set()
         for r in courses:
-            instr.update(parse_emails(r.get("Lecturer Email", "")))
+            instr.update(parse_emails(r.get("Instructor Email", "")))
         rooms = st.session_state.get("classrooms", [])
         return [
             (str(len(courses)), t("kpi_sections", lang), ""),
@@ -74,13 +74,13 @@ def theme_toggle() -> None:
 
 
 def lang_selector_bar() -> str:
-    """App-bar language switch: single button showing the OTHER language flag.
+    """App-bar language switch: button shows the CURRENT language flag.
 
     Clicking switches to the other language — same pattern as theme_toggle."""
     st.session_state.setdefault("lang", DEFAULT_LANG)
     current = get_lang()
     other = next(c for c in LANGS if c != current)
-    if st.button(_LANG_LABELS[other], key="lang_btn"):
+    if st.button(_LANG_LABELS[current], key="lang_btn"):
         st.session_state["lang"] = other
         st.rerun()
     return get_lang()

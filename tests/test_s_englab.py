@@ -32,7 +32,7 @@ def test_non_eng_lab_unconstrained():
     closed = tuple(("Mo", h) for h in range(9, 18))
     cfg = Config(w_englab=100, eng_lab_days=("Mo",), w_cohort_gap=0, w_evening=0,
                  w_room_count=0, w_instr_days=0, w_parttime_days=0, w_order=0,
-                 w_nonadjacent=0, friday_blackout=closed, seminar_blackout=())
+                 w_nonadjacent=0, blackout=closed)
     rooms = [Room("LAB-L", 50, True, True)]
     instr = {"a": Instructor("a", "n", False, "D")}
     s = Section("P201_01", "001", "P 201", "n", 2, "P", "Department of Psychology",

@@ -1,101 +1,11 @@
-Course Code,Course Name,Section No,T,P,L,Lecturer Name,Lecturer Email,~Students
-CMPE 113,Intro to Programming,01,3,0,2,A. Yilmaz,ayilmaz@uni.edu,50
-CMPE 113,Intro to Programming,02,3,0,2,A. Yilmaz,ayilmaz@uni.edu,50
-CMPE 223,Discrete Structures,01,3,0,0,A. Yilmaz,ayilmaz@uni.edu,46
-CMPE 241,Data Structures,01,3,0,2,C. Arslan,carslan@uni.edu,42
-CMPE 241,Data Structures,02,3,0,2,C. Arslan,carslan@uni.edu,42
-CMPE 252,Object-Oriented Programming,01,3,0,2,C. Arslan,carslan@uni.edu,40
-CMPE 321,Database Systems,01,3,0,2,G. Polat,gpolat@uni.edu,38
-CMPE 332,Operating Systems,01,3,0,2,G. Polat,gpolat@uni.edu,44
-CMPE 343,Computer Organization,01,3,0,2,H. Tekin,htekin@uni.edu,41
-CMPE 411,Machine Learning,01,3,0,0,H. Tekin,htekin@uni.edu,55
-CMPE 422,Computer Networks,01,3,0,2,G. Polat,gpolat@uni.edu,39
-CMPE 451,Senior Design Project,01,1,4,0,A. Yilmaz,ayilmaz@uni.edu,24
-EE 201,Circuit Theory,01,3,0,2,K. Aslan,kaslan@uni.edu,48
-EE 201,Circuit Theory,02,3,0,2,K. Aslan,kaslan@uni.edu,48
-EE 212,Signals and Systems,01,3,0,0,K. Aslan,kaslan@uni.edu,44
-EE 302,Electronics II,01,2,0,2,S. Un,sun@uni.edu,35
-EE 311,Electromagnetic Fields,01,3,0,0,S. Un,sun@uni.edu,33
-EE 401,Control Systems,01,3,0,2,V. Ozdemir,vozdemir@uni.edu,30
-EE 421,Power Systems,01,3,0,0,V. Ozdemir,vozdemir@uni.edu,28
-ME 201,Thermodynamics I,01,3,0,0,O. Kara,okara@uni.edu,52
-ME 201,Thermodynamics I,02,3,0,0,O. Kara,okara@uni.edu,52
-ME 211,Statics,01,3,0,0,O. Kara,okara@uni.edu,50
-ME 305,Fluid Mechanics,01,3,0,2,P. Eren,peren@uni.edu,40
-ME 311,Machine Design,01,3,0,0,P. Eren,peren@uni.edu,36
-ME 401,Heat Transfer,01,3,0,0,O. Kara,okara@uni.edu,32
-IE 220,Probability for Engineers,01,3,0,0,F. Sezer,fsezer@uni.edu,60
-IE 240,Operations Research,01,3,0,0,F. Sezer,fsezer@uni.edu,40
-IE 305,Production Planning,01,3,0,0,Z. Acar,zacar@uni.edu,38
-IE 411,Quality Control,01,3,0,0,Z. Acar,zacar@uni.edu,34
-CE 201,Engineering Statics,01,3,0,0,M. Ozturk,mozturk@uni.edu,55
-CE 305,Structural Analysis,01,3,0,0,M. Ozturk,mozturk@uni.edu,42
-CE 311,Geotechnical Engineering,01,3,0,2,N. Bulut,nbulut@uni.edu,36
-CE 401,Transportation Engineering,01,3,0,0,N. Bulut,nbulut@uni.edu,30
-MATH 101,Calculus I,01,4,0,0,N. Sahin,nsahin@uni.edu,96
-MATH 101,Calculus I,02,4,0,0,N. Sahin,nsahin@uni.edu,96
-MATH 101,Calculus I,03,4,0,0,N. Sahin,nsahin@uni.edu,96
-MATH 102,Calculus II,01,4,0,0,N. Sahin,nsahin@uni.edu,90
-MATH 102,Calculus II,02,4,0,0,N. Sahin,nsahin@uni.edu,90
-MATH 201,Linear Algebra,01,3,0,0,U. Yildirim,uyildirim@uni.edu,70
-MATH 201,Linear Algebra,02,3,0,0,U. Yildirim,uyildirim@uni.edu,70
-MATH 202,Differential Equations,01,4,0,0,U. Yildirim,uyildirim@uni.edu,65
-MATH 301,Probability Theory,01,3,0,0,E. Korkmaz,ekorkmaz@uni.edu,45
-PHYS 101,Physics I,01,3,0,2,R. Acar,racar@uni.edu,80
-PHYS 101,Physics I,02,3,0,2,R. Acar,racar@uni.edu,80
-PHYS 102,Physics II,01,3,0,2,R. Acar,racar@uni.edu,75
-PHYS 102,Physics II,02,3,0,2,R. Acar,racar@uni.edu,75
-PHYS 201,Modern Physics,01,3,0,0,T. Guler,tguler@uni.edu,40
-CHEM 101,General Chemistry,01,3,0,2,T. Yildiz,tyildiz@uni.edu,64
-CHEM 101,General Chemistry,02,3,0,2,T. Yildiz,tyildiz@uni.edu,64
-CHEM 201,Organic Chemistry,01,3,0,2,T. Yildiz,tyildiz@uni.edu,38
-CHEM 301,Physical Chemistry,01,3,0,2,Y. Demirci,ydemirci@uni.edu,30
-BIO 150,Introduction to Biology,01,3,0,2,D. Ozkan,dozkan@uni.edu,55
-BIO 210,Genetics,01,3,0,0,D. Ozkan,dozkan@uni.edu,44
-BIO 301,Molecular Biology,01,3,0,2,L. Sari,lsari@uni.edu,30
-PSY 101,Introduction to Psychology,01,3,0,0,M. Demir,mdemir@uni.edu,120
-PSY 101,Introduction to Psychology,02,3,0,0,M. Demir,mdemir@uni.edu,120
-PSY 212,Developmental Psychology,01,3,0,0,M. Demir,mdemir@uni.edu,60
-PSY 305,Cognitive Psychology,01,3,0,0,B. Yalcin,byalcin@uni.edu,48
-PSY 311,Social Psychology,01,3,0,0,B. Yalcin,byalcin@uni.edu,50
-PSY 401,Clinical Psychology,01,3,0,0,M. Demir,mdemir@uni.edu,35
-BUS 101,Introduction to Business,01,3,0,0,E. Celik (S),ecelik@uni.edu,140
-BUS 220,Marketing Principles,01,3,0,0,E. Celik (S),ecelik@uni.edu,110
-BUS 301,Corporate Finance,01,3,0,0,K. Aydin,kaydin@uni.edu,70
-BUS 311,Principles of Management,01,3,0,0,K. Aydin,kaydin@uni.edu,68
-BUS 401,Strategic Management,01,3,0,0,K. Aydin,kaydin@uni.edu,50
-ECON 101,Microeconomics,01,3,0,0,S. Erdogan,serdogan@uni.edu,85
-ECON 101,Microeconomics,02,3,0,0,S. Erdogan,serdogan@uni.edu,85
-ECON 102,Macroeconomics,01,3,0,0,S. Erdogan,serdogan@uni.edu,80
-ECON 301,Econometrics,01,3,0,0,A. Kaya,akaya@uni.edu,45
-ARCH 171,Architectural Design Studio I,01,0,8,0,L. Kaya,lkaya@uni.edu,18
-ARCH 272,Architectural Design Studio II,01,0,8,0,L. Kaya,lkaya@uni.edu,16
-ARCH 301,History of Architecture,01,3,0,0,I. Toprak,itoprak@uni.edu,40
-ARCH 373,Building Technology,01,2,2,0,I. Toprak,itoprak@uni.edu,30
-ENG 101,Academic English I,01,3,0,0,J. Park (S),jpark@uni.edu,30
-ENG 101,Academic English I,02,3,0,0,J. Park (S),jpark@uni.edu,30
-ENG 102,Academic English II,01,3,0,0,J. Park (S),jpark@uni.edu,30
-ENG 201,Technical English,01,3,0,0,R. Miller (S),rmiller@uni.edu,28
-HIST 101,History of Civilization,01,2,0,0,B. Koc,bkoc@uni.edu,100
-HIST 201,Modern History,01,2,0,0,B. Koc,bkoc@uni.edu,60
-LAW 101,Introduction to Law,01,3,0,0,H. Sahin,hsahin@uni.edu,75
-LAW 201,Constitutional Law,01,3,0,0,H. Sahin,hsahin@uni.edu,55
-CMPE 101,Computer Literacy,01,2,0,1,A. Yilmaz,ayilmaz@uni.edu,90
-CMPE 101,Computer Literacy,02,2,0,1,A. Yilmaz,ayilmaz@uni.edu,90
-CMPE 215,Logic Design,01,3,0,2,H. Tekin,htekin@uni.edu,46
-CMPE 461,Software Engineering,01,3,0,0,C. Arslan,carslan@uni.edu,40
-EE 101,Introduction to EE,01,3,0,0,K. Aslan,kaslan@uni.edu,60
-EE 312,Microprocessors,01,3,0,2,S. Un,sun@uni.edu,34
-ME 101,Introduction to ME,01,2,0,0,O. Kara,okara@uni.edu,58
-IE 350,Systems Simulation,01,3,0,2,Z. Acar,zacar@uni.edu,32
-MATH 103,Calculus for Business,01,3,0,0,E. Korkmaz,ekorkmaz@uni.edu,82
-MATH 103,Calculus for Business,02,3,0,0,E. Korkmaz,ekorkmaz@uni.edu,82
-MATH 305,Numerical Methods,01,3,0,2,U. Yildirim,uyildirim@uni.edu,38
-STAT 201,Statistics,01,3,0,0,A. Kaya,akaya@uni.edu,70
-STAT 201,Statistics,02,3,0,0,A. Kaya,akaya@uni.edu,70
-CHEM 102,General Chemistry II,01,3,0,2,Y. Demirci,ydemirci@uni.edu,56
-BIO 220,Microbiology,01,3,0,2,L. Sari,lsari@uni.edu,36
-POLS 101,Introduction to Political Science,01,3,0,0,H. Sahin,hsahin@uni.edu,88
-POLS 101,Introduction to Political Science,02,3,0,0,H. Sahin,hsahin@uni.edu,88
-SOC 101,Introduction to Sociology,01,3,0,0,B. Koc,bkoc@uni.edu,75
-PHIL 101,Introduction to Philosophy,01,3,0,0,I. Toprak,itoprak@uni.edu,50
+Course Code,Course Name,Dept,Section No,Instructor Name,Instructor Email,Part-time,T,P,L,Section Capacity,~Students,Room Type
+CMPE 113,Introduction to Programming,Faculty of Engineering,CMPE 113_01,A. Yilmaz,ayilmaz@uni.edu,,3,0,2,50,48,pc
+CMPE 113,Introduction to Programming,Faculty of Engineering,CMPE 113_02,A. Yilmaz,ayilmaz@uni.edu,,3,0,2,50,45,pc
+CMPE 223,Discrete Structures,Faculty of Engineering,CMPE 223_01,C. Arslan,carslan@uni.edu,,3,0,0,46,40,
+MATH 101,Calculus I,Faculty of Basic Sciences,MATH 101_01,B. Demir,bdemir@uni.edu,,4,0,0,60,58,
+MATH 101,Calculus I,Faculty of Basic Sciences,MATH 101_02,H. Kaya (S),,yes,4,0,0,60,55,
+PSY 201,Developmental Psychology,Faculty of Arts and Sciences,PSY 201_01,S. Aydin,saydin@uni.edu,,3,0,0,40,38,
+ARCH 301,Architectural Design III,Faculty of Architecture,ARCH 301_01,M. Celik,mcelik@uni.edu,,2,0,4,25,22,studio
+ARCH 301,Architectural Design III,Faculty of Architecture,ARCH 301_02,M. Celik,mcelik@uni.edu,,2,0,4,25,20,studio
+EE 202,Circuit Theory,Faculty of Engineering,EE 202_01,K. Sahin,ksahin@uni.edu,,3,0,2,45,42,lab
+ADA 403,Exploratory Data Analysis,Faculty of Econ. and Administ. Sciences,ADA 403_01,O. Gencel,ogencel@uni.edu,,3,0,0,45,40,

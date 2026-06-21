@@ -22,7 +22,7 @@ def test_two_theory_sessions_infeasible_when_one_day_open():
     closed = tuple((day, h) for day in ("Tu", "We", "Th", "Fr") for h in range(9, 18))
     cfg = Config(w_cohort_gap=0, w_evening=0, w_room_count=0, w_instr_days=0,
                  w_parttime_days=0, w_order=0, w_englab=0,
-                 friday_blackout=closed, seminar_blackout=())
+                 blackout=closed)
     rooms = [Room("R1", 50, False, True)]
     instr = {"a": Instructor("a", "n", False, "D")}
     assigns, stats = model_cpsat.build_and_solve([_make_section()], rooms, instr, cfg)

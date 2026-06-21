@@ -25,11 +25,11 @@ from timetabling.ui_input import (
 
 _ROWS = [
     {"Course Code": "CMPE 113", "Course Name": "Intro", "Section No": "01",
-     "T": "3", "P": "0", "L": "2", "Lecturer Name": "A. Yilmaz",
-     "Lecturer Email": "a@x.edu", "~Students": "40"},
+     "T": "3", "P": "0", "L": "2", "Instructor Name": "A. Yilmaz",
+     "Instructor Email": "a@x.edu", "~Students": "40"},
     {"Course Code": "MATH 101", "Course Name": "Calc", "Section No": "02",
-     "T": "4", "P": "0", "L": "0", "Lecturer Name": "B. Demir (S)",
-     "Lecturer Email": "", "~Students": "30"},
+     "T": "4", "P": "0", "L": "0", "Instructor Name": "B. Demir (S)",
+     "Instructor Email": "", "~Students": "30"},
 ]
 
 
@@ -48,7 +48,7 @@ def test_build_instructors_part_time():
     instr = build_instructors_from_courselist(_ROWS)
     assert instr["a@x.edu"].is_staff is True
     # B. Demir has a blank email -> not keyed; full-timeness asserted via a present email
-    rows = [{"Lecturer Name": "C (S)", "Lecturer Email": "c@x.edu", "Course Code": "EE 201"}]
+    rows = [{"Instructor Name": "C (S)", "Instructor Email": "c@x.edu", "Course Code": "EE 201"}]
     instr2 = build_instructors_from_courselist(rows)
     assert instr2["c@x.edu"].is_staff is False
 
@@ -78,6 +78,30 @@ def test_validate_courselist_missing_column():
     assert "Section No" in warns[0][1]["cols"]
 
 
+def test_validate_courselist_warns_bad_level():
+    # valid cohort (MATH-1) but no 3-digit number -> level undeterminable
+    rows = [{"Course Code": "MATH 12", "Section No": "01", "T": "3", "P": "0",
+             "L": "0", "Instructor Email": "a@x.edu"}]
+    codes = [c for c, _ in validate_courselist(rows)]
+    assert "warn_bad_level" in codes
+    assert "warn_bad_code" not in codes
+
+
+def test_validate_courselist_unparseable_code_warns_both():
+    rows = [{"Course Code": "???", "Section No": "01", "T": "3", "P": "0",
+             "L": "0", "Instructor Email": "a@x.edu"}]
+    codes = [c for c, _ in validate_courselist(rows)]
+    assert "warn_bad_code" in codes
+    assert "warn_bad_level" in codes
+
+
+def test_validate_courselist_clean_codes_no_level_warning():
+    # _ROWS use full codes (CMPE 113, MATH 101) -> levels resolve
+    codes = [c for c, _ in validate_courselist(_ROWS)]
+    assert "warn_bad_level" not in codes
+    assert "warn_bad_code" not in codes
+
+
 def test_ui_inputs_feed_run_pipeline():
     cfg = Config(solve_time_limit_s=10.0)
     secs, _ = build_sections_from_courselist(_ROWS, "001", cfg)
@@ -95,7 +119,7 @@ def test_ui_inputs_feed_run_pipeline():
 
 def test_year_column_overrides_cohort_year():
     rows = [{"Course Code": "CMPE 113", "Section No": "01", "T": "3", "P": "0",
-             "L": "0", "Lecturer Email": "a@x.edu", "~Students": "10", "Year": "2"}]
+             "L": "0", "Instructor Email": "a@x.edu", "~Students": "10", "Year": "2"}]
     secs, _ = build_sections_from_courselist(rows, "001", Config())
     assert secs[0].cohort_key == "CMPE-2"   # code parses year 1; Year column wins
 
@@ -105,15 +129,53 @@ def test_year_column_absent_falls_back_to_code():
     assert secs[0].cohort_key == "CMPE-1"   # no Year column -> derived from code
 
 
+# --- Dept override column (interoperability for non-conforming code schemes) ---
+
+def test_dept_column_overrides_department_and_cohort():
+    rows = [{"Course Code": "1234", "Section No": "01", "T": "3", "P": "0",
+             "L": "0", "Instructor Email": "a@x.edu", "Dept": "psy", "Year": "2"}]
+    secs, _ = build_sections_from_courselist(rows, "001", Config())
+    assert secs[0].dept_code == "PSY"           # upper-cased override
+    assert secs[0].cohort_key == "PSY-2"        # Dept + Year override compose
+
+
+def test_dept_override_with_unparseable_code_no_bad_code_warning():
+    rows = [{"Course Code": "1234", "Section No": "01", "T": "3", "P": "0",
+             "L": "0", "Instructor Email": "a@x.edu", "Dept": "PSY"}]
+    codes = [c for c, _ in validate_courselist(rows)]
+    assert "warn_bad_code" not in codes          # Dept supplied -> actionable warning suppressed
+
+
+def test_unparseable_code_without_dept_still_warns():
+    rows = [{"Course Code": "1234", "Section No": "01", "T": "3", "P": "0",
+             "L": "0", "Instructor Email": "a@x.edu"}]
+    codes = [c for c, _ in validate_courselist(rows)]
+    assert "warn_bad_code" in codes
+
+
+def test_dept_override_sets_instructor_home_dept():
+    rows = [{"Course Code": "1234", "Section No": "01", "T": "3", "P": "0", "L": "0",
+             "Instructor Name": "A. Yilmaz", "Instructor Email": "a@x.edu", "Dept": "PSY"}]
+    instr = build_instructors_from_courselist(rows)
+    assert instr["a@x.edu"].home_dept == "PSY"
+
+
+def test_dept_column_in_importer_aliases():
+    from timetabling.csv_import import COURSE_COL_MAP, COURSE_POSITIONAL
+    assert "Dept" in COURSE_COL_MAP
+    # appended at the end so existing positional indices are unchanged
+    assert COURSE_POSITIONAL[-1] == "Dept"
+
+
 def test_parttime_column_overrides_S_marker():
     rows = [{"Course Code": "EE 201", "Section No": "01", "T": "3", "P": "0", "L": "0",
-             "Lecturer Name": "A. Yilmaz", "Lecturer Email": "a@x.edu", "Part-time": "yes"}]
+             "Instructor Name": "A. Yilmaz", "Instructor Email": "a@x.edu", "Part-time": "yes"}]
     instr = build_instructors_from_courselist(rows)
     assert instr["a@x.edu"].is_staff is False   # column says part-time despite no (S)
 
 
 def test_parttime_falls_back_to_S_when_column_absent():
-    rows = [{"Course Code": "EE 201", "Lecturer Name": "B (S)", "Lecturer Email": "b@x.edu"}]
+    rows = [{"Course Code": "EE 201", "Instructor Name": "B (S)", "Instructor Email": "b@x.edu"}]
     instr = build_instructors_from_courselist(rows)
     assert instr["b@x.edu"].is_staff is False
 
@@ -122,7 +184,7 @@ def test_parttime_falls_back_to_S_when_column_absent():
 
 def test_room_type_requires_lab():
     rows = [{"Course Code": "X 101", "Section No": "01", "T": "3", "P": "0", "L": "0",
-             "Lecturer Email": "a@x.edu", "Room Type": "computer-lab"}]
+             "Instructor Email": "a@x.edu", "Room Type": "computer-lab"}]
     secs, _ = build_sections_from_courselist(rows, "001", Config())
     assert secs[0].requires_lab_room is True
 
@@ -130,7 +192,7 @@ def test_room_type_requires_lab():
 def test_room_type_regular_or_blank_no_lab():
     for val in ("", "regular", "classroom", "normal"):
         rows = [{"Course Code": "X 101", "Section No": "01", "T": "3", "P": "0", "L": "0",
-                 "Lecturer Email": "a@x.edu", "Room Type": val}]
+                 "Instructor Email": "a@x.edu", "Room Type": val}]
         secs, _ = build_sections_from_courselist(rows, "001", Config())
         assert secs[0].requires_lab_room is False
 
@@ -149,9 +211,72 @@ def test_parse_fixed():
 
 def test_fixed_column_sets_section_fields():
     rows = [{"Course Code": "X 101", "Section No": "01", "T": "3", "P": "0", "L": "0",
-             "Lecturer Email": "a@x.edu", "Fixed": "We 10"}]
+             "Instructor Email": "a@x.edu", "Fixed": "We 10"}]
     secs, _ = build_sections_from_courselist(rows, "001", Config())
     assert secs[0].fixed_day == "We" and secs[0].fixed_start == 10
+
+
+# --- Two-table data model: locked semantics --------------------------------
+
+def test_dept_is_faculty_and_cohort_from_code():
+    rows = [{"Course Code": "ADA 403", "Section No": "ADA 403_01", "T": "3", "P": "0",
+             "L": "0", "Instructor Email": "a@x.edu", "Section Capacity": "45",
+             "Dept": "Faculty of Econ"}]
+    s = build_sections_from_courselist(rows, "001", Config())[0][0]
+    assert s.faculty == "Faculty of Econ"      # DEPT -> faculty
+    assert s.cohort_key == "ADA-4"             # cohort from code prefix, NOT DEPT
+    assert s.dept_code == "ADA"
+    assert s.section_id == "ADA 403_01"        # SECTION used directly
+    assert s.students == 45                    # Section Capacity drives size
+
+
+def test_cohort_falls_back_to_dept_when_code_unparseable():
+    rows = [{"Course Code": "1234", "Section No": "01", "T": "3", "P": "0", "L": "0",
+             "Instructor Email": "a@x.edu", "Section Capacity": "20", "Dept": "PSY"}]
+    s = build_sections_from_courselist(rows, "001", Config())[0][0]
+    assert s.cohort_key == "PSY-0" and s.dept_code == "PSY"
+
+
+def test_section_capacity_preferred_then_students_fallback():
+    base = {"Course Code": "X 101", "Section No": "01", "T": "2", "P": "0", "L": "0",
+            "Instructor Email": "a@x.edu"}
+    s1 = build_sections_from_courselist([base | {"Section Capacity": "50",
+                                                 "~Students": "30"}], "001", Config())[0][0]
+    assert s1.students == 50                    # quota preferred
+    s2 = build_sections_from_courselist([base | {"~Students": "30"}],
+                                        "001", Config())[0][0]
+    assert s2.students == 30                    # falls back to actual
+
+
+def test_instructor_keyed_by_name_when_email_absent():
+    rows = [{"Course Code": "X 101", "Section No": "01", "T": "2", "P": "0", "L": "0",
+             "Instructor Name": "Mustafa Yuksel (S)", "Instructor Email": "",
+             "Section Capacity": "10"}]
+    secs = build_sections_from_courselist(rows, "001", Config())[0]
+    assert secs[0].instructor_ids == ["mustafa yuksel"]
+    instr = build_instructors_from_courselist(rows)
+    assert "mustafa yuksel" in instr and instr["mustafa yuksel"].is_staff is False
+
+
+def test_required_room_type_categorical():
+    def rt(val, L="0"):
+        rows = [{"Course Code": "X 101", "Section No": "01", "T": "2", "P": "0", "L": L,
+                 "Instructor Email": "a@x.edu", "Section Capacity": "10", "Room Type": val}]
+        return build_sections_from_courselist(rows, "001", Config())[0][0]
+    assert rt("studio").required_room_type == "studio"
+    assert rt("computer pc lab").required_room_type == "pc"
+    assert rt("").required_room_type == "" and rt("").requires_lab_room is False
+    assert rt("", L="2").requires_lab_room is True     # L>0 -> lab family
+
+
+def test_build_rooms_categorical_type_and_back_compat():
+    rooms = build_rooms_from_ui(
+        [{"Room": "A1", "Capacity": "30", "Type": "normal"},
+         {"Room": "PC1", "Capacity": "20", "Type": "pc"},
+         {"Room": "L9", "Cap": "15", "Lab": "x"}], Config())     # legacy keys
+    assert rooms["A1"].type == "normal" and rooms["A1"].is_lab is False
+    assert rooms["PC1"].type == "pc" and rooms["PC1"].is_lab is True
+    assert rooms["L9"].type == "lab" and rooms["L9"].cap == 15    # legacy Lab/Cap honored
 
 
 def test_end_to_end_ui_path_settings_and_columns():
@@ -160,9 +285,9 @@ def test_end_to_end_ui_path_settings_and_columns():
     cfg = build_config(DEFAULT_SETTINGS, {"a@x.edu": [["Mo", "AM"], ["Mo", "PM"]]}, 10.0)
     rows = [
         {"Course Code": "CS 101", "Section No": "01", "T": "2", "P": "0", "L": "0",
-         "Lecturer Email": "a@x.edu", "~Students": "20", "Fixed": "We 10"},
+         "Instructor Email": "a@x.edu", "~Students": "20", "Fixed": "We 10"},
         {"Course Code": "CS 201", "Section No": "01", "T": "2", "P": "0", "L": "0",
-         "Lecturer Email": "b@x.edu", "~Students": "15", "Room Type": "lab"},
+         "Instructor Email": "b@x.edu", "~Students": "15", "Room Type": "lab"},
     ]
     secs, _ = build_sections_from_courselist(rows, "001", cfg)
     instr = build_instructors_from_courselist(rows)

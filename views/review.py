@@ -24,7 +24,7 @@ def render(lang: str) -> None:
              for r in rows if r.get("Course Code")}
     instr = set()
     for r in rows:
-        instr.update(parse_emails(r.get("Lecturer Email", "")))
+        instr.update(parse_emails(r.get("Instructor Email", "")))
     st.markdown(kpi_chips_html([
         (t("kpi_sections", lang), str(len(rows)), ""),
         (t("kpi_courses", lang), str(n_courses), ""),

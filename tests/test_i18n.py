@@ -36,6 +36,12 @@ def test_new_ui_keys_bilingual():
             assert t(k, lang) and t(k, lang) != k        # present, actually translated
 
 
+def test_code_warning_keys_bilingual():
+    for k in ["warn_bad_code", "warn_bad_level"]:
+        for lang in LANGS:
+            assert t(k, lang, n=1) and t(k, lang, n=1) != k
+
+
 def test_settings_keys_bilingual():
     keys = ["step_settings", "set_caption", "set_policy_header", "set_avail_header",
             "set_profile_header", "set_w_evening", "set_blackout_header",

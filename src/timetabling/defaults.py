@@ -1,13 +1,25 @@
 # Default classroom list — embedded so the app runs without data/classrooms.csv.
 # Online virtual room is excluded; the solver adds it automatically at solve time.
-# Lab flag is derived from room name: True when name contains "-L" or "-PC".
+# Type is derived from the room-name token: -PC -> pc, -STD/-STU -> studio,
+# -L -> lab, else normal (the shared room-type vocabulary).
+
+def _type(name: str) -> str:
+    if "-PC" in name:
+        return "pc"
+    if "-STD" in name or "-STU" in name:
+        return "studio"
+    if "-L" in name:
+        return "lab"
+    return "normal"
+
 
 def _lab(name: str) -> str:
-    return "x" if any(tok in name for tok in ("-L", "-PC")) else ""
+    """Back-compat shim (legacy boolean lab flag) — kept for older callers."""
+    return "x" if _type(name) != "normal" else ""
 
 
 DEFAULT_CLASSROOMS: list[dict] = [
-    {"Room": r, "Cap": str(c), "Lab": _lab(r)}
+    {"Room": r, "Capacity": str(c), "Type": _type(r)}
     for r, c in [
         ("A211-PC-L",     99),
         ("A216",          25),

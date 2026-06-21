@@ -91,8 +91,7 @@ def render(lang: str) -> None:
     )
     _, _col, _ = st.columns([1.5, 3, 1.5])
     ph = _col.empty()
-    if ph.button(t("solve_button", lang), type="primary", key="solve_btn",
-                 use_container_width=True):
+    if ph.button(t("solve_button", lang), type="primary", key="solve_btn"):
         cfg = build_config(st.session_state["settings"],
                            st.session_state["availability"], _SOLVE_SECONDS)
         secs, _ = build_sections_from_courselist(courses, _PERIOD, cfg)

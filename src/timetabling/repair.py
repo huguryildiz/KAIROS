@@ -29,6 +29,7 @@ class State:
         self.sect_slot = defaultdict(set)
         self.sect_theory_day = defaultdict(set)   # (section_id, day) -> {theory block_ids}
         self.instr_day_hours = defaultdict(int)   # (iid, day) -> placed teaching hours
+        self.instr_active_days = defaultdict(set)  # iid -> {days with >0 placed hours}
         self.cohort_slot_courses = defaultdict(Counter)   # (cohort, day, hour) -> {course: count}
 
     def free_to_place(self, c, sid, iids):
@@ -55,6 +56,7 @@ class State:
         for iid in iids:
             self.instr_blocks[iid].add(bid)
             self.instr_day_hours[(iid, c.day)] += c.length
+            self.instr_active_days[iid].add(c.day)
         for hh in range(c.start, c.start + c.length):
             if c.room not in self.virtual:
                 self.room_owner[(c.room, c.day, hh)] = bid
@@ -74,6 +76,8 @@ class State:
         for iid in iids:
             self.instr_blocks[iid].discard(bid)
             self.instr_day_hours[(iid, c.day)] -= c.length
+            if self.instr_day_hours[(iid, c.day)] <= 0:
+                self.instr_active_days[iid].discard(c.day)
         for hh in range(c.start, c.start + c.length):
             if self.room_owner.get((c.room, c.day, hh)) == bid:
                 del self.room_owner[(c.room, c.day, hh)]
@@ -102,6 +106,14 @@ def _soft_score(state: State, c, s, cfg: Config, eligible, cap) -> int:
             if iid in eligible:
                 score += cfg.w_instr_daily_overload * max(
                     0, state.instr_day_hours[(iid, c.day)] + c.length - cap)
+    # weekly distinct-day overload: placing on a day the instructor doesn't yet teach
+    # adds a new day; penalize only when they are already at/over the weekly cap.
+    if cfg.w_instr_weekly_overload:
+        wcap = cfg.max_instr_weekly_days
+        for iid in s.instructor_ids:
+            days = state.instr_active_days[iid]
+            if c.day not in days and len(days) >= wcap:
+                score += cfg.w_instr_weekly_overload
     return score
 
 
@@ -113,7 +125,8 @@ def greedy_construct(state: State, order: List[str], cand_by_block,
     the overload penalty is enabled (its own weight + an eligible set)."""
     eligible = eligible or set()
     shaping = cfg is not None and (cfg.soft_shaping_in_repair
-                                   or (cfg.w_instr_daily_overload and eligible))
+                                   or (cfg.w_instr_daily_overload and eligible)
+                                   or cfg.w_instr_weekly_overload)
     for bid in order:
         s = state.sec_of[bid]; iids = state.sec_instr.get(s.section_id, [])
         if shaping:

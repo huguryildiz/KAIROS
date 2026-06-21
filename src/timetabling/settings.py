@@ -12,7 +12,7 @@ import copy
 import json
 from typing import Dict, Tuple
 
-from .config import Config
+from .config import Config, DAYS, SATURDAY
 
 # Upper bound of the occupancy horizon (Config.horizon_end). Not a settings field — used to
 # size the PM availability band. Closing hours past a section's own window is harmless.
@@ -25,12 +25,21 @@ DEFAULT_SETTINGS: dict = {
     "day_end": 18,            # -> Config.undergrad_end
     "saturday": False,        # -> Config.saturday_enabled
     "include_grad": False,    # -> Config.include_grad
-    "midday_split": 13,       # -> Config.midday_split_hour (AM/PM boundary)
+    "grad_start": 18,         # -> Config.grad_start (earliest grad start hour; only used when include_grad)
     "max_theory_session": 2,  # -> Config.max_theory_session
     "max_block_len": 4,       # -> Config.max_block_len
-    # [day, hour, staff_only]; staff_only False -> friday_blackout, True -> seminar_blackout
-    "blackouts": [["Fr", 13, False], ["Th", 14, True], ["Th", 15, True]],
+    # [day, hour, staff_only]; staff_only True closes the slot only for full-time staff
+    # (e.g. a faculty seminar). Empty by default — closed slots are school-specific and added
+    # from the UI blackout editor. Rows map straight to Config.blackout triples.
+    "blackouts": [],
+    # lunch-break protection: when enabled, [lunch_start, lunch_end) is closed every active
+    # day (expanded into universal blackout slots in build_config). Default off so an
+    # untouched Settings step reproduces today's Config exactly.
+    "lunch_enabled": False,
+    "lunch_start": 12,        # inclusive hour
+    "lunch_end": 13,          # exclusive hour
     "daily_hours_cap": 0,     # 0 = off; N>0 enables the soft per-(instr,day) overload at N hours
+    "instr_days_cap": 0,      # 0 = off; N>0 enables the soft per-instructor weekly day cap at N days
     "weights": {              # preset levels, never raw numbers
         "evening": "normal",
         "cohort_gap": "normal",
@@ -61,26 +70,32 @@ def _int(v, default: int) -> int:
 
 
 def availability_closed_slots(availability: Dict[str, list], settings: dict) -> frozenset:
-    """Turn {email: [[day, "AM"|"PM"], ...]} into a frozenset of (email, day, hour) closed
-    slots. AM = [day_start, midday_split); PM = [midday_split, _HORIZON_END)."""
+    """Turn {email: [[day, slot], ...]} into a frozenset of (email, day, hour) closed
+    slots. `slot` is an hour int (e.g. 9 → blocks 09:00–10:00) for the current hourly
+    picker, or the legacy half-day code "AM"/"PM" (AM = [day_start, midday_split);
+    PM = [midday_split, _HORIZON_END)) — both are accepted so older profiles still load."""
     if not availability:
         return frozenset()
     s = settings or {}
     day_start = _int(s.get("day_start"), 9)
-    midday = _int(s.get("midday_split"), 13)
+    midday = 13
     out = set()
     for email, slots in availability.items():
         for entry in slots or []:
             try:
-                day, half = entry[0], str(entry[1]).upper()
+                day, val = entry[0], entry[1]
             except (TypeError, IndexError):
                 continue
+            half = str(val).upper()
             if half == "AM":
                 hours = range(day_start, midday)
             elif half == "PM":
                 hours = range(midday, _HORIZON_END)
             else:
-                continue
+                try:
+                    hours = (int(val),)
+                except (TypeError, ValueError):
+                    continue
             for h in hours:
                 out.add((email, day, h))
     return frozenset(out)
@@ -97,23 +112,39 @@ def build_config(settings: dict, availability: Dict[str, list],
     field falls back to its default and the solve proceeds."""
     s = settings or {}
 
-    # window + midday guard (keep day_start < midday < day_end <= horizon)
+    # window guard
     day_start = _int(s.get("day_start"), 9)
     day_end = _int(s.get("day_end"), 18)
     if not (0 <= day_start < day_end <= _HORIZON_END):
         day_start, day_end = 9, 18
-    midday = _int(s.get("midday_split"), 13)
-    if not (day_start < midday < day_end):
-        midday = 13 if day_start < 13 < day_end else (day_start + day_end) // 2
 
-    # blackouts split by the staff_only flag
-    universal, staff = [], []
+    # graduate earliest-start hour. Grad sessions still end by Config.grad_end (21:00); only
+    # the start floor is user-tunable so daytime grad classes are allowed. Must sit in
+    # [day_start, grad_end); falls back to 18 (today's behavior) on bad input.
+    grad_start = _int(s.get("grad_start"), 18)
+    if not (day_start <= grad_start < _HORIZON_END):
+        grad_start = 18
+
+    # blackouts as (day, hour, staff_only) triples — a single list; the scope (everyone vs
+    # full-time only) rides on the third field, so there is no separate seminar field.
+    blackout_rows = []
     for row in s.get("blackouts", []):
         try:
             day, hour, staff_only = str(row[0]), int(row[1]), bool(row[2])
         except (TypeError, ValueError, IndexError):
             continue
-        (staff if staff_only else universal).append((day, hour))
+        blackout_rows.append((day, hour, staff_only))
+
+    # lunch-break protection -> universal (staff_only=False) daily window over every active day
+    if bool(s.get("lunch_enabled", False)):
+        l0 = _int(s.get("lunch_start"), 12)
+        l1 = _int(s.get("lunch_end"), 13)
+        if 0 <= l0 < l1 <= _HORIZON_END:
+            active_days = list(DAYS) + ([SATURDAY] if bool(s.get("saturday", False)) else [])
+            for d in active_days:
+                for h in range(l0, l1):
+                    blackout_rows.append((d, h, False))
+    blackout_rows = list(dict.fromkeys(blackout_rows))   # dedupe, preserve order
 
     # preference weights
     weights = s.get("weights", {}) or {}
@@ -127,19 +158,25 @@ def build_config(settings: dict, availability: Dict[str, list],
     else:
         daily_cap, overload_w = 4, 0   # 4 = Config default; weight 0 = off (today)
 
+    # instructor weekly distinct-day soft cap (1..6 active days; 0 = off)
+    wdays = _int(s.get("instr_days_cap"), 0)
+    if 0 < wdays <= 6:
+        weekly_days, weekly_w = wdays, 8   # 8 ≈ "strong" spread weight; clearly outranks base nudge
+    else:
+        weekly_days, weekly_w = 5, 0       # 5 = Config default; weight 0 = off
+
     closed = availability_closed_slots(
-        availability, {"day_start": day_start, "midday_split": midday})
+        availability, {"day_start": day_start})
 
     return Config(
         horizon_start=day_start,
         undergrad_end=day_end,
         saturday_enabled=bool(s.get("saturday", False)),
         include_grad=bool(s.get("include_grad", False)),
-        midday_split_hour=midday,
+        grad_start=grad_start,
         max_theory_session=_int(s.get("max_theory_session"), 2),
         max_block_len=_int(s.get("max_block_len"), 4),
-        friday_blackout=tuple(universal),
-        seminar_blackout=tuple(staff),
+        blackout=tuple(blackout_rows),
         w_evening=_preset(weights, "evening"),
         w_cohort_gap=_preset(weights, "cohort_gap"),
         w_room_count=_preset(weights, "room_count"),
@@ -147,6 +184,8 @@ def build_config(settings: dict, availability: Dict[str, list],
         w_parttime_days=w_parttime,
         max_instr_daily_hours=daily_cap,
         w_instr_daily_overload=overload_w,
+        max_instr_weekly_days=weekly_days,
+        w_instr_weekly_overload=weekly_w,
         instr_unavailable=closed,
         solve_time_limit_s=float(solve_seconds),
         repair_time_limit_s=float(solve_seconds),

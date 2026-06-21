@@ -14,7 +14,7 @@ def test_shared_instructor_across_faculties_no_conflict():
     # faculties both taught by x must NOT land on the same (day,hour).
     closed = tuple([(d, h) for d in ["Mo", "Tu", "We", "Th"] for h in (9, 10, 11)])
     cfg = Config(solve_time_limit_s=15, horizon_start=9, undergrad_end=12,
-                 friday_blackout=closed, seminar_blackout=())
+                 blackout=closed)
     rooms = [Room("R1", 50, False, True), Room("R2", 50, False, True)]
     instr = {"x": Instructor("x", "n", False, "D")}
     fa = _sec("FA_01", "A 201", "Faculty A", "x", "A-2")

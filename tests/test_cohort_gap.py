@@ -22,8 +22,7 @@ def test_gap_term_penalizes_forced_interior_hole():
     K = 5
     cfg = Config(w_cohort_gap=K, w_evening=0, w_room_count=0, w_instr_days=0,
                  w_parttime_days=0, w_order=0, w_englab=0, w_nonadjacent=0,
-                 horizon_start=9, undergrad_end=12, friday_blackout=closed,
-                 seminar_blackout=())
+                 horizon_start=9, undergrad_end=12, blackout=closed)
     rooms = [Room("R1", 50, False, True)]
     instr = {"a": Instructor("a", "n", False, "D"), "b": Instructor("b", "n", False, "D")}
     s1 = _sec("X201_01", "X 201", "a", "D-2")

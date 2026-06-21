@@ -14,7 +14,7 @@ def _sec(sid, level, students, blocks, instr="i1", cohort="D-1"):
 
 
 def test_gen_candidates_respects_capacity_and_window():
-    cfg = Config()
+    cfg = Config(blackout=(("Fr", 13, False),))
     rooms = [Room("R1", 30, False, True), Room("R2", 10, False, True)]
     instr = Instructor("i1", "n", False, "D")
     b = Block("S_01#T", "S_01", "theory", 3, False)
@@ -73,7 +73,7 @@ def test_fixed_pins_first_block():
 
 
 def test_gen_candidates_seminar_blackout_fulltime_only():
-    cfg = Config()
+    cfg = Config(blackout=(("Th", 14, True), ("Th", 15, True)))
     rooms = [Room("R1", 50, False, True)]
     b = Block("S_01#T", "S_01", "theory", 1, False)
     s = _sec("S_01", 1, 10, [b])
@@ -163,3 +163,31 @@ def test_daily_overload_penalty_spreads_instructor():
     s1b, s2b = _two_block_instr(3)
     assigns_x, _ = model_cpsat.build_and_solve([s1b, s2b], rooms, instructors, cfg_exempt)
     assert _max_daily_hours(assigns_x) == 6
+
+
+def _four_1h_sections():
+    secs = []
+    for k in range(4):
+        s = _sec(f"S{k}_01", 2, 10, [], instr="i1", cohort="D-1")
+        s.blocks = [Block(f"S{k}_01#T", f"S{k}_01", "theory", 1, False)]
+        secs.append(s)
+    return secs
+
+
+def test_weekly_day_cap_concentrates_instructor():
+    # Four 1h theory sections taught by one instructor. With day-spread preference OFF,
+    # the base model is free to scatter them across days; the weekly distinct-day cap
+    # (soft) must pull them onto at most `max_instr_weekly_days` days.
+    rooms = [Room("R1", 50, False, True), Room("R2", 50, False, True)]
+    instructors = {"i1": Instructor("i1", "n", False, "D")}
+
+    base = Config(solve_time_limit_s=10, w_instr_days=0, w_parttime_days=0)
+    a_base, _ = model_cpsat.build_and_solve(_four_1h_sections(), rooms, instructors, base)
+    assert len({a.day for a in a_base}) == 4          # nothing rewards fewer days -> scattered
+
+    capped = Config(solve_time_limit_s=10, w_instr_days=0, w_parttime_days=0,
+                    w_instr_weekly_overload=50, max_instr_weekly_days=1)
+    a_cap, stats = model_cpsat.build_and_solve(_four_1h_sections(), rooms, instructors, capped)
+    assert stats["status_name"] in ("OPTIMAL", "FEASIBLE")
+    assert len(a_cap) == 4                             # all still placed (soft, never blocks)
+    assert len({a.day for a in a_cap}) <= capped.max_instr_weekly_days

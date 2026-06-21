@@ -10,7 +10,7 @@ import streamlit as st
 from timetabling.defaults import DEFAULT_CLASSROOMS
 from timetabling.settings import default_settings
 from timetabling.ui_style import (brand_css, appbar_html, stepper_html,
-                                  hero_html, footer_html)
+                                  hero_html, footer_html, dropzone_drag_js)
 from timetabling.ui_app import (get_lang, get_theme, theme_toggle,
                                 lang_selector_bar, hero_chips)
 from timetabling.i18n import t
@@ -76,6 +76,12 @@ if lang == "tr":
 </script>""",
         height=0,
     )
+
+# Drag-over highlight for the upload cards (Step 1 + Classrooms). Delivered via an
+# iframe component so the JS actually runs — inline <script> in st.markdown is
+# stripped by Streamlit's sanitizer. See ui_style.dropzone_drag_js for details.
+import streamlit.components.v1 as _cmp
+_cmp.html(dropzone_drag_js(), height=0)
 
 with st.container(key="topbar"):
     bar = st.columns([7, 2], vertical_alignment="center")

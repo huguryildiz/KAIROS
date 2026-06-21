@@ -15,9 +15,13 @@ class Config:
     undergrad_end: int = 18       # undergrad blocks must end by this hour
     grad_start: int = 18
     grad_end: int = 21
-    # blackouts: (day, hour) hour-slots that are closed
-    friday_blackout: tuple = (("Fr", 13),)                 # 13:00-14:00
-    seminar_blackout: tuple = (("Th", 14), ("Th", 15))     # Thu 14:00-16:00, full-time only
+    # blackouts: (day, hour, staff_only) hour-slots that are closed. staff_only=True closes
+    # the slot only for sections taught by a full-time instructor (e.g. a faculty seminar);
+    # staff_only=False (or a bare 2-tuple) closes it for everyone. Use
+    # cfg.closed_hours(has_staff) to resolve to the (day, hour) set for a given section.
+    # Empty by default — closed slots are school-specific, supplied via the UI blackout
+    # editor or an explicit Config (e.g. a Fri lunch hour, or a Thu full-time-only seminar).
+    blackout: tuple = ()
     # per-instructor unavailability (UI School-Settings populates this; CLI leaves it empty).
     # frozenset of (instructor_id/email, day, hour) — read in gen_candidates like a per-id blackout.
     instr_unavailable: frozenset = frozenset()
@@ -63,6 +67,12 @@ class Config:
     # >20h/week (service courses) and cannot fit 5 days at 4h. See TODO.md.
     max_instr_daily_hours: int = 4
     w_instr_daily_overload: int = 0
+    # soft: penalize each distinct teaching DAY beyond this many per instructor per week.
+    # 0 = disabled (opt-in). Soft, never hard — a tight cap would be INFEASIBLE for
+    # high-load instructors. Distinct from w_instr_days (which minimizes days outright);
+    # this only penalizes days *beyond* the cap.
+    max_instr_weekly_days: int = 5
+    w_instr_weekly_overload: int = 0
     # exempt high-load instructors (e.g. Basic Sciences service courses): apply the
     # overload penalty only to instructors whose total weekly teaching load is at most
     # this many hours. 0 = no exemption (penalize everyone).
@@ -74,3 +84,16 @@ class Config:
 
     def days(self) -> list:
         return DAYS + [SATURDAY] if self.saturday_enabled else list(DAYS)
+
+    def closed_hours(self, has_staff: bool) -> set:
+        """Resolve `blackout` to the set of closed (day, hour) slots for a section, given
+        whether it is taught by a full-time instructor. staff_only entries apply only when
+        has_staff. Bare 2-tuples are treated as universal (staff_only=False)."""
+        out = set()
+        for entry in self.blackout:
+            day, hour = entry[0], entry[1]
+            staff_only = bool(entry[2]) if len(entry) > 2 else False
+            if staff_only and not has_staff:
+                continue
+            out.add((day, hour))
+        return out

@@ -10,8 +10,7 @@ def test_default_settings_build_config_matches_today():
     cfg = build_config(DEFAULT_SETTINGS, {}, 3000.0)
     assert cfg.horizon_start == 9
     assert cfg.undergrad_end == 18
-    assert cfg.friday_blackout == (("Fr", 13),)
-    assert cfg.seminar_blackout == (("Th", 14), ("Th", 15))
+    assert cfg.blackout == ()
     assert cfg.saturday_enabled is False
     assert cfg.include_grad is False
     assert cfg.midday_split_hour == 13
@@ -24,6 +23,8 @@ def test_default_settings_build_config_matches_today():
     assert cfg.w_instr_days == 3
     assert cfg.w_parttime_days == 5
     assert cfg.w_instr_daily_overload == 0
+    assert cfg.w_instr_weekly_overload == 0
+    assert cfg.max_instr_weekly_days == 5
     assert cfg.solve_time_limit_s == 3000.0
     assert cfg.repair_time_limit_s == 3000.0
     assert cfg.instr_unavailable == frozenset()
@@ -33,22 +34,55 @@ def test_default_settings_build_config_matches_today():
 
 def test_policy_fields_map():
     s = dict(DEFAULT_SETTINGS, day_start=8, day_end=17, saturday=True,
-             include_grad=True, midday_split=12, max_theory_session=3, max_block_len=3)
+             include_grad=True, max_theory_session=3, max_block_len=3)
     cfg = build_config(s, {}, 60.0)
     assert cfg.horizon_start == 8
     assert cfg.undergrad_end == 17
     assert cfg.saturday_enabled is True
     assert cfg.include_grad is True
-    assert cfg.midday_split_hour == 12
     assert cfg.max_theory_session == 3
     assert cfg.max_block_len == 3
 
 
-def test_blackout_split():
+def test_blackout_scope_preserved():
     s = dict(DEFAULT_SETTINGS, blackouts=[["Fr", 13, False], ["We", 10, True]])
     cfg = build_config(s, {}, 60.0)
-    assert cfg.friday_blackout == (("Fr", 13),)
-    assert cfg.seminar_blackout == (("We", 10),)
+    assert cfg.blackout == (("Fr", 13, False), ("We", 10, True))
+    # universal closes for everyone; staff-only closes only when a staff instructor teaches
+    assert cfg.closed_hours(has_staff=False) == {("Fr", 13)}
+    assert cfg.closed_hours(has_staff=True) == {("Fr", 13), ("We", 10)}
+
+
+def test_lunch_off_by_default():
+    """Default settings keep lunch off and carry no baked-in blackouts."""
+    cfg = build_config(DEFAULT_SETTINGS, {}, 60.0)
+    assert cfg.blackout == ()
+
+
+def test_lunch_expands_to_universal_blackout():
+    s = dict(DEFAULT_SETTINGS, lunch_enabled=True, lunch_start=12, lunch_end=13)
+    cfg = build_config(s, {}, 60.0)
+    universal = cfg.closed_hours(has_staff=False)   # everyone-closed slots
+    # every weekday gets 12:00 closed for everyone
+    for d in ("Mo", "Tu", "We", "Th", "Fr"):
+        assert (d, 12) in universal
+    assert ("Sa", 12) not in universal              # Saturday off -> not closed
+    assert ("Sa", 12) not in cfg.closed_hours(has_staff=True)
+
+
+def test_lunch_respects_saturday_and_multi_hour():
+    s = dict(DEFAULT_SETTINGS, lunch_enabled=True, lunch_start=12, lunch_end=14,
+             saturday=True)
+    cfg = build_config(s, {}, 60.0)
+    universal = cfg.closed_hours(has_staff=False)
+    assert ("Sa", 12) in universal and ("Sa", 13) in universal
+    assert ("Mo", 12) in universal and ("Mo", 13) in universal
+
+
+def test_lunch_bad_window_ignored():
+    s = dict(DEFAULT_SETTINGS, lunch_enabled=True, lunch_start=14, lunch_end=12)
+    cfg = build_config(s, {}, 60.0)
+    assert cfg.blackout == ()   # invalid window -> no lunch slots, no baked-in defaults
 
 
 def test_daily_hours_cap():
@@ -59,11 +93,25 @@ def test_daily_hours_cap():
     assert on.w_instr_daily_overload == 5
 
 
+def test_instr_days_cap():
+    # off by default: weight 0, Config default day count
+    off = build_config(dict(DEFAULT_SETTINGS, instr_days_cap=0), {}, 60.0)
+    assert off.w_instr_weekly_overload == 0
+    assert off.max_instr_weekly_days == 5
+    # enabled: soft cap at N days with a non-zero weight
+    on = build_config(dict(DEFAULT_SETTINGS, instr_days_cap=3), {}, 60.0)
+    assert on.max_instr_weekly_days == 3
+    assert on.w_instr_weekly_overload == 8
+    # out-of-range falls back to off
+    bad = build_config(dict(DEFAULT_SETTINGS, instr_days_cap=9), {}, 60.0)
+    assert bad.w_instr_weekly_overload == 0
+
+
 def test_clamp_guard():
-    # midday outside (day_start, day_end) falls back to a sane value, never raises
-    s = dict(DEFAULT_SETTINGS, day_start=9, day_end=18, midday_split=20)
+    # day_start/day_end outside valid range falls back without raising
+    s = dict(DEFAULT_SETTINGS, day_start=20, day_end=5)
     cfg = build_config(s, {}, 60.0)
-    assert 9 < cfg.midday_split_hour < 18
+    assert cfg.horizon_start == 9 and cfg.undergrad_end == 18
 
 
 # --- Block 3: weight presets ------------------------------------------------
@@ -89,7 +137,7 @@ def test_weight_presets_normal_parttime_offset():
 # --- Block 7: availability closed-slots -------------------------------------
 
 def test_availability_closed_slots():
-    cs = {"day_start": 9, "midday_split": 13}
+    cs = {"day_start": 9}
     am = availability_closed_slots({"a@x": [["Mo", "AM"]]}, cs)
     assert ("a@x", "Mo", 9) in am and ("a@x", "Mo", 12) in am
     assert ("a@x", "Mo", 13) not in am
@@ -99,7 +147,7 @@ def test_availability_closed_slots():
 
 
 def test_availability_empty():
-    assert availability_closed_slots({}, {"day_start": 9, "midday_split": 13}) == frozenset()
+    assert availability_closed_slots({}, {"day_start": 9}) == frozenset()
 
 
 # --- Block 8: profile JSON --------------------------------------------------

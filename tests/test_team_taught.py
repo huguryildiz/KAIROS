@@ -24,7 +24,7 @@ def test_both_co_instructors_enter_conflict():
     assert validate.validate(assigns, [s1, s2], {r.room: r for r in rooms}, instructors, cfg) == []
 
 def test_seminar_blackout_if_any_coinstructor_fulltime():
-    cfg = Config()
+    cfg = Config(blackout=(("Th", 14, True), ("Th", 15, True)))
     rooms = [Room("R1", 50, False, True)]
     instructors = {"f": Instructor("f", "Full", True, "D"), "p": Instructor("p", "Part", False, "D")}
     s = _sec("S_01", ["p", "f"], [Block("S_01#T", "S_01", "theory", 1, False)])

@@ -13,14 +13,11 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/0_hard_conflicts-4F46E5?style=for-the-badge" alt="0 hard conflicts">
-  <img src="https://img.shields.io/badge/~90%25_placed-06B6D4?style=for-the-badge" alt="~90% placed">
-  &nbsp;
   <img src="https://img.shields.io/badge/Python_3.11-0b1220?style=for-the-badge&logo=python&logoColor=3776AB" alt="Python 3.11">
   <img src="https://img.shields.io/badge/OR--Tools_CP--SAT-0b1220?style=for-the-badge&logo=google&logoColor=4285F4" alt="OR-Tools CP-SAT">
   <img src="https://img.shields.io/badge/Streamlit-0b1220?style=for-the-badge&logo=streamlit&logoColor=FF4B4B" alt="Streamlit">
   <img src="https://img.shields.io/badge/pandas-0b1220?style=for-the-badge&logo=pandas&logoColor=white" alt="pandas">
-  <img src="https://img.shields.io/badge/pytest_148_passing-0b1220?style=for-the-badge&logo=pytest&logoColor=0A9EDC" alt="pytest 148 passing">
+  <img src="https://img.shields.io/badge/pytest-0b1220?style=for-the-badge&logo=pytest&logoColor=0A9EDC" alt="pytest">
   <img src="https://img.shields.io/badge/Docker-0b1220?style=for-the-badge&logo=docker&logoColor=2496ED" alt="Docker">
   <img src="https://img.shields.io/badge/Google_Cloud_Run-0b1220?style=for-the-badge&logo=googlecloud&logoColor=4285F4" alt="Google Cloud Run">
   <a href="https://kairos.huguryildiz.com"><img src="https://img.shields.io/badge/kairos.huguryildiz.com-live-4F46E5?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Live"></a>
@@ -86,7 +83,7 @@ Hard rules and soft preferences are kept strictly apart. **Hard constraints can 
 | **Room capacity** — seats ≥ enrolled students | candidate pruning |
 | **Pinned lab room** — a lab block sits only in its designated lab room | candidate pruning |
 | **Undergraduate window** — every block ends by 18:00 | candidate pruning |
-| **Blackouts** — Friday 13–14, Thursday 14–16 (full-time staff seminar) | candidate pruning |
+| **Blackouts** — school-configured closed slots, scope *everyone* or *full-time only* (none by default; e.g. a Friday congregational-prayer hour, a Thursday staff seminar) | candidate pruning |
 | **Placement** — exactly one slot per block | CP-SAT model |
 | **Room / instructor no-overlap** — incl. team-taught co-instructors | CP-SAT model |
 | **Self no-overlap** — a section's own blocks never collide | CP-SAT model |
@@ -183,12 +180,12 @@ A single-page progressive flow that walks a user from raw CSV to a placed timeta
 | --- | --- |
 | **1 · Upload courses** | Drop a course-list CSV — or press **Try with sample dataset** (100 sections across 20 departments, bundled, PII-free) |
 | **2 · Review data** | KPI summary (sections, courses, departments, instructors) and non-blocking data-quality warnings |
-| **3 · Classrooms** | Add / edit / delete rooms with capacity and an explicit **is-lab** flag — 103 PII-free defaults preloaded; the `Online` virtual room is added automatically |
-| **4 · School Settings** | Optional per-school config: day window, blackout slots, Saturday / graduate toggles, block-split policy, an instructor daily-hours cap, preference-weight presets, half-day instructor availability, and a download / upload school-profile JSON — backward-compatible (untouched = today's defaults) |
+| **3 · Classrooms** | Add / edit / delete rooms with capacity and a categorical **Type** (`normal/lab/pc/studio`) — 103 PII-free defaults preloaded; the `Online` virtual room is added automatically |
+| **4 · School Settings** | Optional per-school config: day window, blackout slots, Saturday / graduate toggles (incl. a configurable graduate earliest-start hour for daytime grad classes), block-split policy, an instructor daily-hours cap, preference-weight presets, half-day instructor availability, and a download / upload school-profile JSON — backward-compatible (untouched = today's defaults) |
 | **5 · Solve** | One **Solve** button → blocking spinner → placement summary, under a fixed 3000 s budget |
 | **6 · Results** | Weekly Mon–Fri grid, view by cohort / room / instructor / department / course, conflict + unschedulable lists, and `schedule.json` / `assignments.csv` download |
 
-The course-list CSV may carry optional columns — `Year`, `Part-time`, `Room Type`, `Fixed` — that override the cohort / part-time / lab-room requirement / pinned slot otherwise derived from the course code and lecturer name (absent → derived as before).
+The course-list CSV may carry optional columns — `Year`, `Part-time`, `Room Type`, `Fixed` — that override the cohort year / part-time flag / room-type demand (`normal/lab/pc/studio`) / pinned slot otherwise derived from the course code and instructor name (absent → derived as before).
 
 ```bash
 PYTHONPATH=src streamlit run app.py      # http://localhost:8501
@@ -289,25 +286,33 @@ PYTHONPATH=src python3 -m timetabling --period 001 \
 
 ## Input contract
 
-The engine runs from a single **course list** — one CSV, one row per section.
+Two independent tables: a **course list** (one row per section, uploaded each term) and a
+**classroom inventory** (stable; defaults shipped). The full contract is [`INPUT_SCHEMA.md`](INPUT_SCHEMA.md).
+
+**Course list** — required: `Course Code`, `Course Name`, `Dept`, `Section No`, `Instructor Name`, `T`/`P`/`L`, `Section Capacity`. Optional: `Instructor Email`, `Part-time`, `~Students`, `Room Type`, `Fixed`, `Year`.
 
 | Column | Meaning |
 | --- | --- |
-| `Course Code` | e.g. `CMPE 113` — department prefix and year level are derived from it (`CMPE`, year 1) |
-| `Course Name` | Display name |
-| `Section No` | Section number within the course |
+| `Course Code` | e.g. `CMPE 113` — the cohort **program code** and year level derive from it (`CMPE`, year 1) |
+| `Dept` | **Faculty name** (e.g. "Faculty of Engineering") — display grouping, and the cohort fallback when the code is unparseable |
+| `Section No` | Section id; `CMPE 113_01` is used directly, a bare `01` is composed |
 | `T` / `P` / `L` | Weekly theory / practice / lab hours |
-| `Lecturer Name` | Display name — informational only |
-| `Lecturer Email` | The instructor's identity key; team-taught sections list comma-separated emails |
-| `~Students` | Approximate enrollment — drives room capacity and virtual-room routing |
+| `Instructor Name` | Display name; the instructor identity key when no email is given |
+| `Instructor Email` | The instructor's unique identity key when present; team-taught sections list comma-separated emails |
+| `Part-time` | Boolean (overrides the `(S)` name marker) |
+| `Section Capacity` | The quota — the **hard** room-sizing input |
+| `~Students` | Actual/expected enrolment — KPIs + soft right-sizing (falls back to `Section Capacity`) |
+| `Room Type` | Required room category: `normal` / `lab` / `pc` / `studio` |
 
 ```csv
-Course Code,Course Name,Section No,T,P,L,Lecturer Name,Lecturer Email,~Students
-CMPE 113,Introduction to Programming,1,3,0,2,Jane Doe,jane.doe@uni.edu,45
-ECON 101,Principles of Economics,1,3,0,0,John Smith,john.smith@uni.edu,120
+Course Code,Course Name,Dept,Section No,Instructor Name,Instructor Email,Part-time,T,P,L,Section Capacity,~Students,Room Type
+CMPE 113,Introduction to Programming,Faculty of Engineering,CMPE 113_01,Jane Doe,jane.doe@uni.edu,,3,0,2,50,45,pc
+ECON 101,Principles of Economics,Faculty of Econ.,ECON 101_01,John Smith,john.smith@uni.edu,,3,0,0,120,118,
 ```
 
-**Derived automatically:** cohort `(department prefix, year level)` from the course code; instructor identity from email; teaching blocks from `T`/`P`/`L` (theory splits into ≤2 h same-section sessions on different days). **Provided separately:** the classroom inventory (name, capacity, explicit lab flag) and the period.
+**Classroom inventory** — `Room`, `Capacity`, `Type` (`normal/lab/pc/studio`; derived from the room-name token, e.g. `-PC`→`pc`, when seeding). Defaults ship in `defaults.py`.
+
+**Derived automatically:** cohort `(program code, year level)` from the course code; instructor identity from email-or-name; teaching blocks from `T`/`P`/`L` (theory splits into ≤2 h same-section sessions on different days). The `section → room` assignment is the solver's **output**, never an input.
 
 ### Outputs (`out/`)
 

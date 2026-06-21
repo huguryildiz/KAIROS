@@ -95,7 +95,7 @@ downtime. IAM bindings persist across deploys.
   gcloud run services update timetabling --region <REGION> \
     --memory 4Gi --cpu 4 --timeout 3600 --cpu-boost
   ```
-- **Use the region the custom domain points to.** `schedule.huguryildiz.com` is
+- **Use the region the custom domain points to.** `kairos.huguryildiz.com` is
   domain-mapped to the **`europe-west1`** service (confirm with
   `gcloud beta run domain-mappings list --region <REGION>`). Apply resource changes
   there — not to a same-named service in another region.

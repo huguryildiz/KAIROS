@@ -26,6 +26,10 @@ class Config:
     online_room: str = "Online"
     # solver
     solve_time_limit_s: float = 60.0
+    # overall wall-clock budget for the repair solver (UI sets this; CLI leaves it
+    # unbounded so the documented full-period benchmark runs to convergence — the repair
+    # solver still manages its own per-round budget and ignores --time-limit).
+    repair_time_limit_s: float = float("inf")
     max_rooms_per_block: int = 12   # best-fit: only the K smallest fitting rooms per block
     # phase 2: block splitting
     max_block_len: int = 4

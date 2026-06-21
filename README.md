@@ -1,82 +1,251 @@
-# Course Timetabling
+<!-- markdownlint-disable MD033 -->
+<!-- Inline HTML is intentional: centered hero header and badge row. -->
 
-**Conflict-free weekly university schedules, solved from real data.**
+<p align="center">
+  <img src="assets/icon.svg" alt="Kairos logo" width="120" height="120">
+</p>
 
-A constraint-programming engine built on OR-Tools **CP-SAT** that turns a university's raw
-course, instructor, and room data into a coherent **day + time + room** assignment for every
-section. Section, instructor, size, and T-P-L are fixed inputs; the engine reasons over the
-only two degrees of freedom that matter — **time and room** — and guarantees the result is free
-of resource conflicts under one consistent rule set.
+<h1 align="center">Kairos</h1>
+
+<p align="center">
+  <strong>Course Timetabling</strong><br>
+  <sub>Conflict-free weekly university schedules, solved from real data — upload a course list, get every section on a day, time, and room.</sub>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/0_hard_conflicts-4F46E5?style=for-the-badge" alt="0 hard conflicts">
+  <img src="https://img.shields.io/badge/~90%25_placed-06B6D4?style=for-the-badge" alt="~90% placed">
+  &nbsp;
+  <img src="https://img.shields.io/badge/Python_3.11-0b1220?style=for-the-badge&logo=python&logoColor=3776AB" alt="Python 3.11">
+  <img src="https://img.shields.io/badge/OR--Tools_CP--SAT-0b1220?style=for-the-badge&logo=google&logoColor=4285F4" alt="OR-Tools CP-SAT">
+  <img src="https://img.shields.io/badge/Streamlit-0b1220?style=for-the-badge&logo=streamlit&logoColor=FF4B4B" alt="Streamlit">
+  <img src="https://img.shields.io/badge/pandas-0b1220?style=for-the-badge&logo=pandas&logoColor=white" alt="pandas">
+  <img src="https://img.shields.io/badge/pytest_132_passing-0b1220?style=for-the-badge&logo=pytest&logoColor=0A9EDC" alt="pytest 132 passing">
+  <img src="https://img.shields.io/badge/Google_Cloud_Run-0b1220?style=for-the-badge&logo=googlecloud&logoColor=4285F4" alt="Google Cloud Run">
+</p>
+
+---
+
+## Overview
+
+**Kairos** turns a university's raw course, instructor, and room data into a coherent **day + time + room** assignment for every section — a weekly timetable that is provably free of resource conflicts under one consistent rule set.
+
+Section, instructor, size, and the T–P–L hour split are **fixed inputs**. The engine reasons over the only two degrees of freedom that matter — **time and room** — and never produces an illegal placement: a room is never double-booked, an instructor is never in two places at once, capacity is never exceeded, and every undergraduate block lands inside the teaching window.
+
+It runs two ways: a **command-line solver** for batch runs and benchmarking, and a **bilingual web app** (Streamlit) where a non-technical user uploads a course list, edits classrooms, presses **Solve**, and reads the result on a Mon–Fri grid. The optimization core is OR-Tools **CP-SAT**; the math, rules, and design rationale are documented in [`MODEL.md`](MODEL.md).
+
+---
+
+## Why Kairos
+
+Hand-building a university timetable means juggling hundreds of sections against a handful of rooms, dozens of instructors, and a tangle of rules — and a single missed clash propagates into the term. The hard part isn't *drawing* the grid; it's guaranteeing nothing collides.
+
+- **Conflict-free by construction.** Hard rules are enforced before the solver ever sees a placement; the schedule cannot encode a room, instructor, capacity, lab, window, or blackout clash.
+- **Solved from real data.** One course-list CSV is the entire input contract — cohorts, teaching blocks, and instructor identities are all derived from it.
+- **Independently verified.** A validator re-derives every hard violation from the final assignment list, decoupled from the solver, so an encoding bug can never pass silently.
+- **Honest about its limits.** Where ~90% conflict-free is the practical ceiling, the README says so and shows the numbers — the residual tail is reported, not hidden.
+- **Two front doors.** A scriptable CLI for operators and a zero-friction web app for everyone else, sharing one solve path.
+- **Privacy-first deployment.** No PII in the image; runs IAM-gated on the institution's own EU cloud, scale-to-zero.
 
 ---
 
 ## At a glance
 
-Full-period schedules are produced by a **warm-started repair solver** (`--repair`): a fast
-greedy construction seeds an initial solution, then CP-SAT repeatedly re-optimizes small
-neighbourhoods until no further block can be placed. Measured across the full period, every rule
-enforced:
+Full-period schedules come from a **warm-started repair solver** (`--repair`): a fast greedy construction seeds an initial solution, then CP-SAT repeatedly re-optimizes small *relatedness* neighbourhoods until no further block can be placed. Measured across the full period, every rule enforced:
 
-| Period | Blocks placed | Hard resource conflicts | Wall time |
-|---|---|---|---|
-| **001 — Fall** | 1566 / 1708 · **91.7%** | **0** | 297 s |
-| **002 — Spring** | 1585 / 1788 · **88.6%** | **0** | 628 s |
+| Period | Sections | Blocks placed | Hard resource conflicts | Wall time | Sweeps |
+| --- | --- | --- | --- | --- | --- |
+| **Fall** | 793 | 1566 / 1708 · **91.7%** | **0** | 297 s | 3 |
+| **Spring** | 801 | 1585 / 1788 · **88.6%** | **0** | 628 s | 6 |
 
-The residual ~8–11% is a genuine hard tail — predominantly Architecture studios competing for a
-handful of viable slots. Intensifying the repair buys under one point of placement for roughly
-triple the runtime, so **~90% conflict-free is the practical ceiling**; the remainder is best
-finished by hand. The engineering detail lives in [TODO.md](TODO.md).
+The residual ~8–11% is a genuine hard tail — predominantly Architecture studios competing for a handful of viable slots. Intensifying the repair buys under one point of placement for roughly triple the runtime, so **~90% conflict-free is the practical ceiling**; the remainder is best finished by hand.
+
+### Generated vs. the existing program — period 001
+
+| Metric | Kairos | Existing program |
+| --- | --- | --- |
+| Hard resource conflicts | **0** | ~1091 (room, instructor, window, blackout, capacity, split-day) |
+| Distinct rooms used | 92 | 248 |
+| Evening (≥17h) ratio | 0.19 | 0.22 |
+| Avg room fill (students / cap) | 0.72 | 0.50 |
+
+Measured under one stricter, consistent rule model. The honest claim: our schedule is conflict-free under a single coherent rule set; the existing one is not, under those same rules.
 
 ---
 
-## Getting started
+## The model
+
+Hard rules and soft preferences are kept strictly apart. **Hard constraints can never be violated**; **soft preferences are weighted penalties** the solver minimizes, so they can never cause infeasibility.
+
+### Hard constraints
+
+| Rule | Where enforced |
+| --- | --- |
+| **Room capacity** — seats ≥ enrolled students | candidate pruning |
+| **Pinned lab room** — a lab block sits only in its designated lab room | candidate pruning |
+| **Undergraduate window** — every block ends by 18:00 | candidate pruning |
+| **Blackouts** — Friday 13–14, Thursday 14–16 (full-time staff seminar) | candidate pruning |
+| **Placement** — exactly one slot per block | CP-SAT model |
+| **Room / instructor no-overlap** — incl. team-taught co-instructors | CP-SAT model |
+| **Self no-overlap** — a section's own blocks never collide | CP-SAT model |
+| **Theory different-day** — a section's theory sessions fall on distinct days | model + repair + validator |
+
+Most hard rules are enforced **during candidate generation** — only legal `(room, day, start)` placements are ever produced — while cross-block relations become model/solver constraints. A virtual `Online` room absorbs online and oversize (>100) sections: unlimited capacity, exempt from room no-overlap, while instructor and self constraints still apply.
+
+### Soft objective (minimized)
+
+| Term | Weight | Intent |
+| --- | --- | --- |
+| **Cohort conflict** (`w_cohort_conflict`) | 50 | Same-course sections may run in parallel; different courses in a `(dept, year)` cohort incur a penalty — a hard cohort rule was proven INFEASIBLE at scale |
+| **Evening use** (`w_evening`) | 10 | Discourage ≥17:00 slots |
+| **Part-time day-compactness** (`w_parttime_days`) | 5 | Cluster a part-time instructor's days |
+| **Instructor day-compactness** (`w_instr_days`) | 3 | Fewer distinct teaching days per instructor |
+| **Cohort daily gap** (`w_cohort_gap`) | 3 | Minimize student idle gaps within a day |
+| **Room compactness** (`w_room_count`) | 2 | Reuse fewer distinct rooms |
+| **Course-level ordering** (`w_order`, S-Order) | 1 | Lower-level courses earlier in the day |
+| **Engineering lab days** (`w_englab`, S-EngLab) | 1 | Engineering labs prefer Thu/Fri |
+
+All weights live in the `Config` dataclass at [`src/timetabling/config.py`](src/timetabling/config.py).
+
+---
+
+## Solve chain
+
+The pipeline is a chain of small, single-purpose modules. A course list becomes legal candidates, the solver places and optimizes them, and an independent validator re-checks the result before it is exported as the UI contract.
+
+```text
+┌──────────────────────────────────────────┐
+│   course list                            │
+│   CSV · one row per section              │
+└──────────────────────────────────────────┘
+                      │
+                      ▼
+┌──────────────────────────────────────────┐
+│   derive blocks                          │
+│   T·P·L → cohort, theory & lab blocks    │
+└──────────────────────────────────────────┘
+                      │
+                      ▼
+┌──────────────────────────────────────────┐
+│   prune candidates                       │
+│   legal (room, day, start) only:         │
+│   capacity · lab · window · blackout     │
+└──────────────────────────────────────────┘
+                      │
+                      ▼
+┌──────────────────────────────────────────┐
+│   CP-SAT / repair                        │
+│   place + optimize · no-overlap,         │
+│   different-day · soft objective         │
+└──────────────────────────────────────────┘
+                      │
+                      ▼
+┌──────────────────────────────────────────┐
+│   validate                               │
+│   independent re-check, decoupled        │
+│   from the solver                        │
+└──────────────────────────────────────────┘
+                      │
+                      ▼
+┌──────────────────────────────────────────┐
+│   schedule.json                          │
+│   the UI contract  (+ assignments.csv)   │
+└──────────────────────────────────────────┘
+```
+
+---
+
+## Architecture
+
+| Layer | Stack |
+| --- | --- |
+| Solver core | OR-Tools **CP-SAT** (pure Python) |
+| Data pipeline | pandas · dataclasses · `src/timetabling/` |
+| Full-period solver | Warm-started small-neighbourhood **repair** (`repair.py`) |
+| Validation | Solver-independent re-derivation (`validate.py`) |
+| Web app | **Streamlit** ≥ 1.40 — one container, no separate frontend build |
+| i18n / theming | Bilingual TR/EN · light/dark CSS design tokens |
+| Testing | **pytest** — 132 tests |
+| Packaging | Docker (`python:3.11-slim`) |
+| Deployment | **Google Cloud Run** — EU region, IAM-gated, scale-to-zero |
+
+The architecture rests on a deliberate split between solving and checking: `model_cpsat.py` and `repair.py` produce a schedule, and `validate.py` re-derives every hard violation from the assignment list with no knowledge of the solver's internals — so a model bug surfaces as a reported violation instead of a silent error.
+
+---
+
+## The app
+
+A single-page progressive flow that walks a user from raw CSV to a placed timetable. Bilingual (Turkish / English), with a light/dark theme toggle, and usable on a phone in portrait orientation.
+
+| Step | What happens |
+| --- | --- |
+| **1 · Upload courses** | Drop a course-list CSV — or press **Try with sample dataset** (100 sections across 20 departments, bundled, PII-free) |
+| **2 · Review data** | KPI summary (sections, courses, departments, instructors) and non-blocking data-quality warnings |
+| **3 · Classrooms** | Add / edit / delete rooms with capacity and an explicit **is-lab** flag — 103 PII-free defaults preloaded; the `Online` virtual room is added automatically |
+| **4 · Solve** | One **Solve** button → blocking spinner → placement summary, under a fixed 1200 s budget |
+| **5 · Results** | Weekly Mon–Fri grid, view by cohort / room / instructor / department / course, conflict + unschedulable lists, and `schedule.json` / `assignments.csv` download |
 
 ```bash
-python3 -m pip install -r requirements.txt   # pandas, ortools, pytest
+PYTHONPATH=src streamlit run app.py      # http://localhost:8501
 ```
 
-> Your input is a single course-list CSV (see **Input data** below), placed under `data/`. That
-> folder is gitignored, so it is intentionally absent from fresh clones.
+---
 
-## Input data
+## Project Structure
 
-The engine runs from a single **course list** — one CSV, one row per section. That is the whole
-input contract: cohorts, teaching blocks, and instructor identities are all derived from it.
+```text
+src/timetabling/        The solver and pipeline (importable, framework-free)
+├── config.py           Config dataclass — every tunable parameter, DAYS, LAB_SUFFIXES
+├── model.py            Room, Instructor, Block, Section, Candidate, Assignment, Violation
+├── textnorm.py         Staff-ID / name / int normalization
+├── schedule_parse.py   SCHEDULE grammar (unit / chain / X-over-Y / dirty → flag)
+├── io_csv.py           Quote-aware CSV loaders (dtype=str, leading zeros preserved)
+├── clean.py            Room classification (lab / online / physical / virtual)
+├── join.py             Grades + enrollment + Plan combined frame
+├── derive.py           Section + Block derivation (level, cohort, T/P/L blocks)
+├── route.py            mark_virtual (online/oversize → virtual room), mark_lab_rooms (pin lab)
+├── model_cpsat.py      Candidate generation + pruning + single-shot CP-SAT model
+├── repair.py           Construction + warm-started neighbourhood repair solver (--repair)
+├── decompose.py        Legacy faculty-by-faculty greedy (--decompose), kept for comparison
+├── validate.py         Solver-independent hard-constraint validator
+├── report.py           Data-quality report + Mode-B benchmark
+├── export.py           schedule.json (UI contract) + CSV
+├── pipeline.py         run_pipeline() — one solve path shared by CLI and UI
+├── defaults.py         PII-free default classroom inventory (103 rooms)
+├── i18n.py             Bilingual TR/EN string catalog
+├── ui_*.py             Streamlit theming, grid, input, app-shell helpers
+└── __main__.py         CLI / pipeline orchestration
 
-| Column | Meaning |
-|---|---|
-| `Course Code` | e.g. `CMPE 113` — the department prefix and year level are derived from it (`CMPE`, year 1) |
-| `Course Name` | Display name |
-| `Section No` | Section number within the course |
-| `T` | Weekly theory hours |
-| `P` | Weekly practice hours |
-| `L` | Weekly lab hours |
-| `Lecturer Name` | Display name — informational only |
-| `Lecturer Email` | The instructor's identity key. Team-taught sections list comma-separated emails |
-| `~Students` | Approximate enrollment — drives room capacity and virtual-room routing |
-
-```csv
-Course Code,Course Name,Section No,T,P,L,Lecturer Name,Lecturer Email,~Students
-CMPE 113,Introduction to Programming,1,3,0,2,Jane Doe,jane.doe@uni.edu,45
-ECON 101,Principles of Economics,1,3,0,0,John Smith,john.smith@uni.edu,120
+views/                  Streamlit step renderers — upload, review, classrooms, solve, results
+app.py                  Single-page app shell (app bar + stepper + hero + sections)
+assets/                 Brand SVGs + bundled PII-free sample course list
+examples/               Tiny demo CSV
+tests/                  pytest suite (132 tests)
+MODEL.md                Full model + rules + design rationale
+DEPLOY.md               Google Cloud Run deployment runbook
+Dockerfile              Streamlit + OR-Tools image for Cloud Run
+data/                   Real institutional CSVs (git-ignored — contains PII)
 ```
 
-**Derived automatically from the course list:**
+---
 
-- **Cohort** = `(department prefix, year level)` read from the course code (`CMPE 113` → CMPE,
-  year 1). Service and elective courses inherit the literal code's cohort — an accepted
-  approximation, since cohort conflict is soft (see Architecture).
-- **Instructor identity** = email; the display name is cosmetic. A blank email excludes the
-  section from instructor no-overlap.
-- **Teaching blocks** from `T` / `P` / `L`: theory splits into ≤2h same-section sessions forced
-  onto different days; the lab block is split at `max_block_len`.
+## Quick Start
 
-**Provided separately — not part of the course list:**
+Requires Python 3.11+.
 
-- **Classrooms** — room name, capacity, and an explicit lab flag, managed as their own inventory.
-- **Period** — Fall (`001`) or Spring (`002`), chosen at solve time.
+```bash
+python3 -m pip install -r requirements.txt   # pandas, ortools, pytest, streamlit
 
-## Running the solver
+# Web app (the easy path — try it with the bundled sample dataset)
+PYTHONPATH=src streamlit run app.py
+
+# Run the tests
+python3 -m pytest -q                         # 132 tests
+```
+
+> The web app and tests need **no private data** — classroom defaults come from `defaults.py` and a PII-free sample course list ships in `assets/`. The real institutional CSVs live in `data/`, which is git-ignored and absent from fresh clones.
+
+### Command-line solver
 
 ```bash
 # Full period — the primary path, via the repair solver
@@ -87,172 +256,76 @@ PYTHONPATH=src python3 -m timetabling --period 001 \
     --scope faculty="Basic Sciences" --mode A,B --time-limit 60
 ```
 
-### Parameters
-
 | Flag | Values | Description |
-|---|---|---|
-| `--period` | `001` (Fall) \| `002` (Spring) | Term to schedule — each is solved independently |
-| `--scope` | `all` \| `faculty=<text>` \| `dept=<CODE>` | The slice to solve. `faculty` matches the Grades `Dept.` column; `dept` matches the cohort dept code |
-| `--mode` | `A,B` (default) \| `A` \| `B` | **A** solves from scratch; **B** benchmarks against the existing program |
-| `--repair` | flag | Warm-started small-neighbourhood repair solver — the path for full `--scope all`. Construction → relatedness-neighbourhood re-optimization → loop until dry. Reports `placed/total`, `wall`, `sweeps` |
-| `--decompose` | flag | Legacy faculty-by-faculty greedy (~49% placed). Retained for comparison; superseded by `--repair` |
-| `--time-limit` | seconds (default 60) | CP-SAT budget for the single-shot solver. The repair solver manages its own per-round budget and ignores this |
-| `--max-rooms-per-block N` | int | Truncate each block's candidate room list — a single-shot model-size lever |
+| --- | --- | --- |
+| `--period` | `001` (Fall) · `002` (Spring) | Term to schedule — each solved independently |
+| `--scope` | `all` · `faculty=<text>` · `dept=<CODE>` | The slice to solve |
+| `--mode` | `A,B` (default) · `A` · `B` | **A** solves from scratch; **B** benchmarks against the existing program |
+| `--repair` | flag | Warm-started neighbourhood repair — the path for full `--scope all` |
+| `--decompose` | flag | Legacy faculty-by-faculty greedy (~49%), kept for comparison |
+| `--time-limit` | seconds (default 60) | CP-SAT budget for the single-shot solver |
+| `--max-rooms-per-block N` | int | Truncate each block's candidate room list (model-size lever) |
 | `--out` | dir (default `out/`) | Output folder |
 
-Every other parameter — blackout hours, time windows, objective weights, `max_block_len`,
-`max_theory_session`, soft-term weights — is centralized in the `Config` dataclass at
-[src/timetabling/config.py](src/timetabling/config.py).
+---
 
-## Outputs (`out/`)
+## Input contract
+
+The engine runs from a single **course list** — one CSV, one row per section.
+
+| Column | Meaning |
+| --- | --- |
+| `Course Code` | e.g. `CMPE 113` — department prefix and year level are derived from it (`CMPE`, year 1) |
+| `Course Name` | Display name |
+| `Section No` | Section number within the course |
+| `T` / `P` / `L` | Weekly theory / practice / lab hours |
+| `Lecturer Name` | Display name — informational only |
+| `Lecturer Email` | The instructor's identity key; team-taught sections list comma-separated emails |
+| `~Students` | Approximate enrollment — drives room capacity and virtual-room routing |
+
+```csv
+Course Code,Course Name,Section No,T,P,L,Lecturer Name,Lecturer Email,~Students
+CMPE 113,Introduction to Programming,1,3,0,2,Jane Doe,jane.doe@uni.edu,45
+ECON 101,Principles of Economics,1,3,0,0,John Smith,john.smith@uni.edu,120
+```
+
+**Derived automatically:** cohort `(department prefix, year level)` from the course code; instructor identity from email; teaching blocks from `T`/`P`/`L` (theory splits into ≤2 h same-section sessions on different days). **Provided separately:** the classroom inventory (name, capacity, explicit lab flag) and the period.
+
+### Outputs (`out/`)
 
 | File | Contents |
-|---|---|
-| **`schedule_<period>.json`** | The UI-consumable contract: per-assignment `section_id, course_code, course_name, block_kind, instructor_id, instructor_name, cohort, dept, students, day, start, end, room, room_cap, is_lab_room, flags`, plus `period`, `meta`, `unmet_soft`, `conflicts` |
-| **`schedule_<period>.csv`** | The same assignments as a flat table |
-| **`data_quality_<period>.json`** | Parse / room / cohort / join checks, plus the unschedulable list |
-| **`mode_b_<period>.json`** | Generated vs. existing program — conflict counts, room usage, evening ratio |
+| --- | --- |
+| `schedule_<period>.json` | The UI contract — per-assignment `section_id, course_code, block_kind, instructor, cohort, day, start, end, room, …` plus `meta`, `unmet_soft`, `conflicts` |
+| `schedule_<period>.csv` | The same assignments as a flat table |
+| `data_quality_<period>.json` | Parse / room / cohort / join checks + the unschedulable list |
+| `mode_b_<period>.json` | Generated vs. existing program — conflict counts, room usage, evening ratio |
 
-## Tests
+---
+
+## Deployment
+
+Kairos ships as a single Docker image — Streamlit, OR-Tools CP-SAT, and PII-free defaults — on **Google Cloud Run**, in the institution's own GCP project, **EU region**, **scale-to-zero**. Access is locked to named Google accounts via IAM; the live deployment is reached through `gcloud run services proxy` or the domain mapping at `schedule.huguryildiz.com`.
 
 ```bash
-python3 -m pytest -q        # 86 tests
+gcloud run deploy timetabling --source . \
+  --no-allow-unauthenticated \
+  --memory 4Gi --cpu 4 --cpu-boost \
+  --timeout 3600 --min-instances 0 --max-instances 2
 ```
 
----
-
-## Architecture
-
-The pipeline is a chain of small, single-purpose modules, orchestrated end-to-end by
-`__main__.py`:
-
-```
-src/timetabling/
-  config.py         Config dataclass + all parameters, DAYS, LAB_SUFFIXES
-  model.py          Room, Instructor, Block, Section, Candidate, Assignment, Violation
-  textnorm.py       Staff ID / name / int normalization
-  schedule_parse.py SCHEDULE grammar (unit / chain / X/Y / dirty -> flag)
-  io_csv.py         quote-aware CSV loaders
-  clean.py          room classification (lab/online/physical/virtual), instructor objects
-  join.py           Grades + enrollment + Plan combined frame
-  derive.py         Section + Block derivation (level, cohort, theory/lab blocks, plan_room)
-  route.py          mark_virtual (online/oversize -> virtual room), mark_lab_rooms (pin lab block)
-  model_cpsat.py    candidate generation + pruning + single-shot CP-SAT model
-  repair.py         construction + warm-started small-neighbourhood repair solver (--repair)
-  decompose.py      legacy faculty-by-faculty greedy (--decompose)
-  validate.py       solver-independent hard-constraint validator
-  report.py         data quality + Mode-B benchmark
-  export.py         schedule.json + CSV
-  __main__.py       CLI / pipeline orchestration
-```
-
-The design rests on a deliberate split. Most hard constraints are enforced **during candidate
-generation** — only legal `(room, day, start)` placements are ever produced: capacity, the
-**pinned lab room**, the undergraduate <18:00 window, and the Friday 13–14 and Thursday 14–16
-(full-time staff seminar) blackouts. Cross-block relations become model/solver constraints:
-**placement**, **room / instructor / self no-overlap**, and **theory different-day**. Finally,
-`validate.py` re-checks the solution **independently of the solver**, so an encoding bug can
-never pass silently.
-
-### Key behaviours — all implemented and tested
-
-- **Repair solver (`--repair`).** A greedy first-fit construction seeds a full-period solution.
-  CP-SAT then repeatedly frees a small *relatedness* neighbourhood — the unplaced blocks plus the
-  placed blocks competing for the slots they need — re-solves it with a **soft** placement term
-  (so no neighbourhood is ever infeasible), warm-started from current positions, and commits only
-  non-worsening moves, looping until a full sweep places nothing new. This is what makes the
-  793/801-section period tractable on CP-SAT, where a single global solve of ~356k variables
-  returns UNKNOWN.
-
-- **Virtual room for online / oversize sections.** The largest *real* classroom seats 100.
-  Sections the Plan delivers as `Online`, or whose enrollment exceeds 100, are routed
-  (`route.mark_virtual`) to a virtual `Online` room — unlimited capacity, **exempt from room
-  no-overlap**, while instructor and self constraints still apply. This is faithful to the data:
-  HIST/TUR common courses run online and TEDU/ENGR seminars are roomless. It replaces the earlier
-  *synthetic AMFI halls*, which assumed amphitheatre capacities the data never contained.
-
-- **Theory distributes into ≤2h sessions on different days.** `blocks_from_tpl` splits a
-  section's theory hours into sessions of at most `cfg.max_theory_session` (2h): T:3 → 2+1,
-  T:4 → 2+2. A **hard** constraint — enforced in the model, the repair solver, and an independent
-  `split_day` validator check — forces a section's theory sessions onto **different days**. Labs
-  retain `max_block_len`.
-
-- **Lab block pinned to its real lab room.** `route.mark_lab_rooms` reads each section's
-  designated lab room from the Plan (the `-L`/`-PC`-suffixed token) and pins the lab block to
-  exactly that room; `validate` enforces it (`lab_room`). Sections whose lab is held in a regular
-  room — or that are project courses — keep no pin and use regular rooms. The three real lab rooms
-  missing from `classrooms.csv` (A317/A326/DB102-MF-L, cap 50) were added to the data, and `-PC`
-  rooms (e.g. H007/009-PC) now classify as labs.
-
-- **Cohort conflict is soft, by design.** Sections of the *same* course may run in parallel;
-  different courses within the same `(dept, year)` cohort incur a weighted penalty
-  (`w_cohort_conflict`, default 50) rather than a hard violation. A hard course-level cohort
-  constraint was proven INFEASIBLE at scale. It surfaces as `cohort_conflicts` in
-  `mode_b_<period>.json`.
-
-- **Team-taught sections.** `Section.instructor_ids` is a `list[str]`; every id enters instructor
-  no-overlap, and the seminar blackout applies if any co-instructor is full-time.
-
-A weighted **soft objective** — minimized under the time cap — shapes the quality of feasible
-schedules: evening-slot use, room compactness, instructor / part-time day-compactness, cohort
-daily-compactness (`w_cohort_gap`), course-level day-ordering (`w_order`, S-Order), and
-Engineering lab-day preference (`w_englab`, S-EngLab). The former `w_nonadjacent` term is
-superseded for theory by the hard different-day rule.
+> **Memory matters:** a CP-SAT solve needs **≥ 4 GiB** — the Cloud Run default of 512 MiB OOM-kills the container and the Solve button silently does nothing. The full runbook (regions, IAM, KVKK notes, troubleshooting) is in [`DEPLOY.md`](DEPLOY.md).
 
 ---
 
-## Verified results
+## Reference
 
-### Full period — repair solver, Mode A, all rules
-
-| Period | Sections | Blocks placed | Hard resource conflicts | Wall time | Sweeps |
-|---|---|---|---|---|---|
-| 001 | 793 | 1566 / 1708 · 91.7% | 0 | 297 s | 3 |
-| 002 | 801 | 1585 / 1788 · 88.6% | 0 | 628 s | 6 |
-
-The reported "violations" equal the unplaced-block count — each unplaced block registers as a
-`placement` check — meaning **zero real room / instructor / capacity / lab-room / window /
-blackout / self / different-day conflicts** among the blocks that *were* placed.
-
-### Generated vs. existing program — period 001, Mode-B style
-
-| Metric | Ours | Existing Plan |
-|---|---|---|
-| Hard resource conflicts | **0** | ~1091 — room 325, instructor 522, window 91, blackout 85, capacity 6, split-day 62 |
-| Distinct rooms used | 92 | 248 |
-| Evening (≥17h) ratio | 0.19 | 0.22 |
-| Avg room fill (students / cap) | 0.72 | 0.50 |
-
-The existing program's "conflicts" are measured under *our* stricter, consistent rule model;
-roughly 176 are rule-definition differences (it legitimately uses evening and blackout slots we
-forbid), and the rest include cross-listing and coordinator-listing artifacts. The honest
-claim — and the one this project stands behind — is precise: our schedule is conflict-free under
-one coherent rule set; the existing one is not, under those same rules.
-
-### Per-faculty single-shot
-
-`--scope faculty=...` without `--repair` solves a single faculty (≈30–200 sections) to
-OPTIMAL/FEASIBLE with **0 hard violations** in seconds to minutes — ideal for inspecting one
-program at a time.
+- [`MODEL.md`](MODEL.md) — the full model: time grid, hard rules, soft objective, block derivation, and the design decisions behind them.
+- [`TODO.md`](TODO.md) — phase-by-phase engineering record and remaining backlog.
+- [`CLAUDE.md`](CLAUDE.md) — repository conventions and gotchas.
 
 ---
 
-## Known limitations
-
-1. **The ~8–11% placement tail** — mostly Architecture studios (long blocks, scarce slots). The
-   repair plateaus, and intensification has poor ROI; the residual is best resolved by manual
-   placement or a future smarter neighbourhood/solver strategy.
-2. **Cohort proxy granularity** — `(Dept_Code, Year_Level)` over-approximates student conflict;
-   finer curriculum data would sharpen quality.
-3. **Web UI** — not yet started. A read-only viewer can consume `schedule_<period>.json` today; a
-   simple self-contained HTML timetable generator exists as a scratch tool.
-
----
-
-## Project history
-
-- **Phase 1** — end-to-end CP-SAT pipeline and slice feasibility.
-- **Phase 2** — model fidelity (soft cohort, block splitting, team-taught) and per-faculty results.
-- **Current** — full-period **repair solver**; **virtual rooms** for online/oversize (AMFI halls
-  removed); **theory 2+1 split with a hard different-day rule**; **lab-room pinning**; **Gurobi
-  backend removed** (CP-SAT proved sufficient). The full record is in [TODO.md](TODO.md).
+<p align="center">
+  <strong>Kairos</strong> · Course Timetabling<br>
+  <sub>🗓️ Every section, placed on a conflict-free weekly grid.</sub>
+</p>

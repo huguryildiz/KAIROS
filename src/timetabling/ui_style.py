@@ -141,7 +141,13 @@ h1,h2,h3,h4{margin:0;letter-spacing:-.018em;font-weight:700;color:var(--ink);}
 .st-key-topbar .stepper-wrap{background:transparent;border:none;margin:4px 0 0;}
 
 /* App bar (left side: brand) */
-.tt-appbar{display:flex;align-items:center;gap:14px;}
+/* Streamlit collapses the brand markdown wrapper to a ~12px line box, so the
+   taller brand row top-aligns and its mid-line lands ~8px below the control
+   buttons (which sit on the true row centre). Nudge the brand up to match — a
+   transform, so it shifts visually without reflowing the collapsed wrappers.
+   Offset is line-box-driven (constant for both the 28px and 40px glyph), not
+   glyph-height-driven, so a single value holds across breakpoints. */
+.tt-appbar{display:flex;align-items:center;gap:14px;transform:translateY(-8px);}
 .tt-brand{display:flex;align-items:center;gap:11px;font-weight:700;}
 .tt-brand .glyph{width:40px;height:40px;border-radius:10px;flex:none;overflow:hidden;box-shadow:var(--sh-1);}
 .tt-brand .glyph img{width:100%;height:100%;display:block;border-radius:inherit;}
@@ -212,6 +218,30 @@ h1,h2,h3,h4{margin:0;letter-spacing:-.018em;font-weight:700;color:var(--ink);}
 .chip-stat.good .v{color:#6EE7B7;}
 .chip-stat.bad{background:rgba(248,113,113,.14);border-color:rgba(248,113,113,.34);}
 .chip-stat.bad .v{color:#FCA5A5;}
+
+/* Hero animation — a mini week grid that "solves" itself: course blocks slide
+   into empty cells forming a conflict-free schedule, then gently re-solves on an
+   ~8s loop. Decorative (aria-hidden), lives behind the text on the right. The
+   hero gradient is theme-fixed navy, so this reads identically in light + dark.
+   Day labels are localized in `hero_html` (DAY_LABELS[lang]). */
+.tt-hero h1,.tt-hero>p,.tt-hero>.row{position:relative;z-index:1;}
+.tt-hero-anim{position:absolute;z-index:0;right:30px;top:50%;transform:translateY(-50%);width:286px;pointer-events:none;}
+.tt-hero-anim::before{content:"";position:absolute;inset:-26px -22px;border-radius:30px;background:radial-gradient(60% 60% at 50% 42%, rgba(150,166,240,.22), rgba(150,166,240,0) 72%);}
+.tt-hero-anim .days{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:0 0 7px;}
+.tt-hero-anim .days span{font:600 .56rem/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:rgba(190,200,240,.62);text-align:center;}
+.tt-hero-anim .board{position:relative;}
+.tt-hero-anim .cells{display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(5,26px);gap:6px;}
+.tt-hero-anim .cells i{border-radius:6px;background:rgba(255,255,255,.045);box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);}
+.tt-hero-anim .blocks{position:absolute;inset:0;display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(5,26px);gap:6px;}
+.tt-hero-anim .blk{position:relative;border-radius:6px;--c:#8E9BF2;background:linear-gradient(158deg, color-mix(in srgb,var(--c) 78%, #ffffff) 0%, var(--c) 60%);box-shadow:0 5px 16px -6px var(--c),inset 0 1px 0 rgba(255,255,255,.4);opacity:0;transform:translateY(-12px) scale(.92);animation:solveIn 8s var(--d,0s) cubic-bezier(.34,1.32,.5,1) infinite;}
+.tt-hero-anim .blk::after{content:"";position:absolute;left:7px;right:7px;top:6px;height:3px;border-radius:3px;background:rgba(255,255,255,.5);}
+.tt-hero-anim .sweep{position:absolute;inset:0;border-radius:8px;overflow:hidden;pointer-events:none;}
+.tt-hero-anim .sweep::after{content:"";position:absolute;top:-20%;bottom:-20%;left:-40%;width:34%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.16),transparent);transform:skewX(-14deg);animation:gridSweep 8s 1.9s ease-in-out infinite;}
+@keyframes solveIn{0%{opacity:0;transform:translateY(-12px) scale(.92);}6%{opacity:1;transform:translateY(2px) scale(1.03);}11%{opacity:1;transform:translateY(0) scale(1);}78%{opacity:1;transform:none;}87%{opacity:0;transform:translateY(-8px) scale(.96);}100%{opacity:0;transform:translateY(-12px) scale(.92);}}
+@keyframes gridSweep{0%,18%{transform:translateX(0) skewX(-14deg);opacity:0;}24%{opacity:1;}46%{transform:translateX(900%) skewX(-14deg);opacity:0;}100%{transform:translateX(900%) skewX(-14deg);opacity:0;}}
+/* Hide below 980px so the grid never crowds the headline / on mobile portrait. */
+@media (max-width:980px){.tt-hero-anim{display:none;}}
+@media (prefers-reduced-motion:reduce){.tt-hero-anim .blk{animation:none;opacity:1;transform:none;}.tt-hero-anim .sweep{display:none;}}
 
 /* KPI chips */
 .chips{display:flex;flex-wrap:wrap;gap:11px;margin-bottom:14px;}
@@ -540,18 +570,7 @@ hr{border-color:var(--border) !important;}
 .st-key-topbar [data-testid="stHorizontalBlock"] [data-testid="stElementContainer"]{
   padding:0!important;margin:0!important;}
 .st-key-topbar [data-testid="stHorizontalBlock"]>[data-testid="stColumn"]:first-child{
-  flex:1 1 auto!important;display:flex!important;align-items:center!important;
-  align-self:stretch!important;}
-/* Streamlit collapses the brand's markdown/element wrappers to a ~12px line box
-   even though the brand glyph is 28–40px, so as block children the brand
-   top-aligns and its mid-line drifts BELOW the control buttons. Stretch the
-   column to the full row height, force each inner wrapper to fill it, and
-   flex-centre — so the brand's mid-line lands on the row centre = the buttons. */
-.st-key-topbar [data-testid="stHorizontalBlock"]>[data-testid="stColumn"]:first-child>[data-testid="stVerticalBlock"],
-.st-key-topbar [data-testid="stHorizontalBlock"]>[data-testid="stColumn"]:first-child [data-testid="stElementContainer"],
-.st-key-topbar [data-testid="stHorizontalBlock"]>[data-testid="stColumn"]:first-child [data-testid="stMarkdown"],
-.st-key-topbar [data-testid="stHorizontalBlock"]>[data-testid="stColumn"]:first-child [data-testid="stMarkdownContainer"]{
-  display:flex!important;align-items:center!important;height:100%!important;}
+  flex:1 1 auto!important;display:flex!important;align-items:center!important;}
 .st-key-topbar [data-testid="stHorizontalBlock"]>[data-testid="stColumn"]:last-child{
   flex:0 0 auto!important;display:flex!important;align-items:center!important;
   justify-content:flex-end!important;}
@@ -866,6 +885,37 @@ def kpi_chips_html(items: List[Tuple[str, str, str]]) -> str:
     return f'<div class="chips">{cells}</div>'
 
 
+# Decorative hero animation blocks — (grid-column, grid-row, color, delay). A
+# fixed, conflict-free tiling of the 5×5 mini grid; the CSS animates each block
+# sliding into place. Cool indigo/violet to match the hero gradient, with two
+# mint blocks echoing the "0 hard conflicts" promise (never red = conflict).
+_HERO_ANIM_BLOCKS = (
+    ("1", "1/3", "#8E9BF2", "0s"), ("2", "1", "#A78BF0", ".10s"),
+    ("4", "1/3", "#6E78D8", ".20s"), ("3", "2/4", "#34D6AA", ".30s"),
+    ("5", "2", "#B6A4F4", ".40s"), ("2", "3/5", "#7C89E8", ".50s"),
+    ("1", "4", "#34D6AA", ".60s"), ("4", "4/6", "#9A8CF2", ".70s"),
+    ("5", "5", "#7C89E8", ".80s"),
+)
+
+
+def hero_anim_html(lang: str = DEFAULT_LANG) -> str:
+    """Decorative self-solving mini-timetable for the hero (see the
+    ``.tt-hero-anim`` CSS). ``aria-hidden``; day labels follow ``lang`` so the
+    grid header is localized (TR ``Pzt Sal…`` / EN ``Mon Tue…``)."""
+    labels = DAY_LABELS.get(lang, DAY_LABELS[DEFAULT_LANG])
+    days = "".join(f"<span>{escape(labels.get(d, d))}</span>" for d in DAYS_ORDER)
+    blocks = "".join(
+        f'<div class="blk" style="grid-column:{c};grid-row:{r};--c:{col};--d:{d}"></div>'
+        for (c, r, col, d) in _HERO_ANIM_BLOCKS)
+    return (
+        f'<div class="tt-hero-anim" aria-hidden="true">'
+        f'<div class="days">{days}</div>'
+        f'<div class="board"><div class="cells">{"<i></i>" * 25}</div>'
+        f'<div class="blocks">{blocks}</div>'
+        f'<div class="sweep"></div></div></div>'
+    )
+
+
 def hero_html(lang: str = DEFAULT_LANG, chips=None) -> str:
     """Hero banner. ``chips`` is a list of ``(value, label, tone)`` (tone in
     {'', 'good', 'bad'}); when None the static proof chips are shown — so the
@@ -884,6 +934,7 @@ def hero_html(lang: str = DEFAULT_LANG, chips=None) -> str:
         for (v, label, tone) in chips)
     return (
         f'<div class="tt-hero">'
+        f'{hero_anim_html(lang)}'
         f'<h1>{t("hero_title_html", lang)}</h1>'
         f'<p>{escape(t("hero_body", lang))}</p>'
         f'<div class="row">{cells}</div></div>'

@@ -1,6 +1,7 @@
 from timetabling.ui_style import (block_color, dept_color, metric_cards_html,
                                    week_grid_html, brand_css, hero_html,
-                                   appbar_html, stepper_html, kpi_chips_html)
+                                   hero_anim_html, appbar_html, stepper_html,
+                                   kpi_chips_html, data_table_html)
 
 _SCHED = {"assignments": [
     {"section_id": "A_01", "course_code": "A 101", "room": "R1", "day": "Mo",
@@ -75,10 +76,52 @@ def test_kpi_chips_render_label_value_tone():
     assert "793" in html and "Şube" in html and "kpi good" in html
 
 
-def test_appbar_live_flag_and_context():
-    assert "context-pill live" in appbar_html("tr", "793 şube", live=True)
-    assert "Veri" in appbar_html("tr", "Veri bekleniyor", live=False)
+def test_appbar_brand_only():
+    html = appbar_html("tr")
+    assert "tt-brand" in html and "Kairos" in html
+    assert "context-pill" not in html
 
 
 def test_hero_html_localized():
     assert "tt-hero" in hero_html("tr") and "tt-hero" in hero_html("en")
+
+
+def test_hero_html_embeds_decorative_animation():
+    html = hero_html("tr")
+    # the self-solving mini-grid is present, decorative, and styled by CSS hooks
+    assert 'class="tt-hero-anim"' in html and 'aria-hidden="true"' in html
+    assert html.count('class="blk"') == 9          # all course blocks rendered
+    assert html.count("<i></i>") == 25             # 5×5 empty-cell backdrop
+    css = brand_css("dark")
+    assert "@keyframes solveIn" in css and ".tt-hero-anim" in css
+    assert "prefers-reduced-motion" in css         # freezes when motion reduced
+
+
+def test_hero_anim_day_labels_follow_language():
+    tr, en = hero_anim_html("tr"), hero_anim_html("en")
+    assert "<span>Pzt</span>" in tr and "<span>Cum</span>" in tr
+    assert "Mon" not in tr
+    assert "<span>Mon</span>" in en and "<span>Fri</span>" in en
+    assert "Pzt" not in en
+
+
+def test_data_table_html_themed_and_escaped():
+    # Our own HTML table (themed via tokens) — not st.dataframe's glide canvas,
+    # which can't follow the in-app dark theme. Renders headers, cells, escapes.
+    html = data_table_html(["Course Code", "T", "~Students"],
+                           [["CMPE 113", "3", "50"], ["A<b>", "1", "9"]],
+                           numeric=("T", "~Students"))
+    assert "tt-table-wrap" in html and 'table class="tt-data"' in html
+    assert "CMPE 113" in html and "<th>Course Code</th>" in html
+    assert '<th class="num">T</th>' in html                  # numeric col right-aligned
+    assert '<td class="num">50</td>' in html
+    assert "A&lt;b&gt;" in html and "<b>" not in html        # HTML-escaped
+
+
+def test_data_table_html_empty_rows_render_placeholder():
+    html = data_table_html(["A", "B"], [])
+    assert "tt-td-empty" in html and 'colspan="2"' in html
+
+
+def test_data_table_html_max_height_inlined():
+    assert "--tt-table-h:220px" in data_table_html(["A"], [["x"]], max_height=220)

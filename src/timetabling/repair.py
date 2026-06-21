@@ -301,10 +301,14 @@ def solve_repair(sections, rooms, instructors, cfg):
 
     state = State(sec_of, sec_instr, virtual_names)
     t0 = perf_counter()
+    # Overall wall-clock budget (UI/CLI). The repair loop runs to convergence well within
+    # this for current sizes; the deadline is a hard upper bound that bounds runaway sweeps
+    # on much larger inputs (and keeps the synchronous UI request under Cloud Run limits).
+    deadline = getattr(cfg, "repair_time_limit_s", float("inf")) if cfg else float("inf")
     greedy_construct(state, order, cand_by_block, cfg, eligible, cfg.max_instr_daily_hours)
 
     sweep = 0
-    while True:
+    while perf_counter() - t0 < deadline:
         sweep += 1
         unplaced = [bid for bid, _ in [(b.block_id, s) for b, s in blocks]
                     if bid not in state.placed]
@@ -313,6 +317,8 @@ def solve_repair(sections, rooms, instructors, cfg):
         unplaced.sort(key=lambda bid: (len(cand_by_block[bid]), -sec_of[bid].students))
         gained = 0
         for i in range(0, len(unplaced), BATCH):
+            if perf_counter() - t0 >= deadline:
+                break
             batch = [bid for bid in unplaced[i:i + BATCH] if bid not in state.placed]
             if batch:
                 # placement phase: pure placement (no overload steering) so the result
@@ -328,14 +334,16 @@ def solve_repair(sections, rooms, instructors, cfg):
     if cfg.w_instr_daily_overload and eligible:
         cap = cfg.max_instr_daily_hours
         t_polish = perf_counter()
+        # keep polish within the overall deadline: never exceed the remaining budget.
+        polish_budget = min(POLISH_BUDGET_S, max(0.0, deadline - (t_polish - t0)))
         prev = None
         for _ in range(POLISH_SWEEPS):
             bad = sorted({iid for (iid, day), h in state.instr_day_hours.items()
                           if h > cap and iid in eligible})
-            if not bad or perf_counter() - t_polish > POLISH_BUDGET_S:
+            if not bad or perf_counter() - t_polish > polish_budget:
                 break
             for iid in bad:
-                if perf_counter() - t_polish > POLISH_BUDGET_S:
+                if perf_counter() - t_polish > polish_budget:
                     break
                 batch = list(state.instr_blocks.get(iid, set()))
                 if batch:

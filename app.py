@@ -8,13 +8,15 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 import streamlit as st
 from timetabling.defaults import DEFAULT_CLASSROOMS
-from timetabling.ui_style import brand_css, appbar_html, stepper_html, hero_html
-from timetabling.ui_app import get_lang, get_theme, theme_toggle, lang_selector_bar
+from timetabling.ui_style import (brand_css, appbar_html, stepper_html,
+                                  hero_html, footer_html)
+from timetabling.ui_app import (get_lang, get_theme, theme_toggle,
+                                lang_selector_bar, hero_chips)
 from timetabling.i18n import t
 from views import upload, review, classrooms, solve, results
 
 _ICON = os.path.join(os.path.dirname(__file__), "assets", "icon.svg")
-st.set_page_config(page_title="Course Timetabling", page_icon=_ICON, layout="wide")
+st.set_page_config(page_title="Kairos | Course Timetabling", page_icon=_ICON, layout="wide")
 
 # Session defaults
 st.session_state.setdefault("courses", [])
@@ -28,39 +30,76 @@ st.markdown(brand_css(get_theme()), unsafe_allow_html=True)
 has_courses = bool(st.session_state["courses"])
 has_result = st.session_state["result"] is not None
 
-# --- App bar: brand + context (HTML) on the left, controls (widgets) on the right
-lang = get_lang()
-ctx = (t("appbar_loaded", lang, n=len(st.session_state["courses"]))
-       if has_courses else t("appbar_waiting", lang))
-bar = st.columns([6, 1, 1.4], vertical_alignment="center")
-with bar[0]:
-    st.markdown(appbar_html(lang, ctx, live=has_courses), unsafe_allow_html=True)
-with bar[1]:
-    theme_toggle()
-with bar[2]:
-    lang = lang_selector_bar()
-
-# --- Step indicator
+# --- Sticky glass header: brand + controls + step indicator in one frosted bar
+#     (the .st-key-topbar wrapper is made sticky + backdrop-blurred in ui_style).
 def _solve_status() -> str:
     if not has_courses:
         return "locked"
     return "done" if has_result else "active"
 
-steps = [
-    {"key": "upload", "label": t("step_upload", lang),
-     "status": "done" if has_courses else "active"},
-    {"key": "review", "label": t("step_review", lang),
-     "status": "done" if has_courses else "locked"},
-    {"key": "classrooms", "label": t("step_classrooms", lang),
-     "status": "done" if has_courses else "locked"},
-    {"key": "solve", "label": t("step_solve", lang), "status": _solve_status()},
-    {"key": "results", "label": t("step_results", lang),
-     "status": "active" if has_result else "locked"},
-]
-st.markdown(stepper_html(steps, lang), unsafe_allow_html=True)
+lang = get_lang()
 
-# --- Hero
-st.markdown(hero_html(lang), unsafe_allow_html=True)
+# Streamlit's file-uploader widget hardcodes English strings in its React bundle.
+# When the UI language is TR, inject a tiny MutationObserver that rewrites those
+# strings in the parent DOM as soon as they appear (and whenever Streamlit re-renders).
+if lang == "tr":
+    import streamlit.components.v1 as _cmp
+    _cmp.html(
+        """<script>
+(function(){
+  var TR={
+    "Drag and drop file here":"Dosyayı buraya bırakın",
+    "Browse files":"Dosya seç"
+  };
+  var LIM=/^Limit \\d+MB per file/;
+  function run(){
+    try{
+      window.parent.document
+        .querySelectorAll('[data-testid="stFileUploaderDropzone"]')
+        .forEach(function(dz){
+          dz.querySelectorAll('p,span,small,button').forEach(function(el){
+            if(el.children.length)return;
+            var s=el.innerText.trim();
+            if(TR[s]){el.innerText=TR[s];return;}
+            if(LIM.test(s)){el.innerText="Maks. 200 MB · Yalnızca CSV";}
+          });
+        });
+    }catch(e){}
+  }
+  run();
+  new MutationObserver(function(){setTimeout(run,60);})
+    .observe(window.parent.document.body,{childList:true,subtree:true});
+})();
+</script>""",
+        height=0,
+    )
+
+with st.container(key="topbar"):
+    bar = st.columns([7, 2], vertical_alignment="center")
+    with bar[0]:
+        st.markdown(appbar_html(lang), unsafe_allow_html=True)
+    with bar[1]:
+        # Theme + language controls on one tight, right-aligned flex row
+        # (the container is flipped to flex-direction:row in ui_style).
+        with st.container(key="topctrls"):
+            theme_toggle()
+            lang = lang_selector_bar()
+
+    steps = [
+        {"key": "upload", "label": t("step_upload", lang),
+         "status": "done" if has_courses else "active"},
+        {"key": "review", "label": t("step_review", lang),
+         "status": "done" if has_courses else "locked"},
+        {"key": "classrooms", "label": t("step_classrooms", lang),
+         "status": "done" if has_courses else "locked"},
+        {"key": "solve", "label": t("step_solve", lang), "status": _solve_status()},
+        {"key": "results", "label": t("step_results", lang),
+         "status": "active" if has_result else "locked"},
+    ]
+    st.markdown(stepper_html(steps, lang), unsafe_allow_html=True)
+
+# --- Hero (chips track the workflow state: proof → dataset → real outcome)
+st.markdown(hero_html(lang, hero_chips(lang)), unsafe_allow_html=True)
 
 
 def _anchor(name: str) -> None:
@@ -86,3 +125,23 @@ if has_result:
     st.divider()
     _anchor("results")
     results.render(lang)
+
+
+# --- Auto-advance: after a fresh upload / sample-load, smooth-scroll the page to
+# the Review step so the next action is in view (set by views.upload._set_courses).
+# --- Footer (attribution) — always last, after every section.
+st.markdown(footer_html(lang), unsafe_allow_html=True)
+
+_scroll_target = st.session_state.pop("scroll_to", None)
+if _scroll_target:
+    import streamlit.components.v1 as components
+    components.html(
+        f"""
+        <script>
+          const doc = window.parent.document;
+          const el = doc.getElementById("s-{_scroll_target}");
+          if (el) el.scrollIntoView({{behavior: "smooth", block: "start"}});
+        </script>
+        """,
+        height=0,
+    )

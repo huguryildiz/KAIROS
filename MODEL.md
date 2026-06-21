@@ -386,6 +386,48 @@ Both solvers share the same candidate generation and constraints.
    are frozen), so it is a cheap secondary cleanup — the construction shaping in step 1 does
    the bulk of the work.
 
+**Repair solver — top-level flow**
+
+```mermaid
+flowchart TD
+    A([Start]) --> B[gen_candidates\nfor every block]
+    B --> C[Sort all blocks\nfewest candidates first\nthen largest section]
+    C --> D[Greedy construction\nplace each block in lowest\nsoft-score feasible candidate]
+    D --> E{Unplaced\nblocks?}
+    E -- No --> P
+    E -- Yes --> F[Sort unplaced\nby candidate count]
+    F --> G[Next batch of 30\nunplaced blocks]
+    G --> H[repair_round\nsee detail below]
+    H --> I{More\nbatches?}
+    I -- Yes --> G
+    I -- No --> J{gained > 0\nAND sweep < 25?}
+    J -- Yes --> E
+    J -- No --> P[Polish phase\noverload opt-in]
+    P --> Q{Eligible instructor\nload > cap today?}
+    Q -- No --> R([Done\nassignments + stats])
+    Q -- Yes --> S[repair_round over\noverloaded instructor's blocks]
+    S --> T{Budget / sweeps\nexhausted?}
+    T -- No --> Q
+    T -- Yes --> R
+```
+
+**repair\_round — neighbourhood sub-solver**
+
+```mermaid
+flowchart TD
+    A([batch: unplaced blocks]) --> B[competitors\nroom / instructor / section conflicts\nup to MAX_FREE=240 total]
+    B --> C[Build mini CP-SAT model\nsoft H1: placed OR unplaced var\nH2 room · H3 instr · H_self · H_day]
+    C --> D[Add warm-start hints\ncurrent placement → hint=1\nunplaced → hint=1 on unplaced var]
+    D --> E[Solve\n12 s · 8 workers]
+    E --> F{OPTIMAL or\nFEASIBLE?}
+    F -- No --> Z([return 0])
+    F -- Yes --> G{new_placed\n≥ old_placed?}
+    G -- No → accept guard --> Z
+    G -- Yes --> H[Release free set\nfrom state]
+    H --> I[Occupy new assignments\ninto state]
+    I --> J([return gained])
+```
+
 Full-period result (overload off): 001 ≈ 91.7 % placed, 002 ≈ 88.6 %, both at **0 hard
 conflicts**. A ~8–11 % tail (Architecture studios) remains.
 

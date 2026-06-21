@@ -9,7 +9,7 @@ from .repair import solve_repair
 from .validate import validate
 from .export import build_schedule_dict
 
-AUTO_REPAIR_THRESHOLD = 120
+AUTO_REPAIR_THRESHOLD = 50
 
 
 @dataclass

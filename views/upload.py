@@ -29,7 +29,7 @@ def render(lang: str) -> None:
     with st.container(key="upload_card"):
         st.markdown(dropzone_html(lang), unsafe_allow_html=True)
 
-        up = st.file_uploader("", type=["csv"], label_visibility="collapsed")
+        up = st.file_uploader("Upload CSV", type=["csv"], label_visibility="collapsed")
         if up is not None:
             try:
                 report = _ingest(up)

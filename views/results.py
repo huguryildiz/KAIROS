@@ -5,22 +5,21 @@ import pandas as pd
 import streamlit as st
 
 from timetabling.ui_grid import filter_assignments, distinct_values
-from timetabling.ui_style import metric_cards_html, week_grid_html
+from timetabling.ui_style import metric_cards_html, week_grid_html, eyebrow_html
 from timetabling.i18n import t
 
 # View dimension -> i18n label key for the "view by" selector.
 VIEW_KEY = {"cohort": "res_view_cohort", "room": "res_view_room",
-            "instructor_name": "res_view_instructor", "dept": "res_view_dept"}
+            "instructor_name": "res_view_instructor", "dept": "res_view_dept",
+            "course_code": "res_view_course"}
 
 
 def render(lang: str) -> None:
     res = st.session_state.get("result")
     if res is None:
         return
-    st.markdown(
-        f'<div class="eyebrow"><span class="n">5</span>{t("step_results", lang)}</div>',
-        unsafe_allow_html=True)
-    st.subheader(t("res_header", lang))
+    st.markdown(eyebrow_html(5, t("step_results", lang), "results"),
+                unsafe_allow_html=True)
 
     sched = res.schedule
     total_blocks = len(res.assignments) + sum(len(s.blocks) for s in res.unschedulable)
@@ -43,18 +42,20 @@ def render(lang: str) -> None:
     entity = c2.selectbox(t(VIEW_KEY[view_field], lang), entities)
     view = filter_assignments(sched, view_field, entity)
     st.markdown(week_grid_html(view, lang=lang), unsafe_allow_html=True)
-    st.caption(t("res_grid_caption", lang, n=len(view["assignments"])))
+    st.caption(t("res_grid_caption", lang))
 
     st.write("")
     c3, c4 = st.columns(2)
     c3.download_button(t("res_dl_json", lang),
                        json.dumps(sched, ensure_ascii=False, indent=2),
-                       file_name=f"schedule_{st.session_state.get('period','')}.json",
-                       use_container_width=True)
+                       file_name="schedule.json",
+                       use_container_width=True,
+                       key="dl_json")
     c4.download_button(t("res_dl_csv", lang),
                        pd.DataFrame(sched["assignments"]).to_csv(index=False),
-                       file_name=f"schedule_{st.session_state.get('period','')}.csv",
-                       use_container_width=True)
+                       file_name="schedule.csv",
+                       use_container_width=True,
+                       key="dl_csv")
 
     if res.unschedulable:
         with st.expander(t("res_unsched_title", lang, n=len(res.unschedulable))):

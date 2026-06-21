@@ -2,8 +2,9 @@
 
 A formal description of the University Course Timetabling (UCTP) model implemented in
 `src/timetabling/`. This is the ground-truth specification: it mirrors `model_cpsat.py`
-(the declarative CP-SAT model), `repair.py` (the production solver), and `config.py`
-(the tunable weights). When the code and this document disagree, the code wins — update
+(the declarative CP-SAT model), `repair.py` (the production solver), `config.py`
+(the tunable defaults), and `settings.py` (the per-school overrides exposed in the UI's
+School Settings step). When the code and this document disagree, the code wins — update
 this file.
 
 The solver decides, for each undergraduate course **block**, a **(room, day, start-hour)**.
@@ -39,6 +40,13 @@ A placement that breaks one of these is never even generated, so it cannot occur
 - **Friday blackout** — nothing is scheduled into the **Friday 13:00–14:00** slot.
 - **Seminar blackout** — nothing is scheduled into **Thursday 14:00–16:00** if any of the
   section's instructors is full-time staff.
+- **Instructor availability** — a block is never placed in a half-day an instructor marked
+  unavailable; every co-instructor's unavailability applies (a per-instructor blackout, set
+  in the School Settings step).
+- **Fixed session** — if a section declares a fixed slot, its **first block** is pinned to
+  exactly that `(day, start-hour)` (its remaining blocks schedule freely).
+- **Room type** — if a section declares it needs a lab room (the `Room Type` column), its
+  blocks go only in lab-flagged rooms; otherwise any fitting room (today's behavior).
 
 ### Hard constraints — enforced as model relations (across blocks)
 
@@ -76,8 +84,22 @@ Listed heaviest weight first; weights live in `config.py`.
 ### What "0 hard violations" means
 
 `validate.py` independently re-checks: placement, capacity, lab-room, daytime window,
-blackouts, room/instructor/self no-overlap, and theory different-day. Cohort conflict and
-instructor overload are **soft metrics**, never hard violations.
+blackouts, room/instructor/self no-overlap, theory different-day, and the School-Settings
+hard rules — **room-type** (lab requirement), **fixed** (pinned first block), and
+**instructor-unavailable**. Cohort conflict and instructor overload are **soft metrics**,
+never hard violations.
+
+### Per-school configuration (School Settings)
+
+Every value above is a default tuned to our own institution; the **School Settings** UI step
+lets another school override them without touching code. A session **Settings** dict plus an
+instructor-availability map are turned into a `Config` by `settings.build_config` at solve
+time: the day window, blackout slots, Saturday / graduate toggles, block-split policy, the
+instructor daily-hours cap, and the soft-preference weights (as off / normal / strong presets)
+are all configurable; optional course-list columns (`Year`, `Part-time`, `Room Type`, `Fixed`)
+override the string-derived cohort / part-time / lab / pin. Unconfigured settings reproduce the
+defaults documented here exactly, so this section stays the ground truth for the out-of-the-box
+behavior. A downloadable "school profile" JSON persists a school's settings + availability.
 
 ---
 
@@ -121,6 +143,8 @@ instructor overload are **soft metrics**, never hard violations.
 | — | evening threshold | 17:00 | `evening_from_hour` |
 | — | Friday blackout | 13–14 | `friday_blackout` |
 | — | seminar blackout (full-time only) | Th 14–16 | `seminar_blackout` |
+| — | AM/PM split for half-day availability | 13:00 | `midday_split_hour` |
+| — | per-instructor unavailable slots | — | `instr_unavailable` (School Settings) |
 
 ---
 
@@ -143,7 +167,11 @@ $(r,d,h)$ only when it already satisfies:
 - room capacity $\mathrm{cap}_r \ge n_s$ (the virtual `Online` room is exempt — unlimited);
 - lab-room pinning — a lab block only in the section's designated lab room;
 - undergrad window $h + \ell_b \le 18$;
-- Friday 13–14 and Thursday 14–16 (seminar, full-time only) blackouts.
+- Friday 13–14 and Thursday 14–16 (seminar, full-time only) blackouts;
+- per-instructor availability (`Config.instr_unavailable`) — a candidate is dropped if any of
+  the section's instructors is marked unavailable over its span;
+- fixed-slot pin — a section's first block is restricted to its declared `(day, start)`;
+- room-type — when a section requires a lab room, only lab-flagged rooms are emitted.
 
 Best-fit additionally caps each block to the `max_rooms_per_block` smallest fitting rooms.
 

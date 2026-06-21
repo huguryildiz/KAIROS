@@ -167,7 +167,7 @@ The pipeline is a chain of small, single-purpose modules. A course list becomes 
 | Validation | Solver-independent re-derivation (`validate.py`) |
 | Web app | **Streamlit** ≥ 1.40 — one container, no separate frontend build |
 | i18n / theming | Bilingual TR/EN · light/dark CSS design tokens |
-| Testing | **pytest** — 148 tests |
+| Testing | **pytest** — 179 tests |
 | Packaging | Docker (`python:3.11-slim`) |
 | Deployment | **Google Cloud Run** — EU region, IAM-gated, scale-to-zero |
 
@@ -184,8 +184,11 @@ A single-page progressive flow that walks a user from raw CSV to a placed timeta
 | **1 · Upload courses** | Drop a course-list CSV — or press **Try with sample dataset** (100 sections across 20 departments, bundled, PII-free) |
 | **2 · Review data** | KPI summary (sections, courses, departments, instructors) and non-blocking data-quality warnings |
 | **3 · Classrooms** | Add / edit / delete rooms with capacity and an explicit **is-lab** flag — 103 PII-free defaults preloaded; the `Online` virtual room is added automatically |
-| **4 · Solve** | One **Solve** button → blocking spinner → placement summary, under a fixed 3000 s budget |
-| **5 · Results** | Weekly Mon–Fri grid, view by cohort / room / instructor / department / course, conflict + unschedulable lists, and `schedule.json` / `assignments.csv` download |
+| **4 · School Settings** | Optional per-school config: day window, blackout slots, Saturday / graduate toggles, block-split policy, an instructor daily-hours cap, preference-weight presets, half-day instructor availability, and a download / upload school-profile JSON — backward-compatible (untouched = today's defaults) |
+| **5 · Solve** | One **Solve** button → blocking spinner → placement summary, under a fixed 3000 s budget |
+| **6 · Results** | Weekly Mon–Fri grid, view by cohort / room / instructor / department / course, conflict + unschedulable lists, and `schedule.json` / `assignments.csv` download |
+
+The course-list CSV may carry optional columns — `Year`, `Part-time`, `Room Type`, `Fixed` — that override the cohort / part-time / lab-room requirement / pinned slot otherwise derived from the course code and lecturer name (absent → derived as before).
 
 ```bash
 PYTHONPATH=src streamlit run app.py      # http://localhost:8501
@@ -198,6 +201,7 @@ PYTHONPATH=src streamlit run app.py      # http://localhost:8501
 ```text
 src/timetabling/        The solver and pipeline (importable, framework-free)
 ├── config.py           Config dataclass — every tunable parameter, DAYS, LAB_SUFFIXES
+├── settings.py         School-Settings layer — Settings dict ↔ Config, availability, profile JSON
 ├── model.py            Room, Instructor, Block, Section, Candidate, Assignment, Violation
 ├── textnorm.py         Staff-ID / name / int normalization
 ├── schedule_parse.py   SCHEDULE grammar (unit / chain / X-over-Y / dirty → flag)
@@ -218,11 +222,11 @@ src/timetabling/        The solver and pipeline (importable, framework-free)
 ├── ui_*.py             Streamlit theming, grid, input, app-shell helpers
 └── __main__.py         CLI / pipeline orchestration
 
-views/                  Streamlit step renderers — upload, review, classrooms, solve, results
+views/                  Streamlit step renderers — upload, review, classrooms, settings, solve, results
 app.py                  Single-page app shell (app bar + stepper + hero + sections)
 assets/                 Brand SVGs + bundled PII-free sample course list
 examples/               Tiny demo CSV
-tests/                  pytest suite (148 tests)
+tests/                  pytest suite (179 tests)
 MODEL.md                Full model + rules + design rationale
 Dockerfile              Streamlit + OR-Tools image for Cloud Run
 cloudbuild.yaml         Cloud Run continuous deploy (push to main)

@@ -188,8 +188,37 @@ def competitors(state: State, batch, cand_by_block) -> set:
     return comp - set(batch)
 
 
+def add_soft_objective(m, x, free, cand_by_block, state, free_set, cfg,
+                       staff_ids=frozenset()):
+    """Build the joint soft penalty over the free neighborhood, accounting for the
+    frozen (non-free) placement as constants. Returns (penalty_terms, penalty_ub) so the
+    caller can set BIG > penalty_ub and keep placement lexicographically dominant. Each
+    term is gated by its weight, so disabled preferences cost nothing."""
+    penalty = []
+    ub = 0
+    length_of = {bid: (cand_by_block[bid][0].length if cand_by_block[bid] else 0)
+                 for bid in free}
+
+    # --- per-candidate: evening + S-Order + S-EngLab ---
+    for bid in free:
+        s = state.sec_of[bid]
+        best = 0
+        for c in cand_by_block[bid]:
+            v = x.get((bid, c.room, c.day, c.start))
+            if v is None:
+                continue
+            sc = _cand_soft(c, s, cfg)
+            if sc:
+                penalty.append(sc * v)
+                if sc > best:
+                    best = sc
+        ub += best
+
+    return penalty, ub
+
+
 def repair_round(state: State, batch, cand_by_block, cfg=None, eligible=None,
-                 tl=REPAIR_TL) -> int:
+                 tl=REPAIR_TL, staff_ids=frozenset()) -> int:
     comp = competitors(state, batch, cand_by_block)
     free = list(dict.fromkeys(list(batch) + list(comp)))[:MAX_FREE]
     free_set = set(free)
@@ -254,9 +283,12 @@ def repair_round(state: State, batch, cand_by_block, cfg=None, eligible=None,
         if len(vs) > 1:
             m.Add(sum(vs) <= 1)
 
-    # soft: per-(instructor, day) overload — frozen hours are a constant, free blocks vary.
-    # Weighted well under BIG so it only breaks ties and never blocks a placement.
-    obj = BIG * sum(unpl.values())
+    # objective: lexicographic — placement dominates, soft only breaks ties.
+    penalty, penalty_ub = [], 0
+    if cfg is not None and cfg.soft_shaping_in_repair:
+        penalty, penalty_ub = add_soft_objective(
+            m, x, free, cand_by_block, state, free_set, cfg, staff_ids)
+    # per-(instructor, day) overload — frozen hours are a constant, free blocks vary.
     if cfg is not None and cfg.w_instr_daily_overload and eligible:
         cap = cfg.max_instr_daily_hours
         keys = set(instr_day_load) | set(frozen_instr_hours)
@@ -270,8 +302,10 @@ def repair_round(state: State, batch, cand_by_block, cfg=None, eligible=None,
                 continue
             over = m.NewIntVar(0, const + len(vs), f"iover|{key[0]}|{key[1]}")
             m.Add(over >= sum(vs) + const - cap)
-            obj += cfg.w_instr_daily_overload * over
-    m.Minimize(obj)
+            penalty.append(cfg.w_instr_daily_overload * over)
+            penalty_ub += cfg.w_instr_daily_overload * (const + len(vs))
+    big = max(BIG, penalty_ub + 1)
+    m.Minimize(big * sum(unpl.values()) + sum(penalty))
 
     for bid in free:
         if bid in cur:

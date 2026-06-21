@@ -20,7 +20,8 @@
   <img src="https://img.shields.io/badge/OR--Tools_CP--SAT-0b1220?style=for-the-badge&logo=google&logoColor=4285F4" alt="OR-Tools CP-SAT">
   <img src="https://img.shields.io/badge/Streamlit-0b1220?style=for-the-badge&logo=streamlit&logoColor=FF4B4B" alt="Streamlit">
   <img src="https://img.shields.io/badge/pandas-0b1220?style=for-the-badge&logo=pandas&logoColor=white" alt="pandas">
-  <img src="https://img.shields.io/badge/pytest_132_passing-0b1220?style=for-the-badge&logo=pytest&logoColor=0A9EDC" alt="pytest 132 passing">
+  <img src="https://img.shields.io/badge/pytest_148_passing-0b1220?style=for-the-badge&logo=pytest&logoColor=0A9EDC" alt="pytest 148 passing">
+  <img src="https://img.shields.io/badge/Docker-0b1220?style=for-the-badge&logo=docker&logoColor=2496ED" alt="Docker">
   <img src="https://img.shields.io/badge/Google_Cloud_Run-0b1220?style=for-the-badge&logo=googlecloud&logoColor=4285F4" alt="Google Cloud Run">
   <a href="https://kairos.huguryildiz.com"><img src="https://img.shields.io/badge/kairos.huguryildiz.com-live-4F46E5?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Live"></a>
 </p>
@@ -166,7 +167,7 @@ The pipeline is a chain of small, single-purpose modules. A course list becomes 
 | Validation | Solver-independent re-derivation (`validate.py`) |
 | Web app | **Streamlit** ≥ 1.40 — one container, no separate frontend build |
 | i18n / theming | Bilingual TR/EN · light/dark CSS design tokens |
-| Testing | **pytest** — 132 tests |
+| Testing | **pytest** — 148 tests |
 | Packaging | Docker (`python:3.11-slim`) |
 | Deployment | **Google Cloud Run** — EU region, IAM-gated, scale-to-zero |
 
@@ -183,7 +184,7 @@ A single-page progressive flow that walks a user from raw CSV to a placed timeta
 | **1 · Upload courses** | Drop a course-list CSV — or press **Try with sample dataset** (100 sections across 20 departments, bundled, PII-free) |
 | **2 · Review data** | KPI summary (sections, courses, departments, instructors) and non-blocking data-quality warnings |
 | **3 · Classrooms** | Add / edit / delete rooms with capacity and an explicit **is-lab** flag — 103 PII-free defaults preloaded; the `Online` virtual room is added automatically |
-| **4 · Solve** | One **Solve** button → blocking spinner → placement summary, under a fixed 1200 s budget |
+| **4 · Solve** | One **Solve** button → blocking spinner → placement summary, under a fixed 3000 s budget |
 | **5 · Results** | Weekly Mon–Fri grid, view by cohort / room / instructor / department / course, conflict + unschedulable lists, and `schedule.json` / `assignments.csv` download |
 
 ```bash
@@ -221,10 +222,10 @@ views/                  Streamlit step renderers — upload, review, classrooms,
 app.py                  Single-page app shell (app bar + stepper + hero + sections)
 assets/                 Brand SVGs + bundled PII-free sample course list
 examples/               Tiny demo CSV
-tests/                  pytest suite (132 tests)
+tests/                  pytest suite (148 tests)
 MODEL.md                Full model + rules + design rationale
-DEPLOY.md               Google Cloud Run deployment runbook
 Dockerfile              Streamlit + OR-Tools image for Cloud Run
+cloudbuild.yaml         Cloud Run continuous deploy (push to main)
 data/                   Real institutional CSVs (git-ignored — contains PII)
 ```
 
@@ -241,10 +242,22 @@ python3 -m pip install -r requirements.txt   # pandas, ortools, pytest, streamli
 PYTHONPATH=src streamlit run app.py
 
 # Run the tests
-python3 -m pytest -q                         # 132 tests
+python3 -m pytest -q                         # 148 tests
 ```
 
 > The web app and tests need **no private data** — classroom defaults come from `defaults.py` and a PII-free sample course list ships in `assets/`. The real institutional CSVs live in `data/`, which is git-ignored and absent from fresh clones.
+
+### Docker (local)
+
+Build and run the same image that ships to Cloud Run:
+
+```bash
+docker build -t kairos .
+docker run --rm -p 8501:8080 kairos
+# then open http://localhost:8501
+```
+
+`data/` is never copied in (see `.dockerignore`) — the container is ready to use with uploaded input and the bundled PII-free sample. Cloud Run injects `$PORT`; locally the container listens on `8080`, which the command above maps to `8501`.
 
 ### Command-line solver
 
@@ -305,24 +318,37 @@ ECON 101,Principles of Economics,1,3,0,0,John Smith,john.smith@uni.edu,120
 
 ## Deployment
 
-Kairos ships as a single Docker image — Streamlit, OR-Tools CP-SAT, and PII-free defaults — on **Google Cloud Run**, in the institution's own GCP project, **EU region**, **scale-to-zero**. Access is locked to named Google accounts via IAM; the live deployment is reached through `gcloud run services proxy` or the domain mapping at `kairos.huguryildiz.com`.
+Kairos ships as a single Docker image — Streamlit, OR-Tools CP-SAT, and PII-free defaults — on **Google Cloud Run**, in the institution's own GCP project, **`europe-west1`**, **scale-to-zero**. Access is locked to named Google accounts via IAM; the live service is mapped to `kairos.huguryildiz.com`. No PII enters the image — `.dockerignore` keeps `data/` out, and classroom defaults come from `defaults.py`.
+
+**Continuous deploy.** Every push to `main` triggers [`cloudbuild.yaml`](cloudbuild.yaml), which deploys the `kairos` service to `europe-west1` with the resources below. To deploy by hand (same flags, so manual and CI stay in sync):
 
 ```bash
-gcloud run deploy timetabling --source . \
+gcloud run deploy kairos --source . --region europe-west1 \
   --no-allow-unauthenticated \
-  --memory 4Gi --cpu 4 --cpu-boost \
+  --memory 8Gi --cpu 4 --cpu-boost \
   --timeout 3600 --min-instances 0 --max-instances 2
 ```
 
-> **Memory matters:** a CP-SAT solve needs **≥ 4 GiB** — the Cloud Run default of 512 MiB OOM-kills the container and the Solve button silently does nothing. The full runbook (regions, IAM, KVKK notes, troubleshooting) is in [`DEPLOY.md`](DEPLOY.md).
+**Grant access** to the 1–2 named users, and reach the IAM-gated service through a local proxy:
+
+```bash
+gcloud run services add-iam-policy-binding kairos --region europe-west1 \
+  --member="user:alice@gmail.com" --role="roles/run.invoker"
+gcloud run services proxy kairos --region europe-west1 --port 8080   # then open http://localhost:8080
+```
+
+> **Two traps to know:**
+>
+> - **Memory:** a CP-SAT solve needs **≥ 4 GiB** (the Cloud Run default of 512 MiB OOM-kills the container — SIGKILL, uncatchable — and the Solve button silently does nothing while lighter clicks still work); the service runs at **8 GiB** for headroom at larger problem sizes. Keep `--memory 8Gi`.
+> - **Region:** `kairos.huguryildiz.com` is domain-mapped to the `europe-west1` service. Apply resource changes (`gcloud run services update kairos --region europe-west1 …`) there — not to a same-named service in another region. A deploy without `--memory/--cpu/--timeout` can revert the service to the 512 MiB / 1 vCPU / 300 s defaults, so bake them into `cloudbuild.yaml` (already done) or re-pass them.
+>
+> **KVKK:** keep the service in an EU region and enable Cloud Audit Logs. The solve runs synchronously inside one long request under a fixed **3000 s / 50 min** budget (`_SOLVE_SECONDS` in [`views/solve.py`](views/solve.py)); `--timeout 3600` (60 min) keeps the request alive past it, a ~10 min margin for container startup and response streaming.
 
 ---
 
 ## Reference
 
 - [`MODEL.md`](MODEL.md) — the full model: time grid, hard rules, soft objective, block derivation, and the design decisions behind them.
-- [`TODO.md`](TODO.md) — phase-by-phase engineering record and remaining backlog.
-- [`CLAUDE.md`](CLAUDE.md) — repository conventions and gotchas.
 
 ---
 

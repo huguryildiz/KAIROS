@@ -164,41 +164,59 @@ def _policy(lang: str, s: dict) -> None:
 def _blackouts(lang: str, s: dict) -> None:
     st.markdown(f"**{t('set_blackout_header', lang)}**")
     st.caption(t("set_blackout_desc", lang))
-    dl = DAY_LABELS.get(lang, DAY_LABELS["en"])
+    dl_full = DAY_LABELS_FULL.get(lang, DAY_LABELS_FULL["en"])
     bl = s.setdefault("blackouts", [])
+    # chips: group by (day, scope), collapse consecutive hours into compact range labels
     if bl:
-        for i, row in enumerate(list(bl)):
-            day, hour, staff = row[0], int(row[1]), bool(row[2])
-            day_label = dl.get(day, day)
+        grouped: dict = {}      # (day, staff) -> set(hours)
+        for row in bl:
+            grouped.setdefault((row[0], bool(row[2])), set()).add(int(row[1]))
+        ci = 0
+        for (day, staff), hours in grouped.items():
             staff_html = (f'<span class="bl-st"> · {t("set_scope_staff", lang)}</span>'
                           if staff else "")
-            cc = st.columns([6, 1], vertical_alignment="center")
-            cc[0].markdown(
-                f'<span class="bl-chip"><span class="bl-ic">⊘</span>'
-                f'{day_label} {hour:02d}:00{staff_html}</span>',
-                unsafe_allow_html=True,
-            )
-            if cc[1].button("✕", key=f"bl_rm_{i}"):
-                bl.pop(i)
-                _bump()
-                st.rerun()
+            for label in _fmt_ranges(hours):
+                start_h, end_h = int(label[:2]), int(label.split("–")[1][:2])
+                rng = set(range(start_h, end_h))
+                cc = st.columns([6, 1], vertical_alignment="center")
+                cc[0].markdown(
+                    f'<span class="bl-chip"><span class="bl-ic">⊘</span>'
+                    f'{dl_full.get(day, day)} {label}{staff_html}</span>',
+                    unsafe_allow_html=True,
+                )
+                if cc[1].button("✕", key=f"bl_rm_{day}_{staff}_{start_h}_{ci}"):
+                    s["blackouts"] = [r for r in bl
+                                      if not (r[0] == day and bool(r[2]) == staff
+                                              and int(r[1]) in rng)]
+                    _bump()
+                    st.rerun()
+                ci += 1
     else:
         st.caption(t("set_blackout_none", lang))
 
     rev = st.session_state.get("set_rev", 0)
     scope_opts = [t("set_scope_all", lang), t("set_scope_staff", lang)]
-    a1, a2, a3, a4 = st.columns([2, 1.2, 2.2, 0.9], vertical_alignment="bottom")
-    dl_full = DAY_LABELS_FULL.get(lang, DAY_LABELS_FULL["en"])
-    nd = a1.selectbox(t("set_blackout_day", lang), _work_days(s),
-                      format_func=lambda d: dl_full.get(d, d), key=f"bl_day_{rev}")
-    nh = _hour_select(a2, t("set_blackout_hour", lang), 6, 21, 12, f"bl_hour_{rev}")
-    nscope = a3.segmented_control(t("set_blackout_scope", lang), scope_opts,
+    a1, a2, a3 = st.columns([2.4, 1, 1])
+    nd = a1.multiselect(t("set_blackout_day_scope", lang), _work_days(s),
+                        format_func=lambda d: dl_full.get(d, d), key=f"bl_days_{rev}")
+    nf = _hour_select(a2, t("set_blackout_hour_from", lang), 6, 20, 13, f"bl_from_{rev}")
+    nt = _hour_select(a3, t("set_blackout_hour_to", lang), 7, 21, 17, f"bl_to_{rev}")
+    b1, b2, b3 = st.columns([2, 1.4, 1], vertical_alignment="bottom")
+    nscope = b1.segmented_control(t("set_blackout_scope", lang), scope_opts,
                                   default=scope_opts[0], key=f"bl_scope_{rev}")
-    if a4.button(t("set_blackout_add", lang), icon=":material/add:", key=f"bl_add_{rev}", type="primary"):
-        nst = nscope == scope_opts[1]
-        bl.append([nd, int(nh), bool(nst)])
+    if b2.button(t("set_blackout_lunch_preset", lang), icon=":material/lunch_dining:",
+                 key=f"bl_lunch_{rev}"):
+        bl.extend(r for r in _expand_blackout(["Mo", "Tu", "We", "Th", "Fr"], 12, 13, False)
+                  if r not in bl)
         _bump()
         st.rerun()
+    if b3.button(t("set_blackout_add", lang), icon=":material/add:",
+                 key=f"bl_add_{rev}", type="primary"):
+        staff = nscope == scope_opts[1]
+        if nd and nt > nf:
+            bl.extend(r for r in _expand_blackout(nd, nf, nt, staff) if r not in bl)
+            _bump()
+            st.rerun()
 
 
 def _win(s) -> tuple[int, int]:
@@ -232,6 +250,17 @@ def _slots_to_hours(slots, day_start, day_end, midday) -> dict:
                 continue
         by_day.setdefault(d, set()).update(hrs)
     return by_day
+
+
+def _expand_blackout(days, h_from, h_to, staff):
+    """(days, [h_from, h_to)) -> list of [day, hour, staff] triples, de-duped order-preserving."""
+    out = []
+    for d in days:
+        for h in range(int(h_from), int(h_to)):
+            row = [d, int(h), bool(staff)]
+            if row not in out:
+                out.append(row)
+    return out
 
 
 def _fmt_ranges(hours) -> list:

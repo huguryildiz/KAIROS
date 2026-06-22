@@ -45,7 +45,7 @@ def test_repair_state_rejects_same_day_theory_sibling():
 
 def test_solve_repair_theory_on_different_days():
     from timetabling.repair import solve_repair
-    cfg = Config(solve_time_limit_s=5)
+    cfg = Config(solve_time_limit_s=5, repair_time_limit_s=2)   # bound soft-polish budget
     rooms = {"R1": Room("R1", 50, False, True)}
     instr = {"i1": Instructor("i1", "n", True, "D")}
     s = _theory_section()

@@ -100,7 +100,7 @@ def test_cohort_gap_term_isolated_from_s_order():
 def test_cohort_pass_preserves_placement_and_conflict():
     from timetabling.repair import solve_repair
     from timetabling.model import Room, Instructor
-    cfg = Config(solve_time_limit_s=10)
+    cfg = Config(solve_time_limit_s=10, repair_time_limit_s=2)   # bound soft-polish budget
     rooms = {"R1": Room("R1", 50, False, True), "R2": Room("R2", 50, False, True)}
     instr = {f"i{n}": Instructor(f"i{n}", "x", True, "D") for n in range(6)}
     secs = []

@@ -75,14 +75,12 @@ class Config:
     # apply cohort-conflict soft shaping in the repair greedy construction
     # (default on; --no-soft-shaping turns it off for baseline A/B runs)
     soft_shaping_in_repair: bool = True
-    # run the post-convergence accept-guarded SOFT-POLISH passes (Pass C / Pass I) that
-    # re-seat already-placed blocks to lower the joint soft objective. Default OFF: at
-    # production scale (>800 sections) the frozen-LNS neighborhoods are pinned and the
-    # passes are a measured no-op that still consumes the wall-clock budget (Pass C: ~600s,
-    # 0 gain on the 841 sample, 2026-06-22). The objective machinery, the soft-aware accept
-    # guard (_soft_total) and the per-pass code are kept (invariant-safe, unit-tested) for
-    # a future neighborhood/budget redesign. See docs/TODO.md §4.8.
-    soft_polish_in_repair: bool = False
+    # run the post-convergence move-based SOFT-POLISH (soft_search.anneal_soft) that re-seats
+    # already-placed blocks to lower the normalized weighted-sum soft objective (idle/maxrun/
+    # instr_days/room_stable/free_day) under a conf no-regress guard. Default ON: the move-based
+    # local search measurably steers the surviving dials at scale (steerability gate, 2026-06-22)
+    # while never regressing placement (accept guard) or conf. Bounded by the repair deadline.
+    soft_polish_in_repair: bool = True
     # move-based soft polish (soft_search.anneal_soft): acceptor + its single parameter.
     soft_polish_acceptor: str = "schc"        # schc | lahc | deluge | sa
     soft_polish_counter_limit: int = 5000     # SCHC counter / LAHC history length

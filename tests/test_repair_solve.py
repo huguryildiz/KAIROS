@@ -3,7 +3,7 @@ def test_solve_repair_places_clean_small_instance():
     from timetabling.model import Room, Section, Block, Instructor
     from timetabling.repair import solve_repair
     from timetabling.validate import validate
-    cfg = Config(solve_time_limit_s=5)
+    cfg = Config(solve_time_limit_s=5, repair_time_limit_s=2)   # bound soft-polish budget
     rooms = {"R1": Room("R1", 50, False, True), "Online": Room("Online", 9999, False, False, True)}
     instr = {f"i{n}": Instructor(f"i{n}", "x", True, "D") for n in range(4)}
 
@@ -25,7 +25,7 @@ def test_repair_respects_availability():
     from timetabling.config import Config
     from timetabling.model import Room, Section, Block, Instructor
     from timetabling.repair import solve_repair
-    cfg = Config(solve_time_limit_s=5,
+    cfg = Config(solve_time_limit_s=5, repair_time_limit_s=2,
                  instr_unavailable=frozenset(("i0", "Mo", h) for h in range(9, 18)))
     rooms = {"R1": Room("R1", 50, False, True)}
     instr = {"i0": Instructor("i0", "x", True, "D")}

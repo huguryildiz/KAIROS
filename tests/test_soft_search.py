@@ -213,28 +213,28 @@ def test_anneal_lowers_objective_via_swap_dense():
     assert t1["days"] < t0["days"]               # only a swap can lower days here
 
 
-def test_anneal_guard_blocks_any_metric_regression():
+def test_anneal_conflict_guard_holds():
     from timetabling.soft_search import anneal_soft, _global_terms
     cfg = Config()
-    # One cohort with a Monday gap. The only gap-reducing relocate for B sits in a SECOND
-    # room (R2), which would raise room_count above baseline -> the all-metric guard must
-    # forbid it, so no metric ends above its starting value.
+    # B sits in the evening (no conflict). Its only evening-reducing relocate lands on A's
+    # cohort slot (Mo 9-11), which would create a cohort conflict. The conflict guard must
+    # block it even though it lowers the objective -> conflict never exceeds baseline (0).
     a = _sec("A_01", "i1", code="ADA 101")
     b = _sec("B_01", "i2", code="ADA 102")       # same cohort ADA-1
     cand = {
         "A_01#T": [Candidate("A_01#T", "R1", "Mo", 9, 2)],
-        "B_01#T": [Candidate("B_01#T", "R1", "Mo", 13, 2), Candidate("B_01#T", "R2", "Mo", 11, 2)],
+        "B_01#T": [Candidate("B_01#T", "R2", "Mo", 16, 2), Candidate("B_01#T", "R3", "Mo", 9, 2)],
     }
     st = _state(a, b)
     st.occupy("A_01#T", cand["A_01#T"][0])        # ADA-1 Mo 9-11
-    st.occupy("B_01#T", cand["B_01#T"][0])        # ADA-1 Mo 13-15 (gap at 11-13)
+    st.occupy("B_01#T", cand["B_01#T"][0])        # ADA-1 Mo 16-18 (evening, no conflict)
     t0 = _global_terms(st, cfg)
+    assert t0["conf"] == 0
     anneal_soft(st, cand, cfg, budget_s=1.0, seed=0)
     t1 = _global_terms(st, cfg)
     assert len(st.placed) == 2
-    for k in ("evening", "gap", "rooms", "days", "conf"):
-        assert t1[k] <= t0[k]                     # no metric regresses above baseline
-    assert t1["rooms"] == t0["rooms"]             # the room-scattering gap fix was blocked
+    assert t1["conf"] <= t0["conf"]               # conflict guard: never above baseline
+    assert st.placed["B_01#T"].start == 16        # evening->morning blocked (would conflict)
 
 
 def test_global_terms_raw_four_terms_plus_conf():

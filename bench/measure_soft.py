@@ -46,5 +46,19 @@ print(f"[{label}] placed={placed}/{total} rate={placed/total:.4f} wall={wall:.0f
 pre, post = res.stats.get("soft_pre"), res.stats.get("soft_post")
 if pre and post:
     keys = ("evening", "gap", "rooms", "days", "conf")
-    print(f"  within-run pre ->post (guard=baseline): "
+    print(f"  within-run pre ->post (Pareto; only conflict guarded): "
           + " ".join(f"{k} {pre[k]}->{post[k]}" for k in keys))
+
+# Utilization: how full is the grid (physical rooms x days x undergrad teaching hours)?
+phys = [r for r in rooms.values() if not r.is_virtual]
+days_n = len(cfg.days())
+hours_n = max(1, cfg.undergrad_end - cfg.horizon_start)
+cap_slots = len(phys) * days_n * hours_n
+occ_slots = sum(a.end - a.start for a in res.assignments
+                if a.room in rooms and not rooms[a.room].is_virtual)
+rooms_used = len({a.room for a in res.assignments
+                  if a.room in rooms and not rooms[a.room].is_virtual})
+grid = occ_slots / cap_slots if cap_slots else 0.0
+print(f"  utilization: grid {occ_slots}/{cap_slots} room-hours = {grid:.1%} full "
+      f"| rooms used {rooms_used}/{len(phys)} = {rooms_used/len(phys):.1%} "
+      f"({days_n} days x {hours_n}h x {len(phys)} rooms)")

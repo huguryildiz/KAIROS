@@ -326,11 +326,11 @@ def anneal_soft(state, cand_by_block, cfg, budget_s, seed=0):
         t = _local_terms(st, cohorts, instrs, rooms, blocks, cfg)
         return _norm_obj(t, base, cfg), t
 
-    # No-regress guard over EVERY soft metric (the four toggles + cohort_conflict): no move
-    # may push any metric above its baseline. The polish then only ever lowers the
-    # normalized objective inside the "all metrics <= baseline" box, so each toggle ends
-    # <= baseline (gate-safe by construction).
-    guard_keys = ("evening", "gap", "rooms", "days", "conf")
+    # No-regress guard over cohort_conflict only: no move may push global conflict above
+    # baseline. The four UI toggles are free to trade off against each other (Pareto), driven
+    # by the normalized weighted objective = the user's weights ARE the trade-off policy.
+    # Placement is invariant by construction (moves never unplace).
+    guard_keys = ("conf",)
     e_start = _norm_obj(base, base, cfg)
     acc = _make_acceptor(cfg, rng)
     acc.init(e_start)

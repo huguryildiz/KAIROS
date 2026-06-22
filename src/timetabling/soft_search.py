@@ -97,13 +97,26 @@ def _local_terms(state, cohorts, instrs, rooms, blocks, cfg) -> dict:
     return {"evening": evening, "gap": gap, "rooms": rooms_used, "days": days, "conf": conf}
 
 
+def _norm_obj(terms, base, cfg) -> float:
+    """Normalized weighted sum of the four UI toggles: sum w_i * term_i / base_i. Dividing
+    each term by its start value puts the four on a common scale so no single raw magnitude
+    dominates, while preserving the user's relative weights. cohort_conflict is NOT in the
+    objective (held separately as a no-regress guard)."""
+    return (cfg.w_evening * terms["evening"] / max(base["evening"], 1)
+            + cfg.w_cohort_gap * terms["gap"] / max(base["gap"], 1)
+            + cfg.w_room_count * terms["rooms"] / max(base["rooms"], 1)
+            + cfg.w_instr_days * terms["days"] / max(base["days"], 1))
+
+
 def _slot(c):
     return (c.room, c.day, c.start)
 
 
-def try_relocate(state, cand_by_block, bid, rng, cfg):
+def try_relocate(state, cand_by_block, bid, rng, eval_fn):
     """Move bid to a random alternative legal+free candidate. Leaves state in the new
-    config; returns (delta, revert) or None. revert() restores the original placement."""
+    config; returns (dobj, dconf, revert) or None. eval_fn(state, cohorts, instrs, rooms,
+    blocks) -> (objective, conflict) over the affected entities; dobj/dconf are the after-
+    minus-before deltas. revert() restores the original placement."""
     s = state.sec_of[bid]
     iids = state.sec_instr.get(s.section_id, [])
     c_old = state.placed.get(bid)
@@ -117,23 +130,24 @@ def try_relocate(state, cand_by_block, bid, rng, cfg):
     instrs = set(iids)
     rooms = {c_old.room, c_new.room}
     blocks = {bid}
-    before = _local_soft(state, cohorts, instrs, rooms, blocks, cfg)
+    o0, f0 = eval_fn(state, cohorts, instrs, rooms, blocks)
     state.release(bid)
     if not state.free_to_place(c_new, s.section_id, iids):
         state.occupy(bid, c_old)
         return None
     state.occupy(bid, c_new)
-    delta = _local_soft(state, cohorts, instrs, rooms, blocks, cfg) - before
+    o1, f1 = eval_fn(state, cohorts, instrs, rooms, blocks)
 
     def revert():
         state.release(bid)
         state.occupy(bid, c_old)
-    return delta, revert
+    return o1 - o0, f1 - f0, revert
 
 
-def try_swap(state, cand_by_block, bid1, bid2, cfg):
+def try_swap(state, cand_by_block, bid1, bid2, eval_fn):
     """Exchange the slots of bid1 and bid2 if each has a candidate for the other's current
-    slot and both are feasible. Leaves state swapped; returns (delta, revert) or None."""
+    slot and both are feasible. Leaves state swapped; returns (dobj, dconf, revert) or
+    None. eval_fn as in try_relocate."""
     if bid1 == bid2:
         return None
     c1 = state.placed.get(bid1)
@@ -152,7 +166,7 @@ def try_swap(state, cand_by_block, bid1, bid2, cfg):
     instrs = set(iids1) | set(iids2)
     rooms = {c1.room, c2.room}
     blocks = {bid1, bid2}
-    before = _local_soft(state, cohorts, instrs, rooms, blocks, cfg)
+    o0, f0 = eval_fn(state, cohorts, instrs, rooms, blocks)
     state.release(bid1)
     state.release(bid2)
     ok = False
@@ -167,14 +181,14 @@ def try_swap(state, cand_by_block, bid1, bid2, cfg):
         state.occupy(bid1, c1)
         state.occupy(bid2, c2)
         return None
-    delta = _local_soft(state, cohorts, instrs, rooms, blocks, cfg) - before
+    o1, f1 = eval_fn(state, cohorts, instrs, rooms, blocks)
 
     def revert():
         state.release(bid1)
         state.release(bid2)
         state.occupy(bid1, c1)
         state.occupy(bid2, c2)
-    return delta, revert
+    return o1 - o0, f1 - f0, revert
 
 
 class SCHC:
@@ -294,16 +308,28 @@ def _make_acceptor(cfg, rng=None):
 
 
 def anneal_soft(state, cand_by_block, cfg, budget_s, seed=0):
-    """Relocate already-placed blocks to lower the joint soft objective, guided by the
-    acceptor. Never unplaces; restores the best incumbent so soft never regresses."""
+    """Relocate/swap already-placed blocks to lower the NORMALIZED four-toggle objective
+    (evening, cohort_gap[all cohorts], room_count, instr_days), guided by the acceptor.
+    cohort_conflict is a no-regress guard: any move that would push global conflict above
+    its start value is rejected. Never unplaces; restores the best incumbent so the
+    objective never regresses globally and conflict never exceeds baseline."""
     rng = _random.Random(seed)
     placed = [bid for bid in state.placed if cand_by_block.get(bid)]
-    soft_start = _soft_total(state, cfg)
+    base = _global_terms(state, cfg)
+    conf_base = base["conf"]
+
+    def eval_fn(st, cohorts, instrs, rooms, blocks):
+        t = _local_terms(st, cohorts, instrs, rooms, blocks, cfg)
+        return _norm_obj(t, base, cfg), t["conf"]
+
+    e_start = _norm_obj(base, base, cfg)
     acc = _make_acceptor(cfg, rng)
-    acc.init(soft_start)
-    cur = soft_start
-    best = soft_start
+    acc.init(e_start)
+    cur = e_start
+    conf_cur = conf_base
+    best = e_start
     best_snapshot = dict(state.placed)
+    at_best = True
     iters = accepted = 0
     t0 = perf_counter()
     if placed:
@@ -313,25 +339,31 @@ def anneal_soft(state, cand_by_block, cfg, budget_s, seed=0):
                 if len(placed) >= 2 and rng.random() < 0.5:
                     b1 = placed[rng.randrange(len(placed))]
                     b2 = placed[rng.randrange(len(placed))]
-                    res = try_swap(state, cand_by_block, b1, b2, cfg)
+                    res = try_swap(state, cand_by_block, b1, b2, eval_fn)
                 else:
                     bid = placed[rng.randrange(len(placed))]
-                    res = try_relocate(state, cand_by_block, bid, rng, cfg)
+                    res = try_relocate(state, cand_by_block, bid, rng, eval_fn)
                 if res is None:
                     continue
-                delta, revert = res
-                if acc.accept(delta, iters):
-                    cur += delta
+                dobj, dconf, revert = res
+                if conf_cur + dconf > conf_base:     # cohort-conflict no-regress guard
+                    revert()
+                    continue
+                if acc.accept(dobj, iters):
+                    cur += dobj
+                    conf_cur += dconf
                     accepted += 1
-                    if cur < best:
+                    if cur < best - 1e-9:
                         best = cur
                         best_snapshot = dict(state.placed)
+                        at_best = True
+                    else:
+                        at_best = False
                 else:
                     revert()
-    # restore best incumbent
-    if cur != best:
+    if not at_best:                          # restore best incumbent
         for bid in list(state.placed):
             state.release(bid)
         for bid, c in best_snapshot.items():
             state.occupy(bid, c)
-    return {"iters": iters, "accepted": accepted, "soft_start": soft_start, "soft_end": best}
+    return {"iters": iters, "accepted": accepted, "soft_start": e_start, "soft_end": best}

@@ -62,50 +62,72 @@ from timetabling.validate import validate
 from timetabling.model import Room, Instructor
 
 
-def test_relocate_lowers_soft_and_keeps_placement():
-    from timetabling.soft_search import try_relocate
+def _eval_fn(cfg, base):
+    """Build a polish objective evaluator over affected entities: (normalized E, raw conf)."""
+    from timetabling.soft_search import _local_terms, _norm_obj
+
+    def fn(state, cohorts, instrs, rooms, blocks):
+        t = _local_terms(state, cohorts, instrs, rooms, blocks, cfg)
+        return _norm_obj(t, base, cfg), t["conf"]
+    return fn
+
+
+def test_relocate_lowers_normalized_objective_and_keeps_placement():
+    from timetabling.soft_search import try_relocate, _global_terms
     cfg = Config()
-    a = _sec("A_01", "i1")                       # level 1, evening is the only soft
-    cand = {"A_01#T": [Candidate("A_01#T", "R1", "Mo", 16, 2),   # evening (hour 17) cost 10
-                       Candidate("A_01#T", "R1", "Mo", 9, 2)]}    # morning cost 0
+    a = _sec("A_01", "i1")                       # level 1, evening is the only toggle here
+    cand = {"A_01#T": [Candidate("A_01#T", "R1", "Mo", 16, 2),   # evening (hour 17)
+                       Candidate("A_01#T", "R1", "Mo", 9, 2)]}    # morning
     st = _state(a)
     st.occupy("A_01#T", cand["A_01#T"][0])       # park in evening
+    ev = _eval_fn(cfg, _global_terms(st, cfg))
     rng = random.Random(0)
-    res = try_relocate(st, cand, "A_01#T", rng, cfg)
+    res = try_relocate(st, cand, "A_01#T", rng, ev)
     assert res is not None
-    delta, revert = res
-    assert delta == -10                          # evening -> morning
+    dobj, dconf, revert = res
+    assert dobj < 0                              # evening removed -> normalized E drops
+    assert dconf == 0
     assert len(st.placed) == 1                   # never unplaced
     assert st.placed["A_01#T"].start == 9
     revert()                                     # revert restores the evening slot
     assert st.placed["A_01#T"].start == 16
 
 
-def test_swap_helps_where_relocate_cannot():
-    from timetabling.soft_search import try_swap
+def test_swap_lowers_objective_where_relocate_cannot():
+    from timetabling.soft_search import try_swap, _global_terms
     cfg = Config()
-    # i1 teaches A (level2, S-Order penalizes late start). Two single-room slots, both full.
-    a = _sec("A_01", "i1", level=2, code="ADA 201")
-    b = _sec("B_01", "i2", level=1, code="EEE 101")
-    # A at late slot R1 Mo13 (S-Order (4-2)*(13-9)=8); B at early R1 Mo9 (level1 -> 0).
-    # Swap -> A at Mo9 (0), B at Mo13 (0). delta = -8. No empty slot exists (relocate stuck).
+    # i1 teaches A,B ; i2 teaches C,D. Distinct cohorts (no conflict/gap interaction).
+    # A and C sit at a DIFFERENT hour on the packing day so packing won't double-book the
+    # instructor. Initial: i1 on {Mo,We}, i2 on {We,Mo} -> 4 teaching-days. R2 Mo/We slots
+    # are both full (relocate stuck). Swapping B(R2 We) <-> D(R2 Mo) packs i1->{Mo} (A Mo14
+    # + B Mo9), i2->{We} (C We14 + D We9) = 2 teaching-days.
+    a = _sec("A_01", "i1", code="ADA 101")
+    b = _sec("B_01", "i1", code="BBB 101")
+    c = _sec("C_01", "i2", code="CCC 101")
+    d = _sec("D_01", "i2", code="DDD 101")
     cand = {
-        "A_01#T": [Candidate("A_01#T", "R1", "Mo", 13, 2), Candidate("A_01#T", "R1", "Mo", 9, 2)],
-        "B_01#T": [Candidate("B_01#T", "R1", "Mo", 9, 2), Candidate("B_01#T", "R1", "Mo", 13, 2)],
+        "A_01#T": [Candidate("A_01#T", "R1", "Mo", 14, 2)],
+        "B_01#T": [Candidate("B_01#T", "R2", "We", 9, 2), Candidate("B_01#T", "R2", "Mo", 9, 2)],
+        "C_01#T": [Candidate("C_01#T", "R1", "We", 14, 2)],
+        "D_01#T": [Candidate("D_01#T", "R2", "Mo", 9, 2), Candidate("D_01#T", "R2", "We", 9, 2)],
     }
-    st = _state(a, b)
-    st.occupy("A_01#T", cand["A_01#T"][0])       # Mo13
-    st.occupy("B_01#T", cand["B_01#T"][0])       # Mo9
-    res = try_swap(st, cand, "A_01#T", "B_01#T", cfg)
+    st = _state(a, b, c, d)
+    st.occupy("A_01#T", cand["A_01#T"][0])       # i1 Mo 14-16
+    st.occupy("B_01#T", cand["B_01#T"][0])       # i1 We 9-11
+    st.occupy("C_01#T", cand["C_01#T"][0])       # i2 We 14-16
+    st.occupy("D_01#T", cand["D_01#T"][0])       # i2 Mo 9-11
+    ev = _eval_fn(cfg, _global_terms(st, cfg))   # teaching-days base = 4
+    res = try_swap(st, cand, "B_01#T", "D_01#T", ev)
     assert res is not None
-    delta, revert = res
-    assert delta == -8
-    assert st.placed["A_01#T"].start == 9 and st.placed["B_01#T"].start == 13
-    assert len(st.placed) == 2
+    dobj, dconf, revert = res
+    assert dobj < 0                              # teaching-days 4 -> 2
+    assert dconf == 0
+    assert st.placed["B_01#T"].day == "Mo" and st.placed["D_01#T"].day == "We"
+    assert len(st.placed) == 4
 
 
 def test_moves_keep_hard_feasibility():
-    from timetabling.soft_search import try_relocate
+    from timetabling.soft_search import try_relocate, _global_terms
     cfg = Config()
     rooms = {"R1": Room("R1", 50, False, True)}
     instr = {"i1": Instructor("i1", "x", True, "D")}
@@ -114,8 +136,9 @@ def test_moves_keep_hard_feasibility():
                        Candidate("A_01#T", "R1", "Mo", 9, 2)]}
     st = _state(a)
     st.occupy("A_01#T", cand["A_01#T"][0])
+    ev = _eval_fn(cfg, _global_terms(st, cfg))
     rng = random.Random(1)
-    try_relocate(st, cand, "A_01#T", rng, cfg)
+    try_relocate(st, cand, "A_01#T", rng, ev)
     assigns = [__import__("timetabling.model", fromlist=["Assignment"]).Assignment(
         bid, st.sec_of[bid].section_id, "theory", c.room, c.day, c.start, c.start + c.length)
         for bid, c in st.placed.items()]
@@ -143,43 +166,51 @@ def test_schc_refreshes_bound_every_counter_limit():
     assert acc.accept(+30, 2) is False     # cost 50+30=80 > bound 50 now
 
 
-def test_anneal_soft_never_raises_soft_and_keeps_placement():
-    from timetabling.soft_search import anneal_soft
+def test_anneal_lowers_objective_keeps_placement_and_conf():
+    from timetabling.soft_search import anneal_soft, _global_terms
     cfg = Config()
-    secs = [_sec(f"S{n}_01", f"i{n}", level=1, code=f"ADA 10{n}") for n in range(8)]
+    # 8 distinct-cohort sections, each in its own room, all parked in the evening.
+    secs = [_sec(f"S{n}_01", f"i{n}", level=1, code=f"C{n} 101") for n in range(8)]
     cand = {}
     st = _state(*secs)
     for n, s in enumerate(secs):
         bid = f"S{n}_01#T"
-        # each block: an evening option (parked) + a free morning option in its own room
         cand[bid] = [Candidate(bid, f"R{n}", "Mo", 16, 2), Candidate(bid, f"R{n}", "Mo", 9, 2)]
         st.occupy(bid, cand[bid][0])             # park all in evening
-    start_soft = _soft_total(st, cfg)
+    t0 = _global_terms(st, cfg)
     placed_before = len(st.placed)
-    stats = anneal_soft(st, cand, cfg, budget_s=2.0, seed=0)
-    assert len(st.placed) == placed_before       # placement invariant
-    assert stats["soft_end"] <= stats["soft_start"]
-    assert _soft_total(st, cfg) <= start_soft     # never worse than start
-    assert _soft_total(st, cfg) < start_soft      # and here it strictly improves (all evenings clearable)
-
-
-def test_anneal_uses_swaps_for_dense_schedule():
-    from timetabling.soft_search import anneal_soft
-    cfg = Config()
-    # Single shared room, two full slots, no empty slot -> only a swap can improve.
-    a = _sec("A_01", "i1", level=2, code="ADA 201")   # S-Order penalizes late start
-    b = _sec("B_01", "i2", level=1, code="EEE 101")
-    cand = {
-        "A_01#T": [Candidate("A_01#T", "R1", "Mo", 13, 2), Candidate("A_01#T", "R1", "Mo", 9, 2)],
-        "B_01#T": [Candidate("B_01#T", "R1", "Mo", 9, 2), Candidate("B_01#T", "R1", "Mo", 13, 2)],
-    }
-    st = _state(a, b)
-    st.occupy("A_01#T", cand["A_01#T"][0])   # A late (Mo13, S-Order 8)
-    st.occupy("B_01#T", cand["B_01#T"][0])   # B early (Mo9)
-    start = _soft_total(st, cfg)
     anneal_soft(st, cand, cfg, budget_s=2.0, seed=0)
-    assert _soft_total(st, cfg) < start      # swap found: A->Mo9, B->Mo13
-    assert st.placed["A_01#T"].start == 9
+    t1 = _global_terms(st, cfg)
+    assert len(st.placed) == placed_before       # placement invariant
+    assert t1["conf"] <= t0["conf"]              # cohort-conflict guard never exceeded
+    assert t1["evening"] < t0["evening"]         # evening toggle strictly improved
+
+
+def test_anneal_lowers_objective_via_swap_dense():
+    from timetabling.soft_search import anneal_soft, _global_terms
+    cfg = Config()
+    # No empty slot exists -> only a B<->D swap can lower teaching-days (4 -> 2). A/C sit at
+    # hour 14 on the packing day so packing won't double-book the instructor.
+    a = _sec("A_01", "i1", code="ADA 101")
+    b = _sec("B_01", "i1", code="BBB 101")
+    c = _sec("C_01", "i2", code="CCC 101")
+    d = _sec("D_01", "i2", code="DDD 101")
+    cand = {
+        "A_01#T": [Candidate("A_01#T", "R1", "Mo", 14, 2)],
+        "B_01#T": [Candidate("B_01#T", "R2", "We", 9, 2), Candidate("B_01#T", "R2", "Mo", 9, 2)],
+        "C_01#T": [Candidate("C_01#T", "R1", "We", 14, 2)],
+        "D_01#T": [Candidate("D_01#T", "R2", "Mo", 9, 2), Candidate("D_01#T", "R2", "We", 9, 2)],
+    }
+    st = _state(a, b, c, d)
+    st.occupy("A_01#T", cand["A_01#T"][0])
+    st.occupy("B_01#T", cand["B_01#T"][0])
+    st.occupy("C_01#T", cand["C_01#T"][0])
+    st.occupy("D_01#T", cand["D_01#T"][0])
+    t0 = _global_terms(st, cfg)                  # teaching-days = 4
+    anneal_soft(st, cand, cfg, budget_s=2.0, seed=0)
+    t1 = _global_terms(st, cfg)
+    assert len(st.placed) == 4
+    assert t1["days"] < t0["days"]               # only a swap can lower days here
 
 
 def test_global_terms_raw_four_terms_plus_conf():

@@ -63,12 +63,12 @@ from timetabling.model import Room, Instructor
 
 
 def _eval_fn(cfg, base):
-    """Build a polish objective evaluator over affected entities: (normalized E, raw conf)."""
+    """Build a polish objective evaluator over affected entities: (normalized E, terms)."""
     from timetabling.soft_search import _local_terms, _norm_obj
 
     def fn(state, cohorts, instrs, rooms, blocks):
         t = _local_terms(state, cohorts, instrs, rooms, blocks, cfg)
-        return _norm_obj(t, base, cfg), t["conf"]
+        return _norm_obj(t, base, cfg), t
     return fn
 
 
@@ -84,9 +84,9 @@ def test_relocate_lowers_normalized_objective_and_keeps_placement():
     rng = random.Random(0)
     res = try_relocate(st, cand, "A_01#T", rng, ev)
     assert res is not None
-    dobj, dconf, revert = res
+    dobj, dterms, revert = res
     assert dobj < 0                              # evening removed -> normalized E drops
-    assert dconf == 0
+    assert dterms["conf"] == 0
     assert len(st.placed) == 1                   # never unplaced
     assert st.placed["A_01#T"].start == 9
     revert()                                     # revert restores the evening slot
@@ -119,9 +119,9 @@ def test_swap_lowers_objective_where_relocate_cannot():
     ev = _eval_fn(cfg, _global_terms(st, cfg))   # teaching-days base = 4
     res = try_swap(st, cand, "B_01#T", "D_01#T", ev)
     assert res is not None
-    dobj, dconf, revert = res
+    dobj, dterms, revert = res
     assert dobj < 0                              # teaching-days 4 -> 2
-    assert dconf == 0
+    assert dterms["conf"] == 0
     assert st.placed["B_01#T"].day == "Mo" and st.placed["D_01#T"].day == "We"
     assert len(st.placed) == 4
 
@@ -211,6 +211,30 @@ def test_anneal_lowers_objective_via_swap_dense():
     t1 = _global_terms(st, cfg)
     assert len(st.placed) == 4
     assert t1["days"] < t0["days"]               # only a swap can lower days here
+
+
+def test_anneal_guard_blocks_any_metric_regression():
+    from timetabling.soft_search import anneal_soft, _global_terms
+    cfg = Config()
+    # One cohort with a Monday gap. The only gap-reducing relocate for B sits in a SECOND
+    # room (R2), which would raise room_count above baseline -> the all-metric guard must
+    # forbid it, so no metric ends above its starting value.
+    a = _sec("A_01", "i1", code="ADA 101")
+    b = _sec("B_01", "i2", code="ADA 102")       # same cohort ADA-1
+    cand = {
+        "A_01#T": [Candidate("A_01#T", "R1", "Mo", 9, 2)],
+        "B_01#T": [Candidate("B_01#T", "R1", "Mo", 13, 2), Candidate("B_01#T", "R2", "Mo", 11, 2)],
+    }
+    st = _state(a, b)
+    st.occupy("A_01#T", cand["A_01#T"][0])        # ADA-1 Mo 9-11
+    st.occupy("B_01#T", cand["B_01#T"][0])        # ADA-1 Mo 13-15 (gap at 11-13)
+    t0 = _global_terms(st, cfg)
+    anneal_soft(st, cand, cfg, budget_s=1.0, seed=0)
+    t1 = _global_terms(st, cfg)
+    assert len(st.placed) == 2
+    for k in ("evening", "gap", "rooms", "days", "conf"):
+        assert t1[k] <= t0[k]                     # no metric regresses above baseline
+    assert t1["rooms"] == t0["rooms"]             # the room-scattering gap fix was blocked
 
 
 def test_global_terms_raw_four_terms_plus_conf():

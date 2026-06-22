@@ -112,11 +112,16 @@ def _slot(c):
     return (c.room, c.day, c.start)
 
 
+def _dterms(t0, t1):
+    return {k: t1[k] - t0[k] for k in t1}
+
+
 def try_relocate(state, cand_by_block, bid, rng, eval_fn):
     """Move bid to a random alternative legal+free candidate. Leaves state in the new
-    config; returns (dobj, dconf, revert) or None. eval_fn(state, cohorts, instrs, rooms,
-    blocks) -> (objective, conflict) over the affected entities; dobj/dconf are the after-
-    minus-before deltas. revert() restores the original placement."""
+    config; returns (dobj, dterms, revert) or None. eval_fn(state, cohorts, instrs, rooms,
+    blocks) -> (objective, terms) over the affected entities; dobj is the objective delta
+    and dterms the per-term delta dict (evening/gap/rooms/days/conf). revert() restores the
+    original placement."""
     s = state.sec_of[bid]
     iids = state.sec_instr.get(s.section_id, [])
     c_old = state.placed.get(bid)
@@ -130,23 +135,23 @@ def try_relocate(state, cand_by_block, bid, rng, eval_fn):
     instrs = set(iids)
     rooms = {c_old.room, c_new.room}
     blocks = {bid}
-    o0, f0 = eval_fn(state, cohorts, instrs, rooms, blocks)
+    o0, t0 = eval_fn(state, cohorts, instrs, rooms, blocks)
     state.release(bid)
     if not state.free_to_place(c_new, s.section_id, iids):
         state.occupy(bid, c_old)
         return None
     state.occupy(bid, c_new)
-    o1, f1 = eval_fn(state, cohorts, instrs, rooms, blocks)
+    o1, t1 = eval_fn(state, cohorts, instrs, rooms, blocks)
 
     def revert():
         state.release(bid)
         state.occupy(bid, c_old)
-    return o1 - o0, f1 - f0, revert
+    return o1 - o0, _dterms(t0, t1), revert
 
 
 def try_swap(state, cand_by_block, bid1, bid2, eval_fn):
     """Exchange the slots of bid1 and bid2 if each has a candidate for the other's current
-    slot and both are feasible. Leaves state swapped; returns (dobj, dconf, revert) or
+    slot and both are feasible. Leaves state swapped; returns (dobj, dterms, revert) or
     None. eval_fn as in try_relocate."""
     if bid1 == bid2:
         return None
@@ -166,7 +171,7 @@ def try_swap(state, cand_by_block, bid1, bid2, eval_fn):
     instrs = set(iids1) | set(iids2)
     rooms = {c1.room, c2.room}
     blocks = {bid1, bid2}
-    o0, f0 = eval_fn(state, cohorts, instrs, rooms, blocks)
+    o0, t0 = eval_fn(state, cohorts, instrs, rooms, blocks)
     state.release(bid1)
     state.release(bid2)
     ok = False
@@ -181,14 +186,14 @@ def try_swap(state, cand_by_block, bid1, bid2, eval_fn):
         state.occupy(bid1, c1)
         state.occupy(bid2, c2)
         return None
-    o1, f1 = eval_fn(state, cohorts, instrs, rooms, blocks)
+    o1, t1 = eval_fn(state, cohorts, instrs, rooms, blocks)
 
     def revert():
         state.release(bid1)
         state.release(bid2)
         state.occupy(bid1, c1)
         state.occupy(bid2, c2)
-    return o1 - o0, f1 - f0, revert
+    return o1 - o0, _dterms(t0, t1), revert
 
 
 class SCHC:
@@ -316,17 +321,21 @@ def anneal_soft(state, cand_by_block, cfg, budget_s, seed=0):
     rng = _random.Random(seed)
     placed = [bid for bid in state.placed if cand_by_block.get(bid)]
     base = _global_terms(state, cfg)
-    conf_base = base["conf"]
 
     def eval_fn(st, cohorts, instrs, rooms, blocks):
         t = _local_terms(st, cohorts, instrs, rooms, blocks, cfg)
-        return _norm_obj(t, base, cfg), t["conf"]
+        return _norm_obj(t, base, cfg), t
 
+    # No-regress guard over EVERY soft metric (the four toggles + cohort_conflict): no move
+    # may push any metric above its baseline. The polish then only ever lowers the
+    # normalized objective inside the "all metrics <= baseline" box, so each toggle ends
+    # <= baseline (gate-safe by construction).
+    guard_keys = ("evening", "gap", "rooms", "days", "conf")
     e_start = _norm_obj(base, base, cfg)
     acc = _make_acceptor(cfg, rng)
     acc.init(e_start)
     cur = e_start
-    conf_cur = conf_base
+    cur_terms = dict(base)
     best = e_start
     best_snapshot = dict(state.placed)
     at_best = True
@@ -345,13 +354,14 @@ def anneal_soft(state, cand_by_block, cfg, budget_s, seed=0):
                     res = try_relocate(state, cand_by_block, bid, rng, eval_fn)
                 if res is None:
                     continue
-                dobj, dconf, revert = res
-                if conf_cur + dconf > conf_base:     # cohort-conflict no-regress guard
-                    revert()
+                dobj, dterms, revert = res
+                if any(cur_terms[k] + dterms[k] > base[k] for k in guard_keys):
+                    revert()                     # would regress some metric above baseline
                     continue
                 if acc.accept(dobj, iters):
                     cur += dobj
-                    conf_cur += dconf
+                    for k in guard_keys:
+                        cur_terms[k] += dterms[k]
                     accepted += 1
                     if cur < best - 1e-9:
                         best = cur

@@ -68,24 +68,40 @@ def _run_excess(hours, T: int) -> int:
 
 
 def _global_terms(state, cfg) -> dict:
-    """Raw (unweighted) counts of the four UI-toggle soft terms over the FULL placement,
-    plus cohort-conflict (held as a no-regress guard, not optimized). gap covers ALL
-    cohorts (matches report._metrics). Single source of truth for the polish objective."""
-    evening = 0
-    coh_slot = defaultdict(set)      # (cohort, day, hour) -> {course}
-    coh_day = defaultdict(set)       # (cohort, day) -> {hour}
+    """Raw counts of the soft terms over the FULL placement. idle/conf over cohorts (all),
+    maxrun over cohorts+instructors, instr_days over instructors, room_stable per section,
+    free_day over cohorts in the configured year-levels."""
+    coh_day = defaultdict(set)        # (cohort, day) -> {hour}
+    coh_slot = defaultdict(set)       # (cohort, day, hour) -> {course}
+    instr_day = defaultdict(set)      # (iid, day) -> {hour}
+    sec_rooms = defaultdict(set)      # section_id -> {room}
+    coh_days_used = defaultdict(set)  # cohort -> {day}
     for bid, c in state.placed.items():
         s = state.sec_of[bid]
+        sec_rooms[s.section_id].add(c.room)
+        coh_days_used[s.cohort_key].add(c.day)
         for hh in range(c.start, c.start + c.length):
-            if hh >= cfg.evening_from_hour:
-                evening += 1
-            coh_slot[(s.cohort_key, c.day, hh)].add(s.code)
             coh_day[(s.cohort_key, c.day)].add(hh)
-    conf = sum(max(0, len(v) - 1) for v in coh_slot.values())
-    gap = _gap_of(coh_day)
-    rooms = len(state.room_hours_used)
-    days = sum(len(d) for d in state.instr_active_days.values())
-    return {"evening": evening, "gap": gap, "rooms": rooms, "days": days, "conf": conf}
+            coh_slot[(s.cohort_key, c.day, hh)].add(s.code)
+        for iid in state.sec_instr.get(s.section_id, []):
+            for hh in range(c.start, c.start + c.length):
+                instr_day[(iid, c.day)].add(hh)
+    T = cfg.max_consecutive_hours
+    maxrun = (sum(_run_excess(h, T) for h in coh_day.values())
+              + sum(_run_excess(h, T) for h in instr_day.values()))
+    years = {str(y) for y in cfg.free_day_year_levels}
+    n_days = len(cfg.days())
+    free_day = sum(max(0, len(days) - (n_days - 1))
+                   for cohort, days in coh_days_used.items()
+                   if cohort.rsplit("-", 1)[-1] in years) if years else 0
+    return {
+        "idle": _gap_of(coh_day),
+        "maxrun": maxrun,
+        "instr_days": sum(len(d) for d in state.instr_active_days.values()),
+        "room_stable": sum(max(0, len(rs) - 1) for rs in sec_rooms.values()),
+        "free_day": free_day,
+        "conf": sum(max(0, len(v) - 1) for v in coh_slot.values()),
+    }
 
 
 def _local_terms(state, cohorts, instrs, rooms, blocks, cfg) -> dict:

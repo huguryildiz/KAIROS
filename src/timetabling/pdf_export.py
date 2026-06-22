@@ -22,6 +22,9 @@ from .i18n import DAY_LABELS_FULL, DEFAULT_LANG
 _FONT_DIR = Path(__file__).parent / "assets" / "fonts"
 _FONT_REGULAR = _FONT_DIR / "DejaVuSans.ttf"
 _FONT_BOLD = _FONT_DIR / "DejaVuSans-Bold.ttf"
+_LOGO_PATH = Path(__file__).parent.parent.parent / "assets" / "logo.png"
+_LOGO_H = 9.0     # mm — height, matches title row
+_LOGO_W = 28.125  # mm — 1563:500 ≈ 3.125:1 aspect → 9 * (1563/500)
 
 _HOUR_LO, _HOUR_HI = 9, 21          # grid rows = hours 9..20 inclusive
 _TIME_COL_W = 16.0                  # mm
@@ -204,10 +207,19 @@ def _draw_grid_page(pdf: FPDF, schedule: dict, title: str,
     days = DAY_LABELS_FULL.get(lang, DAY_LABELS_FULL[DEFAULT_LANG])
     pdf.add_page()
 
-    # Title
+    # Logo PNG — top-right corner, vertically centred on the title row.
+    row_y = pdf.get_y()
+    if _LOGO_PATH.exists():
+        logo_x = pdf.w - pdf.r_margin - _LOGO_W
+        logo_y = row_y + (9 - _LOGO_H) / 2
+        pdf.image(str(_LOGO_PATH), x=logo_x, y=logo_y, w=_LOGO_W, h=_LOGO_H)
+
+    # Title — reset cursor to left margin (logo drawing leaves it mid-page).
+    pdf.set_xy(pdf.l_margin, row_y)
     pdf.set_font("DejaVu", "B", 14)
     pdf.set_text_color(20, 20, 20)
-    pdf.cell(0, 9, title, new_x="LMARGIN", new_y="NEXT")
+    title_w = pdf.w - pdf.l_margin - pdf.r_margin - (_LOGO_W + 4 if _LOGO_PATH.exists() else 0)
+    pdf.cell(title_w, 9, title, new_x="LMARGIN", new_y="NEXT")
 
     grid_x = pdf.l_margin
     grid_y = pdf.get_y() + 2

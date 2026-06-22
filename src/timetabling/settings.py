@@ -41,9 +41,7 @@ DEFAULT_SETTINGS: dict = {
     "daily_hours_cap": 0,     # 0 = off; N>0 enables the soft per-(instr,day) overload at N hours
     "instr_days_cap": 0,      # 0 = off; N>0 enables the soft per-instructor weekly day cap at N days
     "weights": {              # preset levels, never raw numbers
-        "evening": "normal",
         "cohort_gap": "normal",
-        "room_count": "normal",
         "instr_days": "normal",
     },
 }
@@ -178,9 +176,7 @@ def build_config(settings: dict, availability: Dict[str, list],
         max_theory_session=_int(s.get("max_theory_session"), 2),
         max_block_len=_int(s.get("max_block_len"), 4),
         blackout=tuple(blackout_rows),
-        w_evening=_preset(weights, "evening"),
         w_cohort_gap=_preset(weights, "cohort_gap"),
-        w_room_count=_preset(weights, "room_count"),
         w_instr_days=w_instr,
         w_parttime_days=w_parttime,
         max_instr_daily_hours=daily_cap,

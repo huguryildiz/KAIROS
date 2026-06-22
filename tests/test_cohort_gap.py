@@ -20,7 +20,7 @@ def test_gap_term_penalizes_forced_interior_hole():
     # objective term prefers non-adjacency, so the gap term's effect is otherwise tie-breaking.
     closed = tuple([(d, h) for d in ["Mo", "Tu", "We", "Th"] for h in (9, 10, 11)] + [("Fr", 10)])
     K = 5
-    cfg = Config(w_cohort_gap=K, w_evening=0, w_room_count=0, w_instr_days=0,
+    cfg = Config(w_cohort_gap=K, w_instr_days=0,
                  w_parttime_days=0, w_order=0, w_englab=0, w_nonadjacent=0,
                  horizon_start=9, undergrad_end=12, blackout=closed)
     rooms = [Room("R1", 50, False, True)]

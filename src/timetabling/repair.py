@@ -96,12 +96,10 @@ class State:
 
 
 def _soft_score(state: State, c, s, cfg: Config, eligible, cap) -> int:
-    """Weighted soft penalty for placing candidate c. Lower is better. evening + cohort
-    are gated by cfg.soft_shaping_in_repair; overload by its own weight (opt-in)."""
+    """Weighted soft penalty for placing candidate c. Lower is better. cohort conflict
+    is gated by cfg.soft_shaping_in_repair; overload by its own weight (opt-in)."""
     score = 0
     if cfg.soft_shaping_in_repair:
-        score += cfg.w_evening * sum(1 for h in range(c.start, c.start + c.length)
-                                     if h >= cfg.evening_from_hour)
         for h in range(c.start, c.start + c.length):
             slot = state.cohort_slot_courses.get((s.cohort_key, c.day, h))
             if slot and any(cc != s.code for cc in slot):
@@ -123,11 +121,10 @@ def _soft_score(state: State, c, s, cfg: Config, eligible, cap) -> int:
 
 
 def _cand_soft(c, s, cfg: Config) -> int:
-    """Per-candidate separable soft cost: evening + S-Order + S-EngLab. Independent of
-    other blocks, so it folds into a variable's objective coefficient. Mirrors the
-    per-variable coefficients in model_cpsat.build_and_solve."""
-    cost = cfg.w_evening * sum(1 for h in range(c.start, c.start + c.length)
-                               if h >= cfg.evening_from_hour)
+    """Per-candidate separable soft cost: S-Order + S-EngLab. Independent of other blocks,
+    so it folds into a variable's objective coefficient. Mirrors the per-variable
+    coefficients in model_cpsat.build_and_solve."""
+    cost = 0
     if 2 <= s.level <= 4:
         cost += cfg.w_order * (4 - s.level) * (c.start - cfg.horizon_start)
     if (cfg.eng_faculty_match in s.faculty and "#L" in c.block_id
@@ -200,8 +197,8 @@ def competitors(state: State, batch, cand_by_block) -> set:
 def _soft_total(state, cfg, staff_ids=frozenset()) -> int:
     """Global weighted soft sum over the current full placement. Single source of truth
     for the accept guard and the convergence check — mirrors the terms add_soft_objective
-    puts in the model, plus all four soft terms (per-candidate, cohort-conflict,
-    cohort-gap, instr_days, room_count). Cheap (no CP-SAT)."""
+    puts in the model, plus the soft terms (per-candidate, cohort-conflict, cohort-gap,
+    instr_days). Cheap (no CP-SAT)."""
     total = 0
     compact = {str(y) for y in cfg.compact_cohort_years}
     coh_courses = defaultdict(set)   # (cohort, day, hour) -> {course}
@@ -218,7 +215,6 @@ def _soft_total(state, cfg, staff_ids=frozenset()) -> int:
     total += cfg.w_cohort_gap * sum((max(h) + 1 - min(h)) - len(h)
                                     for h in coh_hours.values() if len(h) >= 2)
     total += cfg.w_instr_days * sum(len(days) for days in state.instr_active_days.values())
-    total += cfg.w_room_count * len(state.room_hours_used)
     return total
 
 
@@ -235,7 +231,7 @@ def add_soft_objective(m, x, free, cand_by_block, state, free_set, cfg,
     length_of = {bid: (cand_by_block[bid][0].length if cand_by_block[bid] else 0)
                  for bid in free}
 
-    # --- per-candidate: evening + S-Order + S-EngLab ---
+    # --- per-candidate: S-Order + S-EngLab ---
     for bid in free:
         s = state.sec_of[bid]
         best = 0

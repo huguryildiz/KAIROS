@@ -70,8 +70,6 @@ class Config:
     eng_lab_days: tuple = ("Th", "Fr")
     eng_faculty_match: str = "Engineering"
     w_nonadjacent: int = 0
-    w_evening: float = 10.0
-    w_room_count: float = 10.0
     w_instr_days: float = 10.0
     w_parttime_days: float = 14.0
     # soft: penalize each teaching-hour beyond this many per (instructor, day).
@@ -89,7 +87,7 @@ class Config:
     # overload penalty only to instructors whose total weekly teaching load is at most
     # this many hours. 0 = no exemption (penalize everyone).
     overload_exempt_weekly: int = 16
-    # apply evening + cohort-conflict soft shaping in the repair greedy construction
+    # apply cohort-conflict soft shaping in the repair greedy construction
     # (default on; --no-soft-shaping turns it off for baseline A/B runs)
     soft_shaping_in_repair: bool = True
     # run the post-convergence accept-guarded SOFT-POLISH passes (Pass C / Pass I) that

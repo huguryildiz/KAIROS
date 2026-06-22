@@ -11,7 +11,7 @@ def _sec(sid, code, level, instr, cohort="D-2"):
 
 
 def test_low_level_lands_earlier():
-    cfg = Config(w_order=100, w_cohort_gap=0, w_evening=0, w_room_count=0,
+    cfg = Config(w_order=100, w_cohort_gap=0,
                  w_instr_days=0, w_parttime_days=0)
     rooms = [Room("R1", 50, False, True)]
     instr = {"a": Instructor("a", "n", False, "D"), "b": Instructor("b", "n", False, "D")}

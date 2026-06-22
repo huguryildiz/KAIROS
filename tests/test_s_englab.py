@@ -12,7 +12,7 @@ def test_eng_lab_prefers_configured_days():
     The test goes RED if englab_terms are absent from the objective.
     """
     cfg = Config(w_englab=100, eng_lab_days=("Mo",),
-                 w_cohort_gap=0, w_evening=0, w_room_count=0,
+                 w_cohort_gap=0,
                  w_instr_days=0, w_parttime_days=0, w_order=0)
     rooms = [Room("LAB-L", 50, True, True)]
     instr = {"a": Instructor("a", "n", False, "D")}
@@ -30,8 +30,8 @@ def test_non_eng_lab_unconstrained():
     # Psychology lab pays nothing -> objective 0.0; if the faculty guard were buggy, objective
     # would be 100. This is the regression guard for faculty isolation.
     closed = tuple(("Mo", h) for h in range(9, 18))
-    cfg = Config(w_englab=100, eng_lab_days=("Mo",), w_cohort_gap=0, w_evening=0,
-                 w_room_count=0, w_instr_days=0, w_parttime_days=0, w_order=0,
+    cfg = Config(w_englab=100, eng_lab_days=("Mo",), w_cohort_gap=0,
+                 w_instr_days=0, w_parttime_days=0, w_order=0,
                  w_nonadjacent=0, blackout=closed)
     rooms = [Room("LAB-L", 50, True, True)]
     instr = {"a": Instructor("a", "n", False, "D")}

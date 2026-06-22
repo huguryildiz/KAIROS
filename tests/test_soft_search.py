@@ -17,17 +17,16 @@ def _state(*secs):
     return State(sec_of, sec_instr, set())
 
 
-def test_soft_total_includes_instr_days_and_room_count():
+def test_soft_total_includes_instr_days():
     from dataclasses import replace
-    cfg = replace(Config(), w_instr_days=3, w_room_count=2)   # pin weights (default-independent)
+    cfg = replace(Config(), w_instr_days=3)   # pin weight (default-independent)
     a = _sec("A_01", "i1", code="ADA 101")
     b = _sec("B_01", "i1", code="ADA 102")     # same instructor i1
     st = _state(a, b)
     st.occupy("A_01#T", Candidate("A_01#T", "R1", "Mo", 9, 2))
     st.occupy("B_01#T", Candidate("B_01#T", "R2", "Tu", 9, 2))
-    # i1 teaches 2 days -> w_instr_days*2 = 6 ; 2 distinct rooms -> w_room_count*2 = 4
-    # evening/order/cohort all zero here
-    assert _soft_total(st, cfg) == 6 + 4
+    # i1 teaches 2 days -> w_instr_days*2 = 6 ; order/cohort all zero here
+    assert _soft_total(st, cfg) == 6
     assert st.room_hours_used == Counter({"R1": 2, "R2": 2})
 
 

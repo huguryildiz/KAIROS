@@ -9,6 +9,8 @@ from time import perf_counter
 from .config import Config
 from .repair import _cand_soft, _soft_total
 
+CHAIN_MAX_DEPTH = 4   # bounded ejection-chain length in anneal_soft
+
 
 def _local_soft(state, cohorts, instrs, rooms, blocks, cfg: Config) -> int:
     """Weighted soft over only the given entities. Each term is owned by one entity type
@@ -460,10 +462,14 @@ def anneal_soft(state, cand_by_block, cfg, budget_s, seed=0):
         while perf_counter() - t0 < budget_s:
             for _ in range(512):                 # amortize the clock check
                 iters += 1
-                if len(placed) >= 2 and rng.random() < 0.5:
+                r = rng.random()
+                if len(placed) >= 2 and r < 0.4:
                     b1 = placed[rng.randrange(len(placed))]
                     b2 = placed[rng.randrange(len(placed))]
                     res = try_swap(state, cand_by_block, b1, b2, eval_fn)
+                elif r < 0.7:
+                    bid = placed[rng.randrange(len(placed))]
+                    res = try_chain(state, cand_by_block, bid, rng, eval_fn, CHAIN_MAX_DEPTH)
                 else:
                     bid = placed[rng.randrange(len(placed))]
                     res = try_relocate(state, cand_by_block, bid, rng, eval_fn)

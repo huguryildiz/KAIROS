@@ -161,3 +161,22 @@ def test_anneal_soft_never_raises_soft_and_keeps_placement():
     assert stats["soft_end"] <= stats["soft_start"]
     assert _soft_total(st, cfg) <= start_soft     # never worse than start
     assert _soft_total(st, cfg) < start_soft      # and here it strictly improves (all evenings clearable)
+
+
+def test_anneal_uses_swaps_for_dense_schedule():
+    from timetabling.soft_search import anneal_soft
+    cfg = Config()
+    # Single shared room, two full slots, no empty slot -> only a swap can improve.
+    a = _sec("A_01", "i1", level=2, code="ADA 201")   # S-Order penalizes late start
+    b = _sec("B_01", "i2", level=1, code="EEE 101")
+    cand = {
+        "A_01#T": [Candidate("A_01#T", "R1", "Mo", 13, 2), Candidate("A_01#T", "R1", "Mo", 9, 2)],
+        "B_01#T": [Candidate("B_01#T", "R1", "Mo", 9, 2), Candidate("B_01#T", "R1", "Mo", 13, 2)],
+    }
+    st = _state(a, b)
+    st.occupy("A_01#T", cand["A_01#T"][0])   # A late (Mo13, S-Order 8)
+    st.occupy("B_01#T", cand["B_01#T"][0])   # B early (Mo9)
+    start = _soft_total(st, cfg)
+    anneal_soft(st, cand, cfg, budget_s=2.0, seed=0)
+    assert _soft_total(st, cfg) < start      # swap found: A->Mo9, B->Mo13
+    assert st.placed["A_01#T"].start == 9

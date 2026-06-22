@@ -51,6 +51,22 @@ def _gap_of(hours_by_day) -> int:
     return sum((max(h) + 1 - min(h)) - len(h) for h in hours_by_day.values() if len(h) >= 2)
 
 
+def _run_excess(hours, T: int) -> int:
+    """Sum over maximal consecutive runs of max(0, run_len - T). Used by maxrun."""
+    if not hours:
+        return 0
+    hs = sorted(hours)
+    total = 0
+    run = 1
+    for i in range(1, len(hs)):
+        if hs[i] == hs[i - 1] + 1:
+            run += 1
+        else:
+            total += max(0, run - T)
+            run = 1
+    return total + max(0, run - T)
+
+
 def _global_terms(state, cfg) -> dict:
     """Raw (unweighted) counts of the four UI-toggle soft terms over the FULL placement,
     plus cohort-conflict (held as a no-regress guard, not optimized). gap covers ALL

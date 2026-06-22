@@ -38,3 +38,20 @@ def test_room_hours_used_decrements_on_release():
     assert st.room_hours_used["R1"] == 2
     st.release("A_01#T")
     assert st.room_hours_used.get("R1", 0) == 0
+
+
+def test_local_soft_matches_soft_total_over_all_entities():
+    from timetabling.soft_search import _local_soft
+    cfg = Config()
+    secs = [_sec("A_01", "i1", level=2, code="ADA 201"),
+            _sec("B_01", "i1", level=2, code="ADA 202"),   # same cohort ADA-2 + instr i1
+            _sec("C_01", "i2", level=3, code="EEE 301")]
+    st = _state(*secs)
+    st.occupy("A_01#T", Candidate("A_01#T", "R1", "Mo", 9, 2))
+    st.occupy("B_01#T", Candidate("B_01#T", "R1", "Mo", 13, 2))   # gap on Monday for ADA-2
+    st.occupy("C_01#T", Candidate("C_01#T", "R2", "Tu", 16, 2))   # evening
+    all_cohorts = {s.cohort_key for s in secs}
+    all_instrs = {iid for s in secs for iid in s.instructor_ids}
+    all_rooms = set(st.room_hours_used)
+    all_blocks = set(st.placed)
+    assert _local_soft(st, all_cohorts, all_instrs, all_rooms, all_blocks, cfg) == _soft_total(st, cfg)

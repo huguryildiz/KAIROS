@@ -17,6 +17,8 @@ class Config:
     grad_end: int = 21
     grad_start_by_dept: tuple = ()          # ((dept_code, hour), ...) earliest-start exceptions
     max_consecutive_hours: int = 3          # soft maxrun threshold (cumulative back-to-back)
+    max_instr_days: int = 5                 # soft instr_days target: penalize an instructor's
+                                            # teaching-days beyond this (5 = off; UI dial 5/3/1)
     free_day_year_levels: tuple = ()        # cohort year-levels that want >=1 empty day
     # soft weights (normalized objective; absolute values are relative-preference only)
     w_idle: float = 15.0                    # always-on student idle gaps (fixed, not a dial)
@@ -82,7 +84,7 @@ class Config:
     # while never regressing placement (accept guard) or conf. Bounded by the repair deadline.
     soft_polish_in_repair: bool = True
     # move-based soft polish (soft_search.anneal_soft): acceptor + its single parameter.
-    soft_polish_acceptor: str = "lahc"        # schc | lahc | deluge | sa (lahc > schc, measured)
+    soft_polish_acceptor: str = "deluge"      # schc | lahc | deluge | sa (deluge wins full Fall+Spring A/B, measured 2026-06-23)
     soft_polish_counter_limit: int = 5000     # SCHC counter / LAHC history length
     soft_polish_seed: int = 0
     evening_from_hour: int = 17   # an hour-slot >= this counts as "evening" for the soft penalty

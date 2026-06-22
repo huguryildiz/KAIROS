@@ -40,20 +40,24 @@ DEFAULT_SETTINGS: dict = {
     "lunch_start": 12,        # inclusive hour
     "lunch_end": 13,          # exclusive hour
     "weights": {              # preset levels, never raw numbers
-        "maxrun": "normal",
-        "instr_days": "normal",
-        "room_stable": "normal",
-        "free_day": "normal",
+        "maxrun": "medium",
+        "instr_days": "medium",
+        "room_stable": "medium",
+        "free_day": "medium",
     },
     "free_day_years": [],     # -> Config.free_day_year_levels (cohort years that want a free day)
 }
 
-# Uniform 0-1 preference scale, identical for all four toggles (normalization removes the
-# need for per-term magnitudes — only the relative dial matters). UI_REF lifts the 0-1
-# preference to an absolute weight ("normal" 0.5 -> 10), comparable to w_order/w_englab and
-# below w_cohort_conflict in the <=50 CP-SAT path; the repair polish normalizes it away.
+# Uniform 0-1 preference scale, identical for all dials (normalization removes the need for
+# per-term magnitudes — only the relative dial matters). UI_REF lifts the 0-1 preference to an
+# absolute weight ("medium" 0.5 -> 10, today's calibrated default). Three stops only: the
+# steerability gate measures the uniform-vs-maxed endpoints, so it cannot justify five.
+# low=5, medium=10, high=20 (high == the maxed profile the gate measures).
 UI_REF: float = 20.0
-WEIGHT_LEVELS: dict = {"off": 0.0, "low": 0.25, "normal": 0.5, "high": 0.75, "max": 1.0}
+WEIGHT_LEVELS: dict = {"low": 0.25, "medium": 0.5, "high": 1.0}
+
+# Migrate older 5-level profiles ("off"/"normal"/"max") onto the 3-level scale.
+_LEGACY_LEVEL: dict = {"off": "low", "normal": "medium", "max": "high"}
 
 
 def default_settings() -> dict:
@@ -103,8 +107,9 @@ def availability_closed_slots(availability: Dict[str, list], settings: dict) -> 
 def _preset(weights: dict, knob: str) -> float:
     """Map a knob's 0-1 preference level to an absolute weight (UI_REF x level). Uniform
     across all four toggles."""
-    lvl = weights.get(knob, "normal")
-    return round(UI_REF * WEIGHT_LEVELS.get(lvl, WEIGHT_LEVELS["normal"]), 1)
+    lvl = weights.get(knob, "medium")
+    lvl = _LEGACY_LEVEL.get(lvl, lvl)
+    return round(UI_REF * WEIGHT_LEVELS.get(lvl, WEIGHT_LEVELS["medium"]), 1)
 
 
 def build_config(settings: dict, availability: Dict[str, list],

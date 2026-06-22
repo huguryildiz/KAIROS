@@ -95,7 +95,8 @@ def _global_terms(state, cfg) -> dict:
     return {
         "idle": _gap_of(coh_day),
         "maxrun": maxrun,
-        "instr_days": sum(len(d) for d in state.instr_active_days.values()),
+        "instr_days": sum(max(0, len(d) - cfg.max_instr_days)
+                          for d in state.instr_active_days.values()),
         "room_stable": sum(max(0, len(rs) - 1) for rs in sec_rooms.values()),
         "free_day": free_day,
         "conf": sum(max(0, len(v) - 1) for v in coh_slot.values()),
@@ -137,7 +138,8 @@ def _local_terms(state, cohorts, instrs, rooms, blocks, cfg) -> dict:
     return {
         "idle": _gap_of(coh_day),
         "maxrun": maxrun,
-        "instr_days": sum(len(state.instr_active_days.get(iid, ())) for iid in instr_set),
+        "instr_days": sum(max(0, len(state.instr_active_days.get(iid, ())) - cfg.max_instr_days)
+                          for iid in instr_set),
         "room_stable": sum(max(0, len(rs) - 1) for rs in sec_rooms.values()),
         "free_day": free_day,
         "conf": sum(max(0, len(v) - 1) for v in coh_slot.values()),
@@ -358,6 +360,56 @@ def try_swap(state, cand_by_block, bid1, bid2, eval_fn):
     return o1 - o0, _dterms(t0, t1), revert
 
 
+def try_consolidate_instr(state, cand_by_block, iid, rng, eval_fn):
+    """Targeted move for instr_days: relocate one of instructor iid's blocks off a single-block
+    teaching day onto a day iid already teaches, vacating the sparse day and cutting iid's
+    active-day count. Falls back to the least-loaded active day when none is single-block.
+    Generic relocate/swap almost never lands such a move at scale (it requires the target day
+    to be one iid ALREADY uses); this primitive proposes it directly. Same return contract as
+    try_relocate; None when no feasible consolidating move exists."""
+    blocks_by_day = defaultdict(list)
+    for bid in state.instr_blocks.get(iid, ()):
+        c = state.placed.get(bid)
+        if c is not None:
+            blocks_by_day[c.day].append(bid)
+    if len(blocks_by_day) < 2:
+        return None
+    single = [d for d, bs in blocks_by_day.items() if len(bs) == 1]
+    src_day = (single[rng.randrange(len(single))] if single
+               else min(blocks_by_day, key=lambda d: len(blocks_by_day[d])))
+    target_days = set(blocks_by_day) - {src_day}
+    src_blocks = blocks_by_day[src_day][:]
+    rng.shuffle(src_blocks)
+    for bid in src_blocks:
+        s = state.sec_of[bid]
+        iids = state.sec_instr.get(s.section_id, [])
+        c_old = state.placed.get(bid)
+        if c_old is None:
+            continue
+        alts = [c for c in cand_by_block[bid]
+                if c.day in target_days and _slot(c) != _slot(c_old)]
+        if not alts:
+            continue
+        c_new = alts[rng.randrange(len(alts))]
+        cohorts = {s.cohort_key}
+        instrs = set(iids)
+        rooms = {c_old.room, c_new.room}
+        eblocks = {bid}
+        o0, t0 = eval_fn(state, cohorts, instrs, rooms, eblocks)
+        state.release(bid)
+        if not state.free_to_place(c_new, s.section_id, iids):
+            state.occupy(bid, c_old)
+            continue
+        state.occupy(bid, c_new)
+        o1, t1 = eval_fn(state, cohorts, instrs, rooms, eblocks)
+
+        def revert(bid=bid, c_old=c_old):
+            state.release(bid)
+            state.occupy(bid, c_old)
+        return o1 - o0, _dterms(t0, t1), revert
+    return None
+
+
 class SCHC:
     """Step Counting Hill Climbing (Bykov & Petrovic 2016). Accept a move iff the resulting
     cost is <= a bound; refresh the bound to the current cost every `counter_limit` steps.
@@ -387,25 +439,34 @@ class SCHC:
 
 
 class LAHC:
-    """Late Acceptance Hill Climbing (Bykov). Accept iff new cost <= the cost `L` steps ago
-    or <= the current cost. One parameter (history length)."""
+    """Late Acceptance Hill Climbing (Bykov). Accept iff new cost <= the cost `L` scored
+    candidates ago or <= the current cost. One parameter (history length).
+
+    The ring advances on every scored candidate passed to accept() via an internal cursor,
+    NOT the caller's iteration id `it`. anneal_soft increments `it` on loop turns that never
+    reach accept() (infeasible moves, conf-guard reverts), so `it % L` would index the ring
+    sparsely; the internal cursor keeps "L scored candidates ago" canonical. `it` is kept in
+    the signature only for protocol parity with SCHC/Deluge/SA."""
 
     def __init__(self, history_len: int):
         self.L = max(1, int(history_len))
-        self.cost = 0
+        self.cost = 0.0
         self.hist = []
+        self.pos = 0
 
-    def init(self, cost: int):
-        self.cost = cost
-        self.hist = [cost] * self.L
+    def init(self, cost: float):
+        self.cost = float(cost)
+        self.hist = [self.cost] * self.L
+        self.pos = 0
 
-    def accept(self, delta: int, it: int) -> bool:
-        new_cost = self.cost + delta
-        idx = it % self.L
-        accepted = new_cost <= self.cost or new_cost <= self.hist[idx]
+    def accept(self, delta: float, it: int) -> bool:
+        candidate = self.cost + float(delta)
+        late = self.hist[self.pos]
+        accepted = candidate <= self.cost or candidate <= late
         if accepted:
-            self.cost = new_cost
-        self.hist[idx] = self.cost
+            self.cost = candidate
+        self.hist[self.pos] = self.cost
+        self.pos = (self.pos + 1) % self.L
         return accepted
 
 
@@ -482,6 +543,11 @@ def anneal_soft(state, cand_by_block, cfg, budget_s, seed=0):
     objective never regresses globally."""
     rng = _random.Random(seed)
     placed = [bid for bid in state.placed if cand_by_block.get(bid)]
+    instr_list = sorted({iid for iids in state.sec_instr.values() for iid in iids})
+    # The targeted instr-day consolidation move only earns its move-budget share when the
+    # instr_days dial is on (max_instr_days below the working-day count gives the term headroom);
+    # when off it would propose mostly-rejected moves and starve maxrun/room_stable, so skip it.
+    consolidate_on = bool(instr_list) and cfg.max_instr_days < len(cfg.days())
     base = _global_terms(state, cfg)
 
     def eval_fn(st, cohorts, instrs, rooms, blocks):
@@ -514,9 +580,12 @@ def anneal_soft(state, cand_by_block, cfg, budget_s, seed=0):
                 elif r < 0.7:
                     bid = placed[rng.randrange(len(placed))]
                     res = try_chain(state, cand_by_block, bid, rng, eval_fn, CHAIN_MAX_DEPTH)
-                else:
+                elif r < 0.85 or not consolidate_on:
                     bid = placed[rng.randrange(len(placed))]
                     res = try_relocate(state, cand_by_block, bid, rng, eval_fn)
+                else:
+                    iid = instr_list[rng.randrange(len(instr_list))]
+                    res = try_consolidate_instr(state, cand_by_block, iid, rng, eval_fn)
                 if res is None:
                     continue
                 _dobj, dterms, revert = res

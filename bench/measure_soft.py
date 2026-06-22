@@ -43,3 +43,8 @@ print(f"[{label}] placed={placed}/{total} rate={placed/total:.4f} wall={wall:.0f
       f"| evening={m['evening_blocks']} cohort_conf={m['cohort_conflicts']} "
       f"cohort_gap={m['cohort_gap']} teach_days={m['instr_teaching_days']} "
       f"rooms={m['rooms_used']} | genuine_hard={genuine} tail={conf.get('placement', 0)}")
+pre, post = res.stats.get("soft_pre"), res.stats.get("soft_post")
+if pre and post:
+    keys = ("evening", "gap", "rooms", "days", "conf")
+    print(f"  within-run pre ->post (guard=baseline): "
+          + " ".join(f"{k} {pre[k]}->{post[k]}" for k in keys))

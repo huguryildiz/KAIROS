@@ -539,11 +539,16 @@ def solve_repair(sections, rooms, instructors, cfg):
     # CP-SAT frozen-LNS passes, which were a measured no-op at scale. OFF by default
     # (cfg.soft_polish_in_repair) until the 841 gate is green.
     soft_polish_rounds = 0
+    soft_pre = soft_post = None
     if cfg.soft_polish_in_repair:
-        from .soft_search import anneal_soft
+        from .soft_search import anneal_soft, _global_terms
         budget = min(SOFT_POLISH_BUDGET_S, max(0.0, deadline - (perf_counter() - t0)))
         if budget > 0:
+            # within-run before/after: the only correct soft comparison (placement is
+            # CP-SAT-nondeterministic, so a separate flag-off run is a different baseline).
+            soft_pre = _global_terms(state, cfg)
             anneal_soft(state, cand_by_block, cfg, budget, seed=cfg.soft_polish_seed)
+            soft_post = _global_terms(state, cfg)
             soft_polish_rounds = 1
 
     # POLISH (overload only): once placement converges, re-optimize the days of
@@ -591,6 +596,8 @@ def solve_repair(sections, rooms, instructors, cfg):
         "sweeps": sweep,
         "polish_rounds": polish_rounds,
         "soft_polish_rounds": soft_polish_rounds,
+        "soft_pre": soft_pre,
+        "soft_post": soft_post,
         "placed": len(state.placed),
         "total": total,
     }

@@ -5,8 +5,7 @@ from collections import defaultdict
 from ortools.sat.python import cp_model
 
 from .config import Config
-from .model import (Section, Block, Room, Instructor, Candidate, Assignment,
-                    overload_eligible_ids)
+from .model import Section, Block, Room, Instructor, Candidate, Assignment
 
 
 def _blackout_hours(instructors, cfg: Config):
@@ -117,7 +116,6 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
     cohort_hour_occ = defaultdict(list)   # (cohort, day, hour) -> vars (compact cohorts only)
     section_occ = defaultdict(list)       # (section_id, day, hour) -> vars
     instr_day_vars = defaultdict(list)            # (instr_id, day) -> vars
-    instr_day_load = defaultdict(list)            # (instr_id, day) -> per-hour vars (sum = daily hours)
 
     compact_years = {str(y) for y in cfg.compact_cohort_years}
     virtual_names = {r.room for r in rooms if r.is_virtual}
@@ -157,7 +155,6 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
                     room_occ[(c.room, c.day, hh)].append(v)
                 for iid in s.instructor_ids:
                     instr_occ[(iid, c.day, hh)].append(v)
-                    instr_day_load[(iid, c.day)].append(v)
                 cohort_course_occ[(s.cohort_key, s.code, c.day, hh)].append(v)
                 if s.cohort_key.rsplit("-", 1)[-1] in compact_years:
                     cohort_hour_occ[(s.cohort_key, c.day, hh)].append(v)
@@ -239,35 +236,6 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
         model.Add(sum(vs) == 0).OnlyEnforceIf(d.Not())
         instr_day[(iid, day)] = d
 
-    # soft: per-(instructor, day) overload — hours beyond cfg.max_instr_daily_hours.
-    # instr_day_load sums one var per occupied hour, so its sum == daily teaching hours.
-    overload_terms = []
-    if cfg.w_instr_daily_overload:
-        cap = cfg.max_instr_daily_hours
-        eligible = overload_eligible_ids(sections, cfg)
-        for (iid, day), vs in instr_day_load.items():
-            if iid not in eligible or len(vs) <= cap:
-                continue
-            over = model.NewIntVar(0, len(vs), f"iover|{iid}|{day}")
-            model.Add(over >= sum(vs) - cap)
-            overload_terms.append(over)
-
-    # soft: per-instructor weekly distinct-day overload — days beyond
-    # cfg.max_instr_weekly_days. instr_day[(iid, day)] is 1 iff the instructor teaches
-    # that day, so their sum == distinct teaching days for the week.
-    weekday_overload_terms = []
-    if cfg.w_instr_weekly_overload:
-        wcap = cfg.max_instr_weekly_days
-        by_instr = defaultdict(list)
-        for (iid, day), d in instr_day.items():
-            by_instr[iid].append(d)
-        for iid, ds in by_instr.items():
-            if len(ds) <= wcap:
-                continue
-            over = model.NewIntVar(0, len(ds), f"iwover|{iid}")
-            model.Add(over >= sum(ds) - wcap)
-            weekday_overload_terms.append(over)
-
     obj = []
     for (iid, day), d in instr_day.items():
         ins = instructors.get(iid, default_instr)
@@ -278,8 +246,6 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
     obj += englab_terms
     obj += [cfg.w_nonadjacent * t for t in nonadj_terms]
     obj += [cfg.w_cohort_conflict * t for t in cohort_conflict_terms]
-    obj += [cfg.w_instr_daily_overload * t for t in overload_terms]
-    obj += [cfg.w_instr_weekly_overload * t for t in weekday_overload_terms]
     if obj:
         model.Minimize(sum(obj))
 

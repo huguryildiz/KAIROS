@@ -39,27 +39,14 @@ def main():
                     help="solve faculty-by-faculty sharing the room pool (for full --scope all)")
     ap.add_argument("--repair", action="store_true",
                     help="warm-started small-neighborhood repair solver (full --scope all)")
-    ap.add_argument("--instr-overload-weight", type=int, default=0,
-                    help="soft penalty per teaching-hour beyond the daily cap per instructor "
-                         "(0 = off; e.g. 20). A hard cap is infeasible — see TODO.md")
-    ap.add_argument("--instr-daily-cap", type=int, default=None,
-                    help="hours/day before the overload penalty applies (default Config=4)")
-    ap.add_argument("--overload-exempt-weekly", type=int, default=None,
-                    help="exempt instructors above this weekly load from the overload penalty "
-                         "(default Config=16; 0 = penalize everyone)")
     ap.add_argument("--no-soft-shaping", action="store_true",
-                    help="disable evening + cohort-conflict shaping in repair greedy "
+                    help="disable cohort-conflict shaping in repair greedy "
                          "construction (for baseline A/B; default on)")
     args = ap.parse_args()
 
-    cfg_kwargs = {"solve_time_limit_s": args.time_limit,
-                  "w_instr_daily_overload": args.instr_overload_weight}
+    cfg_kwargs = {"solve_time_limit_s": args.time_limit}
     if args.max_rooms_per_block is not None:
         cfg_kwargs["max_rooms_per_block"] = args.max_rooms_per_block
-    if args.instr_daily_cap is not None:
-        cfg_kwargs["max_instr_daily_hours"] = args.instr_daily_cap
-    if args.overload_exempt_weekly is not None:
-        cfg_kwargs["overload_exempt_weekly"] = args.overload_exempt_weekly
     if args.no_soft_shaping:
         cfg_kwargs["soft_shaping_in_repair"] = False
     cfg = Config(**cfg_kwargs)

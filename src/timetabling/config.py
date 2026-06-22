@@ -72,21 +72,6 @@ class Config:
     w_nonadjacent: int = 0
     w_instr_days: float = 10.0
     w_parttime_days: float = 14.0
-    # soft: penalize each teaching-hour beyond this many per (instructor, day).
-    # 0 = disabled (opt-in). A hard cap is INFEASIBLE: ~19 instructors carry
-    # >20h/week (service courses) and cannot fit 5 days at 4h. See TODO.md.
-    max_instr_daily_hours: int = 4
-    w_instr_daily_overload: int = 0
-    # soft: penalize each distinct teaching DAY beyond this many per instructor per week.
-    # 0 = disabled (opt-in). Soft, never hard — a tight cap would be INFEASIBLE for
-    # high-load instructors. Distinct from w_instr_days (which minimizes days outright);
-    # this only penalizes days *beyond* the cap.
-    max_instr_weekly_days: int = 5
-    w_instr_weekly_overload: int = 0
-    # exempt high-load instructors (e.g. Basic Sciences service courses): apply the
-    # overload penalty only to instructors whose total weekly teaching load is at most
-    # this many hours. 0 = no exemption (penalize everyone).
-    overload_exempt_weekly: int = 16
     # apply cohort-conflict soft shaping in the repair greedy construction
     # (default on; --no-soft-shaping turns it off for baseline A/B runs)
     soft_shaping_in_repair: bool = True

@@ -21,9 +21,6 @@ def test_default_settings_build_config_matches_today():
     assert cfg.w_cohort_gap == 10
     assert cfg.w_instr_days == 10
     assert cfg.w_parttime_days == 14
-    assert cfg.w_instr_daily_overload == 0
-    assert cfg.w_instr_weekly_overload == 0
-    assert cfg.max_instr_weekly_days == 5
     assert cfg.solve_time_limit_s == 3000.0
     assert cfg.repair_time_limit_s == 3000.0
     assert cfg.instr_unavailable == frozenset()
@@ -82,28 +79,6 @@ def test_lunch_bad_window_ignored():
     s = dict(DEFAULT_SETTINGS, lunch_enabled=True, lunch_start=14, lunch_end=12)
     cfg = build_config(s, {}, 60.0)
     assert cfg.blackout == ()   # invalid window -> no lunch slots, no baked-in defaults
-
-
-def test_daily_hours_cap():
-    off = build_config(dict(DEFAULT_SETTINGS, daily_hours_cap=0), {}, 60.0)
-    assert off.w_instr_daily_overload == 0
-    on = build_config(dict(DEFAULT_SETTINGS, daily_hours_cap=4), {}, 60.0)
-    assert on.max_instr_daily_hours == 4
-    assert on.w_instr_daily_overload == 5
-
-
-def test_instr_days_cap():
-    # off by default: weight 0, Config default day count
-    off = build_config(dict(DEFAULT_SETTINGS, instr_days_cap=0), {}, 60.0)
-    assert off.w_instr_weekly_overload == 0
-    assert off.max_instr_weekly_days == 5
-    # enabled: soft cap at N days with a non-zero weight
-    on = build_config(dict(DEFAULT_SETTINGS, instr_days_cap=3), {}, 60.0)
-    assert on.max_instr_weekly_days == 3
-    assert on.w_instr_weekly_overload == 8
-    # out-of-range falls back to off
-    bad = build_config(dict(DEFAULT_SETTINGS, instr_days_cap=9), {}, 60.0)
-    assert bad.w_instr_weekly_overload == 0
 
 
 def test_clamp_guard():

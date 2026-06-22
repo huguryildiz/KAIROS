@@ -38,8 +38,6 @@ DEFAULT_SETTINGS: dict = {
     "lunch_enabled": False,
     "lunch_start": 12,        # inclusive hour
     "lunch_end": 13,          # exclusive hour
-    "daily_hours_cap": 0,     # 0 = off; N>0 enables the soft per-(instr,day) overload at N hours
-    "instr_days_cap": 0,      # 0 = off; N>0 enables the soft per-instructor weekly day cap at N days
     "weights": {              # preset levels, never raw numbers
         "cohort_gap": "normal",
         "instr_days": "normal",
@@ -150,20 +148,6 @@ def build_config(settings: dict, availability: Dict[str, list],
     w_instr = _preset(weights, "instr_days")
     w_parttime = round(w_instr + 4, 1) if w_instr else 0.0
 
-    # instructor daily-hours soft cap
-    cap = _int(s.get("daily_hours_cap"), 0)
-    if cap > 0:
-        daily_cap, overload_w = cap, 5
-    else:
-        daily_cap, overload_w = 4, 0   # 4 = Config default; weight 0 = off (today)
-
-    # instructor weekly distinct-day soft cap (1..6 active days; 0 = off)
-    wdays = _int(s.get("instr_days_cap"), 0)
-    if 0 < wdays <= 6:
-        weekly_days, weekly_w = wdays, 8   # 8 ≈ "strong" spread weight; clearly outranks base nudge
-    else:
-        weekly_days, weekly_w = 5, 0       # 5 = Config default; weight 0 = off
-
     closed = availability_closed_slots(
         availability, {"day_start": day_start})
 
@@ -179,10 +163,6 @@ def build_config(settings: dict, availability: Dict[str, list],
         w_cohort_gap=_preset(weights, "cohort_gap"),
         w_instr_days=w_instr,
         w_parttime_days=w_parttime,
-        max_instr_daily_hours=daily_cap,
-        w_instr_daily_overload=overload_w,
-        max_instr_weekly_days=weekly_days,
-        w_instr_weekly_overload=weekly_w,
         instr_unavailable=closed,
         solve_time_limit_s=float(solve_seconds),
         repair_time_limit_s=float(solve_seconds),

@@ -15,6 +15,14 @@ class Config:
     undergrad_end: int = 18       # undergrad blocks must end by this hour
     grad_start: int = 18
     grad_end: int = 21
+    grad_start_by_dept: tuple = ()          # ((dept_code, hour), ...) earliest-start exceptions
+    max_consecutive_hours: int = 3          # soft maxrun threshold (cumulative back-to-back)
+    free_day_year_levels: tuple = ()        # cohort year-levels that want >=1 empty day
+    # soft weights (normalized objective; absolute values are relative-preference only)
+    w_idle: float = 15.0                    # always-on student idle gaps (fixed, not a dial)
+    w_maxrun: float = 10.0                  # dial: anti-fatigue consecutive runs
+    w_room_stable: float = 10.0             # dial: per-section room stability
+    w_free_day: float = 10.0                # dial: year-scoped free day
     # blackouts: (day, hour, staff_only) hour-slots that are closed. staff_only=True closes
     # the slot only for sections taught by a full-time instructor (e.g. a faculty seminar);
     # staff_only=False (or a bare 2-tuple) closes it for everyone. Use
@@ -113,3 +121,9 @@ class Config:
                 continue
             out.add((day, hour))
         return out
+
+    def grad_start_for(self, dept_code: str) -> int:
+        for d, h in self.grad_start_by_dept:
+            if d == dept_code:
+                return h
+        return self.grad_start

@@ -76,22 +76,26 @@ def _eval_fn(cfg, base):
 def test_relocate_lowers_normalized_objective_and_keeps_placement():
     from timetabling.soft_search import try_relocate, _global_terms
     cfg = Config()
-    a = _sec("A_01", "i1")                       # level 1, evening is the only toggle here
-    cand = {"A_01#T": [Candidate("A_01#T", "R1", "Mo", 16, 2),   # evening (hour 17)
-                       Candidate("A_01#T", "R1", "Mo", 9, 2)]}    # morning
-    st = _state(a)
-    st.occupy("A_01#T", cand["A_01#T"][0])       # park in evening
+    # cohort ADA-2: sibling B fixed Mo 9-11; A parked Mo 14-16 (idle gap 11-13). Relocating A
+    # to the adjacent Mo 11-13 closes the gap -> idle drops -> normalized E drops.
+    a = _sec("A_01", "i1", level=2, code="ADA 201")
+    b = _sec("B_01", "i2", level=2, code="ADA 202")     # same cohort ADA-2, other instructor
+    cand = {"A_01#T": [Candidate("A_01#T", "R1", "Mo", 14, 2),
+                       Candidate("A_01#T", "R1", "Mo", 11, 2)]}
+    st = _state(a, b)
+    st.occupy("B_01#T", Candidate("B_01#T", "R2", "Mo", 9, 2))
+    st.occupy("A_01#T", cand["A_01#T"][0])       # park with a gap
     ev = _eval_fn(cfg, _global_terms(st, cfg))
     rng = random.Random(0)
     res = try_relocate(st, cand, "A_01#T", rng, ev)
     assert res is not None
     dobj, dterms, revert = res
-    assert dobj < 0                              # evening removed -> normalized E drops
+    assert dobj < 0                              # idle gap closed -> normalized E drops
     assert dterms["conf"] == 0
-    assert len(st.placed) == 1                   # never unplaced
-    assert st.placed["A_01#T"].start == 9
-    revert()                                     # revert restores the evening slot
-    assert st.placed["A_01#T"].start == 16
+    assert len(st.placed) == 2                   # never unplaced
+    assert st.placed["A_01#T"].start == 11
+    revert()                                     # revert restores the gapped slot
+    assert st.placed["A_01#T"].start == 14
 
 
 def test_swap_lowers_objective_where_relocate_cannot():
@@ -170,21 +174,26 @@ def test_schc_refreshes_bound_every_counter_limit():
 def test_anneal_lowers_objective_keeps_placement_and_conf():
     from timetabling.soft_search import anneal_soft, _global_terms
     cfg = Config()
-    # 8 distinct-cohort sections, each in its own room, all parked in the evening.
-    secs = [_sec(f"S{n}_01", f"i{n}", level=1, code=f"C{n} 101") for n in range(8)]
+    # 8 cohorts; each has a fixed block Mo 9-11 and a movable block parked Mo 14-16 (idle gap
+    # 11-13). Each movable block can slide to a clear Tu 9-11 slot, removing its cohort's gap.
     cand = {}
+    secs = []
+    for n in range(8):
+        secs.append(_sec(f"F{n}_01", f"i{n}", level=2, code=f"C{n} 201"))   # fixed sibling
+        secs.append(_sec(f"M{n}_01", f"j{n}", level=2, code=f"C{n} 202"))   # movable
     st = _state(*secs)
-    for n, s in enumerate(secs):
-        bid = f"S{n}_01#T"
-        cand[bid] = [Candidate(bid, f"R{n}", "Mo", 16, 2), Candidate(bid, f"R{n}", "Mo", 9, 2)]
-        st.occupy(bid, cand[bid][0])             # park all in evening
+    for n in range(8):
+        st.occupy(f"F{n}_01#T", Candidate(f"F{n}_01#T", f"R{n}", "Mo", 9, 2))
+        bid = f"M{n}_01#T"
+        cand[bid] = [Candidate(bid, f"S{n}", "Mo", 14, 2), Candidate(bid, f"S{n}", "Tu", 9, 2)]
+        st.occupy(bid, cand[bid][0])             # park with a gap
     t0 = _global_terms(st, cfg)
     placed_before = len(st.placed)
     anneal_soft(st, cand, cfg, budget_s=2.0, seed=0)
     t1 = _global_terms(st, cfg)
     assert len(st.placed) == placed_before       # placement invariant
     assert t1["conf"] <= t0["conf"]              # cohort-conflict guard never exceeded
-    assert t1["evening"] < t0["evening"]         # evening toggle strictly improved
+    assert t1["idle"] < t0["idle"]               # idle gaps strictly improved
 
 
 def test_anneal_lowers_objective_via_swap_dense():
@@ -211,35 +220,37 @@ def test_anneal_lowers_objective_via_swap_dense():
     anneal_soft(st, cand, cfg, budget_s=2.0, seed=0)
     t1 = _global_terms(st, cfg)
     assert len(st.placed) == 4
-    assert t1["days"] < t0["days"]               # only a swap can lower days here
+    assert t1["instr_days"] < t0["instr_days"]   # only a swap can lower instr days here
 
 
 def test_chain_unlocks_where_relocate_and_swap_cannot():
     from timetabling.soft_search import try_chain, try_relocate, try_swap, _global_terms
     cfg = Config()
-    # A is parked in the evening; its only morning candidate (R1 Mo9) is occupied by B, and
-    # B has no candidate at A's evening slot -> neither relocate nor swap can move A. But an
-    # ejection chain can: A -> R1 Mo9 ejecting B -> R2 Mo9 (a free slot). evening drops.
-    a = _sec("A_01", "i1", code="ADA 101")
-    b = _sec("B_01", "i2", code="BBB 101")
+    # cohort ADA-2: sibling E fixed Mo 9-11; A parked Mo 14-16 (idle gap 11-13). A's gap-closing
+    # target (R1 Mo11) is occupied by B, and B has no candidate at A's slot -> neither relocate
+    # nor swap can move A. An ejection chain can: A -> R1 Mo11 ejecting B -> R2 Mo11 (free).
+    a = _sec("A_01", "i1", level=2, code="ADA 201")
+    e = _sec("E_01", "i3", level=2, code="ADA 202")   # same cohort ADA-2, fixed sibling
+    b = _sec("B_01", "i2", code="BBB 101")            # blocks A's target room
     cand = {
-        "A_01#T": [Candidate("A_01#T", "R1", "Mo", 16, 2), Candidate("A_01#T", "R1", "Mo", 9, 2)],
-        "B_01#T": [Candidate("B_01#T", "R1", "Mo", 9, 2), Candidate("B_01#T", "R2", "Mo", 9, 2)],
+        "A_01#T": [Candidate("A_01#T", "R1", "Mo", 14, 2), Candidate("A_01#T", "R1", "Mo", 11, 2)],
+        "B_01#T": [Candidate("B_01#T", "R1", "Mo", 11, 2), Candidate("B_01#T", "R2", "Mo", 11, 2)],
     }
-    st = _state(a, b)
-    st.occupy("A_01#T", cand["A_01#T"][0])        # A evening R1 Mo16
-    st.occupy("B_01#T", cand["B_01#T"][0])        # B morning R1 Mo9 (blocks A's target)
+    st = _state(a, e, b)
+    st.occupy("E_01#T", Candidate("E_01#T", "R0", "Mo", 9, 2))    # ADA-2 fixed Mo 9-11
+    st.occupy("A_01#T", cand["A_01#T"][0])        # ADA-2 Mo 14-16 (gap 11-13)
+    st.occupy("B_01#T", cand["B_01#T"][0])        # BBB-1 R1 Mo 11-13 (blocks A's target)
     ev = _eval_fn(cfg, _global_terms(st, cfg))
     assert try_relocate(st, cand, "A_01#T", random.Random(0), ev) is None   # target occupied
     assert try_swap(st, cand, "A_01#T", "B_01#T", ev) is None               # no reciprocal cand
     res = try_chain(st, cand, "A_01#T", random.Random(0), ev, max_depth=3)
     assert res is not None
     dobj, dterms, revert = res
-    assert dterms["evening"] < 0                   # chain pulled A out of the evening
-    assert st.placed["A_01#T"].start == 9 and st.placed["B_01#T"].room == "R2"
-    assert len(st.placed) == 2
+    assert dterms["idle"] < 0                       # chain closed the cohort gap
+    assert st.placed["A_01#T"].start == 11 and st.placed["B_01#T"].room == "R2"
+    assert len(st.placed) == 3
     revert()
-    assert st.placed["A_01#T"].start == 16 and st.placed["B_01#T"].room == "R1"
+    assert st.placed["A_01#T"].start == 14 and st.placed["B_01#T"].room == "R1"
 
 
 def test_chain_preserves_hard_feasibility():
@@ -264,45 +275,31 @@ def test_chain_preserves_hard_feasibility():
     assert validate(assigns, [a, b], rooms, instr, cfg) == []
 
 
-def test_cheby_is_max_plus_small_sum_augmentation():
-    from timetabling.soft_search import _cheby, CHEBY_RHO
-    cfg = Config()  # w_evening=w_cohort_gap=w_room_count=w_instr_days=10
-    base = {"evening": 10, "gap": 10, "rooms": 10, "days": 10, "conf": 0}
-    # all at baseline -> each normalized value = 10 ; cheby = max(10) + rho*sum(40)
-    assert abs(_cheby(base, base, cfg) - (10 + CHEBY_RHO * 40)) < 1e-9
-    # halving the WORST (here all equal) term lowers the max; halving below others only
-    # lowers the sum-augmentation. Reducing one term to 0 -> max still 10 (others), sum 30.
-    one_zero = {"evening": 0, "gap": 10, "rooms": 10, "days": 10, "conf": 0}
-    assert abs(_cheby(one_zero, base, cfg) - (10 + CHEBY_RHO * 30)) < 1e-9
-    # reducing ALL four lowers the max itself -> much smaller objective
-    all_low = {"evening": 5, "gap": 5, "rooms": 5, "days": 5, "conf": 0}
-    assert _cheby(all_low, base, cfg) < _cheby(one_zero, base, cfg)
-
-
-def test_anneal_with_chains_lowers_evening_keeps_invariants():
+def test_anneal_with_chains_lowers_idle_keeps_invariants():
     from timetabling.soft_search import anneal_soft, _global_terms
     cfg = Config()
-    # A parked in the evening; its morning slot is blocked by B. B can escape to R2 (already
-    # opened by C, so no new room). The wired loop (relocate+swap+chain) should pull A out of
-    # the evening without regressing conflict or placement.
-    a = _sec("A_01", "i1", code="ADA 101")
+    # cohort ADA-2: sibling E fixed Mo 9-11; A parked Mo 14-16 (gap). A's gap-closing slot
+    # (R1 Mo11) is blocked by B. B can escape to R2 (already opened by C, so no new room). The
+    # wired loop (relocate+swap+chain) should close the gap without regressing conflict.
+    a = _sec("A_01", "i1", level=2, code="ADA 201")
+    e = _sec("E_01", "i3", level=2, code="ADA 202")   # same cohort ADA-2, fixed sibling
     b = _sec("B_01", "i2", code="BBB 101")
-    c = _sec("C_01", "i3", code="CCC 101")
+    c = _sec("C_01", "i4", code="CCC 101")
     cand = {
-        "A_01#T": [Candidate("A_01#T", "R1", "Mo", 16, 2), Candidate("A_01#T", "R1", "Mo", 9, 2)],
-        "B_01#T": [Candidate("B_01#T", "R1", "Mo", 9, 2), Candidate("B_01#T", "R2", "Mo", 9, 2)],
-        "C_01#T": [Candidate("C_01#T", "R2", "Mo", 14, 2)],
+        "A_01#T": [Candidate("A_01#T", "R1", "Mo", 14, 2), Candidate("A_01#T", "R1", "Mo", 11, 2)],
+        "B_01#T": [Candidate("B_01#T", "R1", "Mo", 11, 2), Candidate("B_01#T", "R2", "Mo", 11, 2)],
     }
-    st = _state(a, b, c)
+    st = _state(a, e, b, c)
+    st.occupy("E_01#T", Candidate("E_01#T", "R0", "Mo", 9, 2))
     st.occupy("A_01#T", cand["A_01#T"][0])
     st.occupy("B_01#T", cand["B_01#T"][0])
-    st.occupy("C_01#T", cand["C_01#T"][0])
+    st.occupy("C_01#T", Candidate("C_01#T", "R2", "Mo", 14, 2))
     t0 = _global_terms(st, cfg)
     anneal_soft(st, cand, cfg, budget_s=2.0, seed=0)
     t1 = _global_terms(st, cfg)
-    assert len(st.placed) == 3            # placement invariant
+    assert len(st.placed) == 4            # placement invariant
     assert t1["conf"] <= t0["conf"]       # conflict guard
-    assert t1["evening"] < t0["evening"]  # A pulled out of the evening
+    assert t1["idle"] < t0["idle"]        # cohort gap closed
 
 
 def test_anneal_conflict_guard_holds():
@@ -329,7 +326,7 @@ def test_anneal_conflict_guard_holds():
     assert st.placed["B_01#T"].start == 16        # evening->morning blocked (would conflict)
 
 
-def test_global_terms_raw_four_terms_plus_conf():
+def test_global_terms_raw_terms_plus_conf():
     from timetabling.soft_search import _global_terms
     cfg = Config()
     a = _sec("A_01", "i1", level=2, code="ADA 201")
@@ -340,11 +337,13 @@ def test_global_terms_raw_four_terms_plus_conf():
     st.occupy("A_01#T", Candidate("A_01#T", "R1", "Mo", 9, 2))   # ADA-2 Mo 9,10
     st.occupy("B_01#T", Candidate("B_01#T", "R3", "Mo", 9, 2))   # ADA-2 Mo 9,10 (conflict)
     st.occupy("D_01#T", Candidate("D_01#T", "R1", "Mo", 14, 2))  # ADA-2 Mo 14,15 (gap 11-13)
-    st.occupy("C_01#T", Candidate("C_01#T", "R2", "Tu", 16, 2))  # evening hour 17
+    st.occupy("C_01#T", Candidate("C_01#T", "R2", "Tu", 16, 2))
     t = _global_terms(st, cfg)
-    # evening: only hour 17 >= 17 -> 1 ; gap: ADA-2 Mon {9,10,14,15} -> (16-9)-4 = 3
-    # rooms: R1,R3,R2 -> 3 ; days: i1 {Mo}=1, i2 {Tu}=1 -> 2 ; conf: hours 9,10 each 2 courses -> 2
-    assert t == {"evening": 1, "gap": 3, "rooms": 3, "days": 2, "conf": 2}
+    # idle: ADA-2 Mon {9,10,14,15} -> (16-9)-4 = 3 ; maxrun: runs of 2 -> 0
+    # instr_days: i1 {Mo}=1, i2 {Tu}=1 -> 2 ; room_stable: each section 1 room -> 0
+    # free_day: no year config -> 0 ; conf: hours 9,10 each 2 courses -> 2
+    assert t == {"idle": 3, "maxrun": 0, "instr_days": 2, "room_stable": 0,
+                 "free_day": 0, "conf": 2}
 
 
 def test_local_terms_match_global_over_all_entities():

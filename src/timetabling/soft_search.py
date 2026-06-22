@@ -147,34 +147,14 @@ def _local_terms(state, cohorts, instrs, rooms, blocks, cfg) -> dict:
 
 
 def _norm_obj(terms, base, cfg) -> float:
-    """Normalized weighted sum of the four UI toggles: sum w_i * term_i / base_i. Dividing
-    each term by its start value puts the four on a common scale so no single raw magnitude
-    dominates, while preserving the user's relative weights. cohort_conflict is NOT in the
-    objective (held separately as a no-regress guard)."""
-    return (cfg.w_evening * terms["evening"] / max(base["evening"], 1)
-            + cfg.w_cohort_gap * terms["gap"] / max(base["gap"], 1)
-            + cfg.w_room_count * terms["rooms"] / max(base["rooms"], 1)
-            + cfg.w_instr_days * terms["days"] / max(base["days"], 1))
-
-
-CHEBY_RHO = 1e-3   # augmentation weight in the Chebyshev objective
-
-
-def _norm_vals(terms, base, cfg):
-    """The four normalized toggle values [w_i * term_i / base_i]."""
-    return [cfg.w_evening * terms["evening"] / max(base["evening"], 1),
-            cfg.w_cohort_gap * terms["gap"] / max(base["gap"], 1),
-            cfg.w_room_count * terms["rooms"] / max(base["rooms"], 1),
-            cfg.w_instr_days * terms["days"] / max(base["days"], 1)]
-
-
-def _cheby(terms, base, cfg) -> float:
-    """Augmented Chebyshev (min-max) objective: minimize the WORST normalized toggle, with a
-    tiny sum augmentation so any Pareto improvement still lowers E (avoids weakly-optimal
-    stalls). A weighted SUM over-optimizes the cheap-abundant term (gap); the max term drives
-    a FAIR outcome — improving whichever toggle is currently worst."""
-    vals = _norm_vals(terms, base, cfg)
-    return max(vals) + CHEBY_RHO * sum(vals)
+    """Normalized weighted sum of the five non-guard terms. conf is held separately as a
+    no-regress guard (not here). Dividing by base puts terms on a common scale -> weights are
+    pure relative preference; at base each term contributes exactly its weight."""
+    return (cfg.w_idle * terms["idle"] / max(base["idle"], 1)
+            + cfg.w_maxrun * terms["maxrun"] / max(base["maxrun"], 1)
+            + cfg.w_instr_days * terms["instr_days"] / max(base["instr_days"], 1)
+            + cfg.w_room_stable * terms["room_stable"] / max(base["room_stable"], 1)
+            + cfg.w_free_day * terms["free_day"] / max(base["free_day"], 1))
 
 
 def _slot(c):
@@ -497,11 +477,11 @@ def _make_acceptor(cfg, rng=None):
 
 
 def anneal_soft(state, cand_by_block, cfg, budget_s, seed=0):
-    """Relocate/swap/chain already-placed blocks to lower the augmented-Chebyshev (min-max)
-    objective over the four toggles (evening, cohort_gap[all cohorts], room_count,
-    instr_days) — minimizing the WORST normalized toggle drives a FAIR outcome rather than
-    over-optimizing the cheap-abundant one (gap). cohort_conflict is a no-regress guard.
-    Never unplaces; restores the best incumbent so the objective never regresses globally."""
+    """Relocate/swap/chain already-placed blocks to lower the normalized weighted-sum objective
+    over the five non-guard terms (idle, maxrun, instr_days, room_stable, free_day); each is
+    divided by its polish-start baseline so weights are pure relative preference. cohort
+    conflict (conf) is a no-regress guard. Never unplaces; restores the best incumbent so the
+    objective never regresses globally."""
     rng = _random.Random(seed)
     placed = [bid for bid in state.placed if cand_by_block.get(bid)]
     base = _global_terms(state, cfg)
@@ -510,13 +490,12 @@ def anneal_soft(state, cand_by_block, cfg, budget_s, seed=0):
         t = _local_terms(st, cohorts, instrs, rooms, blocks, cfg)
         return _norm_obj(t, base, cfg), t
 
-    # Objective = augmented Chebyshev (min-max) over the four toggles, evaluated on the GLOBAL
-    # per-term totals (cur_terms, tracked incrementally). The moves return per-term local
-    # deltas (dterms); the global max is not separable, so the objective is computed here, not
-    # in the move. No-regress guard over cohort_conflict only; placement invariant by
-    # construction. The four toggles trade off, but the min-max drives a FAIR outcome.
+    # Objective = normalized weighted sum over the five non-guard terms, evaluated on the
+    # GLOBAL per-term totals (cur_terms, tracked incrementally via the moves' per-term local
+    # deltas, dterms). No-regress guard over cohort_conflict only; placement invariant by
+    # construction.
     cur_terms = dict(base)
-    e_start = _cheby(cur_terms, base, cfg)
+    e_start = _norm_obj(cur_terms, base, cfg)
     acc = _make_acceptor(cfg, rng)
     acc.init(e_start)
     cur = e_start
@@ -547,7 +526,7 @@ def anneal_soft(state, cand_by_block, cfg, budget_s, seed=0):
                     revert()                     # cohort-conflict no-regress guard
                     continue
                 new_terms = {k: cur_terms[k] + dterms[k] for k in cur_terms}
-                new_e = _cheby(new_terms, base, cfg)
+                new_e = _norm_obj(new_terms, base, cfg)
                 if acc.accept(new_e - cur, iters):
                     cur = new_e
                     cur_terms = new_terms

@@ -28,9 +28,10 @@ if os.getenv("SOFT_ACCEPTOR"):
     cfg = replace(cfg, soft_polish_acceptor=os.getenv("SOFT_ACCEPTOR"))
 if os.getenv("SOFT_LIMIT"):
     cfg = replace(cfg, soft_polish_counter_limit=int(os.getenv("SOFT_LIMIT")))
-# 0-1 preference weights for the four toggles (normalized objective -> only ratios matter).
-for _env, _field in (("W_EVENING", "w_evening"), ("W_GAP", "w_cohort_gap"),
-                     ("W_ROOM", "w_room_count"), ("W_DAYS", "w_instr_days")):
+# preference weights for the soft dials (normalized objective -> only ratios matter).
+for _env, _field in (("W_IDLE", "w_idle"), ("W_MAXRUN", "w_maxrun"),
+                     ("W_DAYS", "w_instr_days"), ("W_ROOM", "w_room_stable"),
+                     ("W_FREE", "w_free_day")):
     if os.getenv(_env) is not None:
         cfg = replace(cfg, **{_field: float(os.getenv(_env))})
 secs, _ = build_sections_from_courselist(courses, "001", cfg)
@@ -50,7 +51,7 @@ print(f"[{label}] placed={placed}/{total} rate={placed/total:.4f} wall={wall:.0f
       f"rooms={m['rooms_used']} | genuine_hard={genuine} tail={conf.get('placement', 0)}")
 pre, post = res.stats.get("soft_pre"), res.stats.get("soft_post")
 if pre and post:
-    keys = ("evening", "gap", "rooms", "days", "conf")
+    keys = ("idle", "maxrun", "instr_days", "room_stable", "free_day", "conf")
     print(f"  within-run pre ->post (Pareto; only conflict guarded): "
           + " ".join(f"{k} {pre[k]}->{post[k]}" for k in keys))
 

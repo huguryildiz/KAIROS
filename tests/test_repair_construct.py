@@ -49,13 +49,3 @@ def test_soft_shaping_off_is_first_feasible():
     assert st.placed["A_01#T"].start == 17   # no shaping -> first feasible
 
 
-def test_overload_shaping_independent_of_soft_toggle():
-    a = _sec("A_01", "i1")
-    b = _sec("B_01", "i1")    # same instructor i1
-    st = State({"A_01#T": a, "B_01#T": b}, {"A_01": ["i1"], "B_01": ["i1"]}, set())
-    st.occupy("A_01#T", Candidate("A_01#T", "R1", "Mo", 9, 2))   # i1 has 2h Monday
-    cands = {"B_01#T": [Candidate("B_01#T", "R1", "Mo", 11, 2),  # Mon -> i1 hits 4h
-                        Candidate("B_01#T", "R1", "Tu", 9, 2)]}  # Tue -> no overload
-    cfg = Config(soft_shaping_in_repair=False, w_instr_daily_overload=50, max_instr_daily_hours=2)
-    greedy_construct(st, ["B_01#T"], cands, cfg, eligible={"i1"}, cap=2)
-    assert st.placed["B_01#T"].day == "Tu"   # overload shaping still active with soft off

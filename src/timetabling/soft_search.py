@@ -122,3 +122,31 @@ def try_swap(state, cand_by_block, bid1, bid2, cfg):
         state.occupy(bid1, c1)
         state.occupy(bid2, c2)
     return delta, revert
+
+
+class SCHC:
+    """Step Counting Hill Climbing (Bykov & Petrovic 2016). Accept a move iff the resulting
+    cost is <= a bound; refresh the bound to the current cost every `counter_limit` steps.
+    Single parameter, scale-independent. `init(cost)` seeds the running cost + bound."""
+
+    def __init__(self, counter_limit: int):
+        self.limit = max(1, int(counter_limit))
+        self.cost = 0
+        self.bound = 0
+        self.counter = 0
+
+    def init(self, cost: int):
+        self.cost = cost
+        self.bound = cost
+        self.counter = 0
+
+    def accept(self, delta: int, it: int) -> bool:
+        new_cost = self.cost + delta
+        accepted = delta <= 0 or new_cost <= self.bound
+        if accepted:
+            self.cost = new_cost
+        self.counter += 1
+        if self.counter >= self.limit:
+            self.bound = self.cost
+            self.counter = 0
+        return accepted

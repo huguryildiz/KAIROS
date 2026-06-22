@@ -120,3 +120,24 @@ def test_moves_keep_hard_feasibility():
         bid, st.sec_of[bid].section_id, "theory", c.room, c.day, c.start, c.start + c.length)
         for bid, c in st.placed.items()]
     assert validate(assigns, [a], rooms, instr, cfg) == []
+
+
+def test_schc_accepts_downhill_and_bounded_uphill():
+    from timetabling.soft_search import SCHC
+    acc = SCHC(counter_limit=3)
+    acc.init(cost=100)
+    assert acc.accept(-5, 0) is True       # downhill always
+    assert acc.accept(0, 1) is True        # flat always
+    # bound starts at 100; small uphill that keeps cost <= bound is accepted
+    assert acc.accept(+3, 2) is True       # cost 95+3=98 <= bound 100
+    # a jump above the current bound is rejected
+    assert acc.accept(+50, 3) is False     # would exceed bound 100
+
+
+def test_schc_refreshes_bound_every_counter_limit():
+    from timetabling.soft_search import SCHC
+    acc = SCHC(counter_limit=2)
+    acc.init(cost=100)
+    acc.accept(-40, 0)     # cost -> 60 (bound still 100 for first window)
+    acc.accept(-10, 1)     # cost -> 50; after 2 steps bound refreshes to current (50)
+    assert acc.accept(+30, 2) is False     # cost 50+30=80 > bound 50 now

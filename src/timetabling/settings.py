@@ -26,6 +26,7 @@ DEFAULT_SETTINGS: dict = {
     "saturday": False,        # -> Config.saturday_enabled
     "include_grad": False,    # -> Config.include_grad
     "grad_start": 18,         # -> Config.grad_start (earliest grad start hour; only used when include_grad)
+    "grad_start_by_dept": {}, # -> Config.grad_start_by_dept ({dept_code: hour} earliest-start exceptions)
     "max_theory_session": 2,  # -> Config.max_theory_session
     "max_block_len": 4,       # -> Config.max_block_len
     # [day, hour, staff_only]; staff_only True closes the slot only for full-time staff
@@ -122,6 +123,14 @@ def build_config(settings: dict, availability: Dict[str, list],
     if not (day_start <= grad_start < _HORIZON_END):
         grad_start = 18
 
+    # per-department earliest-start exceptions ({dept_code: hour}). Each hour must sit in
+    # [day_start, _HORIZON_END); the dept is upper-cased and deduped. Invalid rows are dropped.
+    grad_pairs = {}
+    for dept, hour in (s.get("grad_start_by_dept", {}) or {}).items():
+        h = _int(hour, -1)
+        if day_start <= h < _HORIZON_END:
+            grad_pairs[str(dept).strip().upper()] = h
+
     # blackouts as (day, hour, staff_only) triples — a single list; the scope (everyone vs
     # full-time only) rides on the third field, so there is no separate seminar field.
     blackout_rows = []
@@ -157,6 +166,7 @@ def build_config(settings: dict, availability: Dict[str, list],
         saturday_enabled=bool(s.get("saturday", False)),
         include_grad=bool(s.get("include_grad", False)),
         grad_start=grad_start,
+        grad_start_by_dept=tuple(grad_pairs.items()),
         max_theory_session=_int(s.get("max_theory_session"), 2),
         max_block_len=_int(s.get("max_block_len"), 4),
         blackout=tuple(blackout_rows),

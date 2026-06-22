@@ -19,6 +19,25 @@ def cohort_from_code(code: str) -> Tuple[str, str, str]:
     return (dept, year, f"{dept}-{year}")
 
 
+def dept_code_for(row: Dict) -> str:
+    """Department code for a courselist row: the parsed course-code prefix, or the upper-cased
+    Dept (faculty) column when the code is unparseable. Mirrors build_sections' UNK fallback."""
+    code = str(row.get("Course Code", "")).strip()
+    dept, _, _ = cohort_from_code(code)
+    if dept == "UNK":
+        faculty = str(row.get("Dept", "")).strip()
+        if faculty:
+            return faculty.upper()
+    return dept
+
+
+def grad_dept_codes(courses: List[Dict]) -> List[str]:
+    """Sorted distinct dept codes among graduate (level > 4) sections — the candidates for a
+    per-department earliest-start override in the Settings panel."""
+    return sorted({dept_code_for(r) for r in courses
+                   if course_level(r.get("Course Code", "")) > 4})
+
+
 def is_part_time(instructor_name: str) -> bool:
     return "(S)" in (instructor_name or "")
 
@@ -101,10 +120,9 @@ def build_sections_from_courselist(rows: List[Dict], period: str,
             continue
         sec_no = str(r.get("Section No", "")).strip()
         sid = section_id_for(code, sec_no)
-        dept, year, _ = cohort_from_code(code)
+        _, year, _ = cohort_from_code(code)
         faculty = str(r.get("Dept", "")).strip()            # DEPT = faculty name
-        if dept == "UNK" and faculty:                       # unparseable code -> DEPT fallback
-            dept = faculty.upper()
+        dept = dept_code_for(r)                              # code prefix, UNK -> DEPT fallback
         yr = parse_int(r.get("Year"), 0)        # optional Year column overrides cohort year (1-6 only)
         eff_year = yr if 1 <= yr <= 6 else year
         cohort = f"{dept}-{eff_year}"

@@ -69,7 +69,7 @@ def split_roomable(sections, rooms, cfg, instructors=None):
 def gen_candidates(block: Block, section: Section, instructors: List[Instructor],
                    rooms: List[Room], cfg: Config) -> List[Candidate]:
     end_cap = cfg.undergrad_end if section.level <= 4 else cfg.grad_end
-    start_lo = cfg.horizon_start if section.level <= 4 else cfg.grad_start
+    start_lo = cfg.horizon_start if section.level <= 4 else cfg.grad_start_for(section.dept_code)
     closed = _blackout_hours(instructors, cfg)
     feasible_rooms = feasible_rooms_for(block, section, rooms, cfg)
     # Fixed-slot pin: only the section's first block is pinned to (fixed_day, fixed_start).

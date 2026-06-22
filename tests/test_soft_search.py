@@ -55,3 +55,68 @@ def test_local_soft_matches_soft_total_over_all_entities():
     all_rooms = set(st.room_hours_used)
     all_blocks = set(st.placed)
     assert _local_soft(st, all_cohorts, all_instrs, all_rooms, all_blocks, cfg) == _soft_total(st, cfg)
+
+
+import random
+from timetabling.validate import validate
+from timetabling.model import Room, Instructor
+
+
+def test_relocate_lowers_soft_and_keeps_placement():
+    from timetabling.soft_search import try_relocate
+    cfg = Config()
+    a = _sec("A_01", "i1")                       # level 1, evening is the only soft
+    cand = {"A_01#T": [Candidate("A_01#T", "R1", "Mo", 16, 2),   # evening (hour 17) cost 10
+                       Candidate("A_01#T", "R1", "Mo", 9, 2)]}    # morning cost 0
+    st = _state(a)
+    st.occupy("A_01#T", cand["A_01#T"][0])       # park in evening
+    rng = random.Random(0)
+    res = try_relocate(st, cand, "A_01#T", rng, cfg)
+    assert res is not None
+    delta, revert = res
+    assert delta == -10                          # evening -> morning
+    assert len(st.placed) == 1                   # never unplaced
+    assert st.placed["A_01#T"].start == 9
+    revert()                                     # revert restores the evening slot
+    assert st.placed["A_01#T"].start == 16
+
+
+def test_swap_helps_where_relocate_cannot():
+    from timetabling.soft_search import try_swap
+    cfg = Config()
+    # i1 teaches A (level2, S-Order penalizes late start). Two single-room slots, both full.
+    a = _sec("A_01", "i1", level=2, code="ADA 201")
+    b = _sec("B_01", "i2", level=1, code="EEE 101")
+    # A at late slot R1 Mo13 (S-Order (4-2)*(13-9)=8); B at early R1 Mo9 (level1 -> 0).
+    # Swap -> A at Mo9 (0), B at Mo13 (0). delta = -8. No empty slot exists (relocate stuck).
+    cand = {
+        "A_01#T": [Candidate("A_01#T", "R1", "Mo", 13, 2), Candidate("A_01#T", "R1", "Mo", 9, 2)],
+        "B_01#T": [Candidate("B_01#T", "R1", "Mo", 9, 2), Candidate("B_01#T", "R1", "Mo", 13, 2)],
+    }
+    st = _state(a, b)
+    st.occupy("A_01#T", cand["A_01#T"][0])       # Mo13
+    st.occupy("B_01#T", cand["B_01#T"][0])       # Mo9
+    res = try_swap(st, cand, "A_01#T", "B_01#T", cfg)
+    assert res is not None
+    delta, revert = res
+    assert delta == -8
+    assert st.placed["A_01#T"].start == 9 and st.placed["B_01#T"].start == 13
+    assert len(st.placed) == 2
+
+
+def test_moves_keep_hard_feasibility():
+    from timetabling.soft_search import try_relocate
+    cfg = Config()
+    rooms = {"R1": Room("R1", 50, False, True)}
+    instr = {"i1": Instructor("i1", "x", True, "D")}
+    a = _sec("A_01", "i1")
+    cand = {"A_01#T": [Candidate("A_01#T", "R1", "Mo", 16, 2),
+                       Candidate("A_01#T", "R1", "Mo", 9, 2)]}
+    st = _state(a)
+    st.occupy("A_01#T", cand["A_01#T"][0])
+    rng = random.Random(1)
+    try_relocate(st, cand, "A_01#T", rng, cfg)
+    assigns = [__import__("timetabling.model", fromlist=["Assignment"]).Assignment(
+        bid, st.sec_of[bid].section_id, "theory", c.room, c.day, c.start, c.start + c.length)
+        for bid, c in st.placed.items()]
+    assert validate(assigns, [a], rooms, instr, cfg) == []

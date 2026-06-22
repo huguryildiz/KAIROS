@@ -42,3 +42,83 @@ def _local_soft(state, cohorts, instrs, rooms, blocks, cfg: Config) -> int:
     # room_count over the given rooms (a room counts once if it has any occupied slot)
     total += cfg.w_room_count * sum(1 for r in rooms if state.room_hours_used.get(r, 0) > 0)
     return total
+
+
+def _slot(c):
+    return (c.room, c.day, c.start)
+
+
+def try_relocate(state, cand_by_block, bid, rng, cfg):
+    """Move bid to a random alternative legal+free candidate. Leaves state in the new
+    config; returns (delta, revert) or None. revert() restores the original placement."""
+    s = state.sec_of[bid]
+    iids = state.sec_instr.get(s.section_id, [])
+    c_old = state.placed.get(bid)
+    if c_old is None:
+        return None
+    alts = [c for c in cand_by_block[bid] if _slot(c) != _slot(c_old)]
+    if not alts:
+        return None
+    c_new = alts[rng.randrange(len(alts))]
+    cohorts = {s.cohort_key}
+    instrs = set(iids)
+    rooms = {c_old.room, c_new.room}
+    blocks = {bid}
+    before = _local_soft(state, cohorts, instrs, rooms, blocks, cfg)
+    state.release(bid)
+    if not state.free_to_place(c_new, s.section_id, iids):
+        state.occupy(bid, c_old)
+        return None
+    state.occupy(bid, c_new)
+    delta = _local_soft(state, cohorts, instrs, rooms, blocks, cfg) - before
+
+    def revert():
+        state.release(bid)
+        state.occupy(bid, c_old)
+    return delta, revert
+
+
+def try_swap(state, cand_by_block, bid1, bid2, cfg):
+    """Exchange the slots of bid1 and bid2 if each has a candidate for the other's current
+    slot and both are feasible. Leaves state swapped; returns (delta, revert) or None."""
+    if bid1 == bid2:
+        return None
+    c1 = state.placed.get(bid1)
+    c2 = state.placed.get(bid2)
+    if c1 is None or c2 is None:
+        return None
+    s1 = state.sec_of[bid1]
+    s2 = state.sec_of[bid2]
+    iids1 = state.sec_instr.get(s1.section_id, [])
+    iids2 = state.sec_instr.get(s2.section_id, [])
+    c1_new = next((c for c in cand_by_block[bid1] if _slot(c) == _slot(c2)), None)
+    c2_new = next((c for c in cand_by_block[bid2] if _slot(c) == _slot(c1)), None)
+    if c1_new is None or c2_new is None:
+        return None
+    cohorts = {s1.cohort_key, s2.cohort_key}
+    instrs = set(iids1) | set(iids2)
+    rooms = {c1.room, c2.room}
+    blocks = {bid1, bid2}
+    before = _local_soft(state, cohorts, instrs, rooms, blocks, cfg)
+    state.release(bid1)
+    state.release(bid2)
+    ok = False
+    if state.free_to_place(c1_new, s1.section_id, iids1):
+        state.occupy(bid1, c1_new)
+        if state.free_to_place(c2_new, s2.section_id, iids2):
+            state.occupy(bid2, c2_new)
+            ok = True
+        else:
+            state.release(bid1)
+    if not ok:
+        state.occupy(bid1, c1)
+        state.occupy(bid2, c2)
+        return None
+    delta = _local_soft(state, cohorts, instrs, rooms, blocks, cfg) - before
+
+    def revert():
+        state.release(bid1)
+        state.release(bid2)
+        state.occupy(bid1, c1)
+        state.occupy(bid2, c2)
+    return delta, revert

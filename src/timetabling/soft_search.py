@@ -177,8 +177,13 @@ def anneal_soft(state, cand_by_block, cfg, budget_s, seed=0):
         while perf_counter() - t0 < budget_s:
             for _ in range(512):                 # amortize the clock check
                 iters += 1
-                bid = placed[rng.randrange(len(placed))]
-                res = try_relocate(state, cand_by_block, bid, rng, cfg)
+                if len(placed) >= 2 and rng.random() < 0.5:
+                    b1 = placed[rng.randrange(len(placed))]
+                    b2 = placed[rng.randrange(len(placed))]
+                    res = try_swap(state, cand_by_block, b1, b2, cfg)
+                else:
+                    bid = placed[rng.randrange(len(placed))]
+                    res = try_relocate(state, cand_by_block, bid, rng, cfg)
                 if res is None:
                     continue
                 delta, revert = res

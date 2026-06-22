@@ -31,6 +31,7 @@ class State:
         self.instr_day_hours = defaultdict(int)   # (iid, day) -> placed teaching hours
         self.instr_active_days = defaultdict(set)  # iid -> {days with >0 placed hours}
         self.cohort_slot_courses = defaultdict(Counter)   # (cohort, day, hour) -> {course: count}
+        self.room_hours_used = Counter()   # room -> # occupied hour-slots (virtual excluded)
 
     def free_to_place(self, c, sid, iids):
         for hh in range(c.start, c.start + c.length):
@@ -60,6 +61,7 @@ class State:
         for hh in range(c.start, c.start + c.length):
             if c.room not in self.virtual:
                 self.room_owner[(c.room, c.day, hh)] = bid
+                self.room_hours_used[c.room] += 1
             for iid in iids:
                 self.instr_slot[(iid, c.day, hh)].add(bid)
             self.sect_slot[(s.section_id, c.day, hh)].add(bid)
@@ -81,6 +83,9 @@ class State:
         for hh in range(c.start, c.start + c.length):
             if self.room_owner.get((c.room, c.day, hh)) == bid:
                 del self.room_owner[(c.room, c.day, hh)]
+                self.room_hours_used[c.room] -= 1
+                if self.room_hours_used[c.room] <= 0:
+                    del self.room_hours_used[c.room]
             for iid in iids:
                 self.instr_slot[(iid, c.day, hh)].discard(bid)
             self.sect_slot[(s.section_id, c.day, hh)].discard(bid)
@@ -195,8 +200,8 @@ def competitors(state: State, batch, cand_by_block) -> set:
 def _soft_total(state, cfg, staff_ids=frozenset()) -> int:
     """Global weighted soft sum over the current full placement. Single source of truth
     for the accept guard and the convergence check — mirrors the terms add_soft_objective
-    puts in the model (per-candidate, cohort-conflict, cohort-gap; instr_days/room_count
-    added with their tasks). Cheap (no CP-SAT)."""
+    puts in the model, plus all four soft terms (per-candidate, cohort-conflict,
+    cohort-gap, instr_days, room_count). Cheap (no CP-SAT)."""
     total = 0
     compact = {str(y) for y in cfg.compact_cohort_years}
     coh_courses = defaultdict(set)   # (cohort, day, hour) -> {course}
@@ -212,6 +217,8 @@ def _soft_total(state, cfg, staff_ids=frozenset()) -> int:
     total += cfg.w_cohort_conflict * sum(max(0, len(v) - 1) for v in coh_courses.values())
     total += cfg.w_cohort_gap * sum((max(h) + 1 - min(h)) - len(h)
                                     for h in coh_hours.values() if len(h) >= 2)
+    total += cfg.w_instr_days * sum(len(days) for days in state.instr_active_days.values())
+    total += cfg.w_room_count * len(state.room_hours_used)
     return total
 
 

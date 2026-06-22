@@ -44,8 +44,8 @@ def test_code_warning_keys_bilingual():
 
 def test_settings_keys_bilingual():
     keys = ["step_settings", "set_caption", "set_policy_header", "set_avail_header",
-            "set_profile_header", "set_w_evening", "set_blackout_header",
-            "set_day_start", "set_avail_save", "set_daily_cap"]
+            "set_profile_header", "set_blackout_header",
+            "set_day_start", "set_avail_save", "set_grad_dept_pick"]
     for k in keys:
         for lang in LANGS:
             assert t(k, lang) and t(k, lang) != k

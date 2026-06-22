@@ -149,6 +149,121 @@ def try_relocate(state, cand_by_block, bid, rng, eval_fn):
     return o1 - o0, _dterms(t0, t1), revert
 
 
+def _feasible_ignoring_room(state, c, sid, iids):
+    """True if candidate c is free on instructor / section / theory-different-day (room
+    conflicts are handled separately by the chain via ejection)."""
+    for hh in range(c.start, c.start + c.length):
+        for iid in iids:
+            if state.instr_slot.get((iid, c.day, hh)):
+                return False
+        if state.sect_slot.get((sid, c.day, hh)):
+            return False
+    if "#L" not in c.block_id and any(b != c.block_id
+            for b in state.sect_theory_day.get((sid, c.day), ())):
+        return False
+    return True
+
+
+def _room_occupants(state, c):
+    """Distinct block ids occupying candidate c's room hour-slots (non-virtual)."""
+    occ = set()
+    if c.room in state.virtual:
+        return occ
+    for hh in range(c.start, c.start + c.length):
+        owner = state.room_owner.get((c.room, c.day, hh))
+        if owner is not None:
+            occ.add(owner)
+    return occ
+
+
+def try_chain(state, cand_by_block, bid, rng, eval_fn, max_depth=4):
+    """Bounded ejection (Kempe-style) chain. Move bid to a candidate slot; if that slot's
+    room is held by a single other block, eject it and recurse (it seeks its own slot), up
+    to max_depth, until some block lands in a fully free slot. Each hop stays
+    instructor/section/theory-day feasible; only single-block ROOM conflicts are ejected.
+    Leaves state in the chained config; returns (dobj, dterms, revert) or None. Unlocks
+    moves that relocate/swap cannot in dense (100%-room) regions."""
+    old = {}                                  # bid -> original candidate (restore target)
+    cohorts, instrs, rooms, blocks = set(), set(), set(), set()
+
+    def note(b, c):
+        s = state.sec_of[b]
+        cohorts.add(s.cohort_key)
+        instrs.update(state.sec_instr.get(s.section_id, []))
+        rooms.add(c.room)
+        blocks.add(b)
+
+    def restore_old():
+        for b in old:
+            if b in state.placed:
+                state.release(b)
+        for b, c in old.items():
+            state.occupy(b, c)
+
+    if state.placed.get(bid) is None:
+        return None
+    old[bid] = state.placed[bid]
+    note(bid, old[bid])
+    state.release(bid)                         # take the first block in hand
+    new = {}
+    to_place = bid
+    ok = False
+    for depth in range(max_depth):
+        s = state.sec_of[to_place]
+        iids = state.sec_instr.get(s.section_id, [])
+        cands = [c for c in cand_by_block[to_place]
+                 if not (depth == 0 and _slot(c) == _slot(old[to_place]))]
+        order = list(range(len(cands)))
+        rng.shuffle(order)
+        chosen = victim = None
+        for i in order:
+            c = cands[i]
+            if not _feasible_ignoring_room(state, c, s.section_id, iids):
+                continue
+            occ = _room_occupants(state, c)    # to_place is in hand -> only other blocks
+            if not occ:
+                chosen = c
+                break
+            if len(occ) == 1:
+                v = next(iter(occ))
+                if v not in old:               # never re-eject a chain member
+                    chosen, victim = c, v
+                    break
+        if chosen is None:
+            break                              # dead end: to_place is in hand
+        note(to_place, chosen)
+        if victim is not None:
+            old.setdefault(victim, state.placed[victim])
+            note(victim, state.placed[victim])
+            state.release(victim)              # eject -> next in hand
+        state.occupy(to_place, chosen)
+        new[to_place] = chosen
+        if victim is None:
+            ok = True
+            break
+        to_place = victim
+    if not ok:
+        restore_old()
+        return None
+    new = {b: state.placed[b] for b in old}
+    o1, t1 = eval_fn(state, cohorts, instrs, rooms, blocks)
+    restore_old()
+    o0, t0 = eval_fn(state, cohorts, instrs, rooms, blocks)
+    for b in new:                              # re-apply the chained config
+        if b in state.placed:
+            state.release(b)
+    for b, c in new.items():
+        state.occupy(b, c)
+
+    def revert():
+        for b in new:
+            if b in state.placed:
+                state.release(b)
+        for b, c in old.items():
+            state.occupy(b, c)
+    return o1 - o0, _dterms(t0, t1), revert
+
+
 def try_swap(state, cand_by_block, bid1, bid2, eval_fn):
     """Exchange the slots of bid1 and bid2 if each has a candidate for the other's current
     slot and both are feasible. Leaves state swapped; returns (dobj, dterms, revert) or

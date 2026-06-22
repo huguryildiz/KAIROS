@@ -214,6 +214,56 @@ def test_anneal_lowers_objective_via_swap_dense():
     assert t1["days"] < t0["days"]               # only a swap can lower days here
 
 
+def test_chain_unlocks_where_relocate_and_swap_cannot():
+    from timetabling.soft_search import try_chain, try_relocate, try_swap, _global_terms
+    cfg = Config()
+    # A is parked in the evening; its only morning candidate (R1 Mo9) is occupied by B, and
+    # B has no candidate at A's evening slot -> neither relocate nor swap can move A. But an
+    # ejection chain can: A -> R1 Mo9 ejecting B -> R2 Mo9 (a free slot). evening drops.
+    a = _sec("A_01", "i1", code="ADA 101")
+    b = _sec("B_01", "i2", code="BBB 101")
+    cand = {
+        "A_01#T": [Candidate("A_01#T", "R1", "Mo", 16, 2), Candidate("A_01#T", "R1", "Mo", 9, 2)],
+        "B_01#T": [Candidate("B_01#T", "R1", "Mo", 9, 2), Candidate("B_01#T", "R2", "Mo", 9, 2)],
+    }
+    st = _state(a, b)
+    st.occupy("A_01#T", cand["A_01#T"][0])        # A evening R1 Mo16
+    st.occupy("B_01#T", cand["B_01#T"][0])        # B morning R1 Mo9 (blocks A's target)
+    ev = _eval_fn(cfg, _global_terms(st, cfg))
+    assert try_relocate(st, cand, "A_01#T", random.Random(0), ev) is None   # target occupied
+    assert try_swap(st, cand, "A_01#T", "B_01#T", ev) is None               # no reciprocal cand
+    res = try_chain(st, cand, "A_01#T", random.Random(0), ev, max_depth=3)
+    assert res is not None
+    dobj, dterms, revert = res
+    assert dterms["evening"] < 0                   # chain pulled A out of the evening
+    assert st.placed["A_01#T"].start == 9 and st.placed["B_01#T"].room == "R2"
+    assert len(st.placed) == 2
+    revert()
+    assert st.placed["A_01#T"].start == 16 and st.placed["B_01#T"].room == "R1"
+
+
+def test_chain_preserves_hard_feasibility():
+    from timetabling.soft_search import try_chain, _global_terms
+    cfg = Config()
+    rooms = {"R1": Room("R1", 50, False, True), "R2": Room("R2", 50, False, True)}
+    instr = {"i1": Instructor("i1", "x", True, "D"), "i2": Instructor("i2", "y", True, "D")}
+    a = _sec("A_01", "i1", code="ADA 101")
+    b = _sec("B_01", "i2", code="BBB 101")
+    cand = {
+        "A_01#T": [Candidate("A_01#T", "R1", "Mo", 16, 2), Candidate("A_01#T", "R1", "Mo", 9, 2)],
+        "B_01#T": [Candidate("B_01#T", "R1", "Mo", 9, 2), Candidate("B_01#T", "R2", "Mo", 9, 2)],
+    }
+    st = _state(a, b)
+    st.occupy("A_01#T", cand["A_01#T"][0])
+    st.occupy("B_01#T", cand["B_01#T"][0])
+    ev = _eval_fn(cfg, _global_terms(st, cfg))
+    try_chain(st, cand, "A_01#T", random.Random(0), ev, max_depth=3)
+    assigns = [__import__("timetabling.model", fromlist=["Assignment"]).Assignment(
+        bid, st.sec_of[bid].section_id, "theory", c.room, c.day, c.start, c.start + c.length)
+        for bid, c in st.placed.items()]
+    assert validate(assigns, [a, b], rooms, instr, cfg) == []
+
+
 def test_anneal_conflict_guard_holds():
     from timetabling.soft_search import anneal_soft, _global_terms
     cfg = Config()

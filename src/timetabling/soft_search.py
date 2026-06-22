@@ -110,6 +110,26 @@ def _norm_obj(terms, base, cfg) -> float:
             + cfg.w_instr_days * terms["days"] / max(base["days"], 1))
 
 
+CHEBY_RHO = 1e-3   # augmentation weight in the Chebyshev objective
+
+
+def _norm_vals(terms, base, cfg):
+    """The four normalized toggle values [w_i * term_i / base_i]."""
+    return [cfg.w_evening * terms["evening"] / max(base["evening"], 1),
+            cfg.w_cohort_gap * terms["gap"] / max(base["gap"], 1),
+            cfg.w_room_count * terms["rooms"] / max(base["rooms"], 1),
+            cfg.w_instr_days * terms["days"] / max(base["days"], 1)]
+
+
+def _cheby(terms, base, cfg) -> float:
+    """Augmented Chebyshev (min-max) objective: minimize the WORST normalized toggle, with a
+    tiny sum augmentation so any Pareto improvement still lowers E (avoids weakly-optimal
+    stalls). A weighted SUM over-optimizes the cheap-abundant term (gap); the max term drives
+    a FAIR outcome — improving whichever toggle is currently worst."""
+    vals = _norm_vals(terms, base, cfg)
+    return max(vals) + CHEBY_RHO * sum(vals)
+
+
 def _slot(c):
     return (c.room, c.day, c.start)
 
@@ -430,11 +450,11 @@ def _make_acceptor(cfg, rng=None):
 
 
 def anneal_soft(state, cand_by_block, cfg, budget_s, seed=0):
-    """Relocate/swap already-placed blocks to lower the NORMALIZED four-toggle objective
-    (evening, cohort_gap[all cohorts], room_count, instr_days), guided by the acceptor.
-    cohort_conflict is a no-regress guard: any move that would push global conflict above
-    its start value is rejected. Never unplaces; restores the best incumbent so the
-    objective never regresses globally and conflict never exceeds baseline."""
+    """Relocate/swap/chain already-placed blocks to lower the augmented-Chebyshev (min-max)
+    objective over the four toggles (evening, cohort_gap[all cohorts], room_count,
+    instr_days) — minimizing the WORST normalized toggle drives a FAIR outcome rather than
+    over-optimizing the cheap-abundant one (gap). cohort_conflict is a no-regress guard.
+    Never unplaces; restores the best incumbent so the objective never regresses globally."""
     rng = _random.Random(seed)
     placed = [bid for bid in state.placed if cand_by_block.get(bid)]
     base = _global_terms(state, cfg)
@@ -443,16 +463,16 @@ def anneal_soft(state, cand_by_block, cfg, budget_s, seed=0):
         t = _local_terms(st, cohorts, instrs, rooms, blocks, cfg)
         return _norm_obj(t, base, cfg), t
 
-    # No-regress guard over cohort_conflict only: no move may push global conflict above
-    # baseline. The four UI toggles are free to trade off against each other (Pareto), driven
-    # by the normalized weighted objective = the user's weights ARE the trade-off policy.
-    # Placement is invariant by construction (moves never unplace).
-    guard_keys = ("conf",)
-    e_start = _norm_obj(base, base, cfg)
+    # Objective = augmented Chebyshev (min-max) over the four toggles, evaluated on the GLOBAL
+    # per-term totals (cur_terms, tracked incrementally). The moves return per-term local
+    # deltas (dterms); the global max is not separable, so the objective is computed here, not
+    # in the move. No-regress guard over cohort_conflict only; placement invariant by
+    # construction. The four toggles trade off, but the min-max drives a FAIR outcome.
+    cur_terms = dict(base)
+    e_start = _cheby(cur_terms, base, cfg)
     acc = _make_acceptor(cfg, rng)
     acc.init(e_start)
     cur = e_start
-    cur_terms = dict(base)
     best = e_start
     best_snapshot = dict(state.placed)
     at_best = True
@@ -475,14 +495,15 @@ def anneal_soft(state, cand_by_block, cfg, budget_s, seed=0):
                     res = try_relocate(state, cand_by_block, bid, rng, eval_fn)
                 if res is None:
                     continue
-                dobj, dterms, revert = res
-                if any(cur_terms[k] + dterms[k] > base[k] for k in guard_keys):
-                    revert()                     # would regress some metric above baseline
+                _dobj, dterms, revert = res
+                if cur_terms["conf"] + dterms["conf"] > base["conf"]:
+                    revert()                     # cohort-conflict no-regress guard
                     continue
-                if acc.accept(dobj, iters):
-                    cur += dobj
-                    for k in guard_keys:
-                        cur_terms[k] += dterms[k]
+                new_terms = {k: cur_terms[k] + dterms[k] for k in cur_terms}
+                new_e = _cheby(new_terms, base, cfg)
+                if acc.accept(new_e - cur, iters):
+                    cur = new_e
+                    cur_terms = new_terms
                     accepted += 1
                     if cur < best - 1e-9:
                         best = cur

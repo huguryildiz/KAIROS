@@ -264,6 +264,21 @@ def test_chain_preserves_hard_feasibility():
     assert validate(assigns, [a, b], rooms, instr, cfg) == []
 
 
+def test_cheby_is_max_plus_small_sum_augmentation():
+    from timetabling.soft_search import _cheby, CHEBY_RHO
+    cfg = Config()  # w_evening=w_cohort_gap=w_room_count=w_instr_days=10
+    base = {"evening": 10, "gap": 10, "rooms": 10, "days": 10, "conf": 0}
+    # all at baseline -> each normalized value = 10 ; cheby = max(10) + rho*sum(40)
+    assert abs(_cheby(base, base, cfg) - (10 + CHEBY_RHO * 40)) < 1e-9
+    # halving the WORST (here all equal) term lowers the max; halving below others only
+    # lowers the sum-augmentation. Reducing one term to 0 -> max still 10 (others), sum 30.
+    one_zero = {"evening": 0, "gap": 10, "rooms": 10, "days": 10, "conf": 0}
+    assert abs(_cheby(one_zero, base, cfg) - (10 + CHEBY_RHO * 30)) < 1e-9
+    # reducing ALL four lowers the max itself -> much smaller objective
+    all_low = {"evening": 5, "gap": 5, "rooms": 5, "days": 5, "conf": 0}
+    assert _cheby(all_low, base, cfg) < _cheby(one_zero, base, cfg)
+
+
 def test_anneal_with_chains_lowers_evening_keeps_invariants():
     from timetabling.soft_search import anneal_soft, _global_terms
     cfg = Config()

@@ -44,6 +44,59 @@ def _local_soft(state, cohorts, instrs, rooms, blocks, cfg: Config) -> int:
     return total
 
 
+def _gap_of(hours_by_day) -> int:
+    """Total per-day idle gap = sum over days of (span - load) for days with >=2 hours."""
+    return sum((max(h) + 1 - min(h)) - len(h) for h in hours_by_day.values() if len(h) >= 2)
+
+
+def _global_terms(state, cfg) -> dict:
+    """Raw (unweighted) counts of the four UI-toggle soft terms over the FULL placement,
+    plus cohort-conflict (held as a no-regress guard, not optimized). gap covers ALL
+    cohorts (matches report._metrics). Single source of truth for the polish objective."""
+    evening = 0
+    coh_slot = defaultdict(set)      # (cohort, day, hour) -> {course}
+    coh_day = defaultdict(set)       # (cohort, day) -> {hour}
+    for bid, c in state.placed.items():
+        s = state.sec_of[bid]
+        for hh in range(c.start, c.start + c.length):
+            if hh >= cfg.evening_from_hour:
+                evening += 1
+            coh_slot[(s.cohort_key, c.day, hh)].add(s.code)
+            coh_day[(s.cohort_key, c.day)].add(hh)
+    conf = sum(max(0, len(v) - 1) for v in coh_slot.values())
+    gap = _gap_of(coh_day)
+    rooms = len(state.room_hours_used)
+    days = sum(len(d) for d in state.instr_active_days.values())
+    return {"evening": evening, "gap": gap, "rooms": rooms, "days": days, "conf": conf}
+
+
+def _local_terms(state, cohorts, instrs, rooms, blocks, cfg) -> dict:
+    """Raw counts of the same terms over only the given entities. Each term is owned by one
+    entity type (evening->block, gap/conf->cohort, days->instructor, rooms->room), so
+    summing over the FULL entity sets reproduces _global_terms (consistency-tested)."""
+    evening = 0
+    for bid in blocks:
+        c = state.placed.get(bid)
+        if c is not None:
+            evening += sum(1 for hh in range(c.start, c.start + c.length)
+                           if hh >= cfg.evening_from_hour)
+    cohort_set = set(cohorts)
+    coh_slot = defaultdict(set)
+    coh_day = defaultdict(set)
+    for bid, c in state.placed.items():
+        s = state.sec_of[bid]
+        if s.cohort_key not in cohort_set:
+            continue
+        for hh in range(c.start, c.start + c.length):
+            coh_slot[(s.cohort_key, c.day, hh)].add(s.code)
+            coh_day[(s.cohort_key, c.day)].add(hh)
+    conf = sum(max(0, len(v) - 1) for v in coh_slot.values())
+    gap = _gap_of(coh_day)
+    rooms_used = sum(1 for r in rooms if state.room_hours_used.get(r, 0) > 0)
+    days = sum(len(state.instr_active_days.get(iid, ())) for iid in instrs)
+    return {"evening": evening, "gap": gap, "rooms": rooms_used, "days": days, "conf": conf}
+
+
 def _slot(c):
     return (c.room, c.day, c.start)
 

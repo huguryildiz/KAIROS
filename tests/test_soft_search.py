@@ -182,6 +182,43 @@ def test_anneal_uses_swaps_for_dense_schedule():
     assert st.placed["A_01#T"].start == 9
 
 
+def test_global_terms_raw_four_terms_plus_conf():
+    from timetabling.soft_search import _global_terms
+    cfg = Config()
+    a = _sec("A_01", "i1", level=2, code="ADA 201")
+    b = _sec("B_01", "i1", level=2, code="ADA 202")   # same cohort ADA-2 + instr i1
+    d = _sec("D_01", "i1", level=2, code="ADA 203")   # same cohort ADA-2 + instr i1
+    c = _sec("C_01", "i2", level=1, code="EEE 101")
+    st = _state(a, b, d, c)
+    st.occupy("A_01#T", Candidate("A_01#T", "R1", "Mo", 9, 2))   # ADA-2 Mo 9,10
+    st.occupy("B_01#T", Candidate("B_01#T", "R3", "Mo", 9, 2))   # ADA-2 Mo 9,10 (conflict)
+    st.occupy("D_01#T", Candidate("D_01#T", "R1", "Mo", 14, 2))  # ADA-2 Mo 14,15 (gap 11-13)
+    st.occupy("C_01#T", Candidate("C_01#T", "R2", "Tu", 16, 2))  # evening hour 17
+    t = _global_terms(st, cfg)
+    # evening: only hour 17 >= 17 -> 1 ; gap: ADA-2 Mon {9,10,14,15} -> (16-9)-4 = 3
+    # rooms: R1,R3,R2 -> 3 ; days: i1 {Mo}=1, i2 {Tu}=1 -> 2 ; conf: hours 9,10 each 2 courses -> 2
+    assert t == {"evening": 1, "gap": 3, "rooms": 3, "days": 2, "conf": 2}
+
+
+def test_local_terms_match_global_over_all_entities():
+    from timetabling.soft_search import _global_terms, _local_terms
+    cfg = Config()
+    a = _sec("A_01", "i1", level=2, code="ADA 201")
+    b = _sec("B_01", "i1", level=2, code="ADA 202")
+    d = _sec("D_01", "i1", level=2, code="ADA 203")
+    c = _sec("C_01", "i2", level=1, code="EEE 101")
+    st = _state(a, b, d, c)
+    st.occupy("A_01#T", Candidate("A_01#T", "R1", "Mo", 9, 2))
+    st.occupy("B_01#T", Candidate("B_01#T", "R3", "Mo", 9, 2))
+    st.occupy("D_01#T", Candidate("D_01#T", "R1", "Mo", 14, 2))
+    st.occupy("C_01#T", Candidate("C_01#T", "R2", "Tu", 16, 2))
+    all_cohorts = {st.sec_of[bid].cohort_key for bid in st.placed}
+    all_instrs = {iid for bid in st.placed for iid in st.sec_instr.get(st.sec_of[bid].section_id, [])}
+    all_rooms = set(st.room_hours_used)
+    all_blocks = set(st.placed)
+    assert _local_terms(st, all_cohorts, all_instrs, all_rooms, all_blocks, cfg) == _global_terms(st, cfg)
+
+
 def test_lahc_accepts_against_history():
     from timetabling.soft_search import LAHC
     acc = LAHC(history_len=3)

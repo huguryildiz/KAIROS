@@ -152,12 +152,92 @@ class SCHC:
         return accepted
 
 
+class LAHC:
+    """Late Acceptance Hill Climbing (Bykov). Accept iff new cost <= the cost `L` steps ago
+    or <= the current cost. One parameter (history length)."""
+
+    def __init__(self, history_len: int):
+        self.L = max(1, int(history_len))
+        self.cost = 0
+        self.hist = []
+
+    def init(self, cost: int):
+        self.cost = cost
+        self.hist = [cost] * self.L
+
+    def accept(self, delta: int, it: int) -> bool:
+        new_cost = self.cost + delta
+        idx = it % self.L
+        accepted = new_cost <= self.cost or new_cost <= self.hist[idx]
+        if accepted:
+            self.cost = new_cost
+        self.hist[idx] = self.cost
+        return accepted
+
+
+class GreatDeluge:
+    """Great Deluge. Accept iff new cost <= a water level that decays each step."""
+
+    def __init__(self, level: float, decay: float):
+        self.level = float(level)
+        self.decay = float(decay)
+        self.cost = 0
+
+    def init(self, cost: int):
+        self.cost = cost
+        self.level = float(cost)
+
+    def accept(self, delta: int, it: int) -> bool:
+        new_cost = self.cost + delta
+        accepted = delta <= 0 or new_cost <= self.level
+        if accepted:
+            self.cost = new_cost
+        self.level = max(self.cost, self.level - self.decay)
+        return accepted
+
+
+class SimAnneal:
+    """Simulated Annealing with geometric cooling over a fixed step budget."""
+
+    def __init__(self, t0: float, t_end: float, steps: int, rng):
+        self.t0 = float(t0)
+        self.t_end = max(1e-6, float(t_end))
+        self.steps = max(1, int(steps))
+        self.rng = rng
+        self.cost = 0
+        self.ratio = (self.t_end / self.t0) ** (1.0 / self.steps) if self.t0 > 0 else 1.0
+        self.t = self.t0
+
+    def init(self, cost: int):
+        self.cost = cost
+        self.t = self.t0
+
+    def accept(self, delta: int, it: int) -> bool:
+        import math
+        if delta <= 0:
+            accepted = True
+        else:
+            accepted = self.rng.random() < math.exp(-delta / max(self.t, 1e-6))
+        if accepted:
+            self.cost += delta
+        self.t = max(self.t_end, self.t * self.ratio)
+        return accepted
+
+
 import random as _random
 
 
-def _make_acceptor(cfg):
-    # extended in Task 7; SCHC for now
-    return SCHC(cfg.soft_polish_counter_limit)
+def _make_acceptor(cfg, rng=None):
+    a = getattr(cfg, "soft_polish_acceptor", "schc")
+    n = cfg.soft_polish_counter_limit
+    if a == "lahc":
+        return LAHC(n)
+    if a == "deluge":
+        return GreatDeluge(level=0, decay=max(1, n) / 1000.0)
+    if a == "sa":
+        return SimAnneal(t0=max(1.0, n / 100.0), t_end=0.1, steps=1_000_000,
+                         rng=rng or _random.Random(0))
+    return SCHC(n)
 
 
 def anneal_soft(state, cand_by_block, cfg, budget_s, seed=0):
@@ -166,7 +246,7 @@ def anneal_soft(state, cand_by_block, cfg, budget_s, seed=0):
     rng = _random.Random(seed)
     placed = [bid for bid in state.placed if cand_by_block.get(bid)]
     soft_start = _soft_total(state, cfg)
-    acc = _make_acceptor(cfg)
+    acc = _make_acceptor(cfg, rng)
     acc.init(soft_start)
     cur = soft_start
     best = soft_start

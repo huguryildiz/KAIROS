@@ -264,6 +264,32 @@ def test_chain_preserves_hard_feasibility():
     assert validate(assigns, [a, b], rooms, instr, cfg) == []
 
 
+def test_anneal_with_chains_lowers_evening_keeps_invariants():
+    from timetabling.soft_search import anneal_soft, _global_terms
+    cfg = Config()
+    # A parked in the evening; its morning slot is blocked by B. B can escape to R2 (already
+    # opened by C, so no new room). The wired loop (relocate+swap+chain) should pull A out of
+    # the evening without regressing conflict or placement.
+    a = _sec("A_01", "i1", code="ADA 101")
+    b = _sec("B_01", "i2", code="BBB 101")
+    c = _sec("C_01", "i3", code="CCC 101")
+    cand = {
+        "A_01#T": [Candidate("A_01#T", "R1", "Mo", 16, 2), Candidate("A_01#T", "R1", "Mo", 9, 2)],
+        "B_01#T": [Candidate("B_01#T", "R1", "Mo", 9, 2), Candidate("B_01#T", "R2", "Mo", 9, 2)],
+        "C_01#T": [Candidate("C_01#T", "R2", "Mo", 14, 2)],
+    }
+    st = _state(a, b, c)
+    st.occupy("A_01#T", cand["A_01#T"][0])
+    st.occupy("B_01#T", cand["B_01#T"][0])
+    st.occupy("C_01#T", cand["C_01#T"][0])
+    t0 = _global_terms(st, cfg)
+    anneal_soft(st, cand, cfg, budget_s=2.0, seed=0)
+    t1 = _global_terms(st, cfg)
+    assert len(st.placed) == 3            # placement invariant
+    assert t1["conf"] <= t0["conf"]       # conflict guard
+    assert t1["evening"] < t0["evening"]  # A pulled out of the evening
+
+
 def test_anneal_conflict_guard_holds():
     from timetabling.soft_search import anneal_soft, _global_terms
     cfg = Config()

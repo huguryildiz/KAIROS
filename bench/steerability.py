@@ -8,11 +8,11 @@ under several weight profiles with the SAME RNG seed. The only thing that varies
 profiles is the weight dial, so any difference in the post-polish terms is the weight effect.
 
 PROFILES (UI_REF=20 -> normal=10, max=20; only the ratio matters under normalization):
-  UNIFORM  : all four toggles = 10 (normal)
-  EVE_MAX  : evening = 20, rest 10
-  GAP_MAX  : cohort_gap = 20, rest 10
-  ROOM_MAX : room_count = 20, rest 10
-  DAYS_MAX : instr_days = 20, rest 10
+  UNIFORM   : idle fixed at 15, all four dials = 10 (normal)
+  MAXRUN_MAX: maxrun = 20, rest at their UNIFORM values
+  DAYS_MAX  : instr_days = 20, rest at their UNIFORM values
+  ROOM_MAX  : room_stable = 20, rest at their UNIFORM values
+  FREE_MAX  : free_day = 20, rest at their UNIFORM values
 
 METRICS (post values P, all profiles share the same pre/base snapshot):
   selected_gain_i   = (P_i^uniform - P_i^scenario) / P_i^uniform   (+ = scenario beats uniform on its toggle)
@@ -32,7 +32,6 @@ from timetabling.ui_input import (build_sections_from_courselist,
                                    build_instructors_from_courselist, build_rooms_from_ui)
 from timetabling.route import mark_virtual
 from timetabling.defaults import DEFAULT_CLASSROOMS
-from timetabling.model import overload_eligible_ids
 from timetabling.model_cpsat import gen_candidates, _instructors_of
 from timetabling.repair import (State, greedy_construct, repair_round, BATCH,
                                 REPAIR_MAX_ROOMS)
@@ -44,19 +43,23 @@ anneal_s = float(sys.argv[3]) if len(sys.argv) > 3 else 90.0
 acceptor = sys.argv[4] if len(sys.argv) > 4 else "lahc"
 
 PROFILES = {
-    "UNIFORM":  {},
-    "EVE_MAX":  {"w_evening": 20.0},
-    "GAP_MAX":  {"w_cohort_gap": 20.0},
-    "ROOM_MAX": {"w_room_count": 20.0},
-    "DAYS_MAX": {"w_instr_days": 20.0},
+    "UNIFORM":    {},
+    "MAXRUN_MAX": {"w_maxrun": 20.0},
+    "DAYS_MAX":   {"w_instr_days": 20.0},
+    "ROOM_MAX":   {"w_room_stable": 20.0},
+    "FREE_MAX":   {"w_free_day": 20.0},
 }
-SELECTED = {"EVE_MAX": "evening", "GAP_MAX": "gap", "ROOM_MAX": "rooms", "DAYS_MAX": "days"}
-TERMS = ("evening", "gap", "rooms", "days")
+SELECTED = {"MAXRUN_MAX": "maxrun", "DAYS_MAX": "instr_days",
+            "ROOM_MAX": "room_stable", "FREE_MAX": "free_day"}
+TERMS = ("idle", "maxrun", "instr_days", "room_stable", "free_day")
 
 # ---- load + build (weight-independent: candidate generation ignores soft weights) ----
 courses = ok_rows(parse_courselist(read_raw("data/sample_courses_2025_001.csv")))[:N]
-cfg0 = build_config({}, {}, anneal_s)                       # uniform weights (all 10)
+cfg0 = build_config({}, {}, anneal_s)                       # idle=15 fixed, dials=10 (normal)
 cfg0 = replace(cfg0, soft_polish_acceptor=acceptor)
+cfg0 = replace(cfg0, free_day_year_levels=(2, 3, 4))       # activate free_day so it can steer
+import os as _os                                            # W_IDLE override for idle-dominance retest
+cfg0 = replace(cfg0, w_idle=float(_os.environ.get("W_IDLE", cfg0.w_idle)))
 cfg0 = replace(cfg0, max_rooms_per_block=max(cfg0.max_rooms_per_block, REPAIR_MAX_ROOMS))
 
 secs, _ = build_sections_from_courselist(courses, "001", cfg0)
@@ -76,14 +79,13 @@ for b, s in blocks:
     cand_by_block[b.block_id] = gen_candidates(b, s, ins_list, room_list, cfg0)
 order = sorted((b.block_id for b, _ in blocks),
                key=lambda bid: (len(cand_by_block[bid]), -sec_of[bid].students))
-eligible = overload_eligible_ids(secs, cfg0) if cfg0.w_instr_daily_overload else set()
 
 # ---- converge ONE placement (mirrors solve_repair: greedy + pure-placement sweeps) ----
 print(f"[converge] N={N} blocks={total} converge_budget={converge_s:.0f}s "
       f"anneal_budget={anneal_s:.0f}s/profile acceptor={acceptor}", flush=True)
 state = State(sec_of, sec_instr, virtual_names)
 t0 = perf_counter()
-greedy_construct(state, order, cand_by_block, cfg0, eligible, cfg0.max_instr_daily_hours)
+greedy_construct(state, order, cand_by_block, cfg0)
 sweep = 0
 while perf_counter() - t0 < converge_s:
     sweep += 1
@@ -107,7 +109,7 @@ placed_n = len(snapshot)
 base = _global_terms(state, cfg0)
 print(f"[converge] done in {perf_counter() - t0:.0f}s sweeps={sweep} "
       f"placed={placed_n}/{total} ({placed_n / total:.2%}) tail={total - placed_n}", flush=True)
-print(f"[base/pre] " + " ".join(f"{k}={base[k]}" for k in ("evening", "gap", "rooms", "days", "conf")),
+print(f"[base/pre] " + " ".join(f"{k}={base[k]}" for k in TERMS + ("conf",)),
       flush=True)
 
 
@@ -143,7 +145,7 @@ print("\n=== STEERABILITY (post values; deltas vs UNIFORM post) ===")
 header = f"{'profile':9s} " + " ".join(f"{t:>20s}" for t in TERMS) + f"{'conf':>8s}"
 print(header)
 print(f"{'UNIFORM':9s} " + " ".join(f"{uni[t]:>20d}" for t in TERMS) + f"{uni['conf']:>8d}")
-for name in ("EVE_MAX", "GAP_MAX", "ROOM_MAX", "DAYS_MAX"):
+for name in ("MAXRUN_MAX", "DAYS_MAX", "ROOM_MAX", "FREE_MAX"):
     post = results[name]["post"]
     sel = SELECTED[name]
     cells = []

@@ -14,7 +14,7 @@ from timetabling.ui_input import normalize_name, grad_dept_codes
 
 _LEVELS = ("off", "low", "normal", "high", "max")
 _MIDDAY = 13  # hardcoded AM/PM boundary; no longer a user-facing setting
-_WEIGHT_KNOBS = ("evening", "cohort_gap", "room_count", "instr_days")
+_WEIGHT_KNOBS = ("maxrun", "instr_days", "room_stable")
 
 
 def _hour_select(col, label: str, lo: int, hi: int, cur, key: str, help: str = "") -> int:
@@ -136,6 +136,7 @@ def _policy(lang: str, s: dict) -> None:
         st.divider()
         st.markdown(f"**{t('set_weights_header', lang)}**")
         st.caption(t("set_weights_desc", lang))
+        st.caption(t("set_w_alwayson", lang))            # idle is always-on (no control)
         disp = [t(f"set_w_{lv}", lang) for lv in _LEVELS]
         wc = st.columns(2)
         for i, knob in enumerate(_WEIGHT_KNOBS):
@@ -146,6 +147,15 @@ def _policy(lang: str, s: dict) -> None:
                                                  help=t(f"set_w_{knob}_help", lang))
             if chosen is not None:
                 s["weights"][knob] = _LEVELS[disp.index(chosen)]
+        # free_day: controlled by which cohort year-levels want a free day (the gate showed a
+        # strength slider can't steer it; the year selection IS its on/off control).
+        cur_years = [int(y) for y in s.get("free_day_years", []) if str(y).strip().isdigit()]
+        picked = st.multiselect(t("set_free_day_years", lang), [1, 2, 3, 4, 5, 6],
+                                default=[y for y in cur_years if 1 <= y <= 6],
+                                format_func=lambda y: t("set_year_n", lang, n=y),
+                                help=t("set_free_day_years_help", lang),
+                                key="set_free_day_years")
+        s["free_day_years"] = list(picked)
 
 
 def _grad_by_dept(lang: str, s: dict) -> None:

@@ -105,30 +105,45 @@ def _global_terms(state, cfg) -> dict:
 
 
 def _local_terms(state, cohorts, instrs, rooms, blocks, cfg) -> dict:
-    """Raw counts of the same terms over only the given entities. Each term is owned by one
-    entity type (evening->block, gap/conf->cohort, days->instructor, rooms->room), so
-    summing over the FULL entity sets reproduces _global_terms (consistency-tested)."""
-    evening = 0
-    for bid in blocks:
-        c = state.placed.get(bid)
-        if c is not None:
-            evening += sum(1 for hh in range(c.start, c.start + c.length)
-                           if hh >= cfg.evening_from_hour)
-    cohort_set = set(cohorts)
-    coh_slot = defaultdict(set)
+    """Same six terms over only the given entities. Each term is owned by one entity type:
+    idle/conf/free_day -> cohort, maxrun -> cohort+instructor, instr_days -> instructor,
+    room_stable -> section (derived from blocks). Summing over the full sets == _global_terms."""
+    cohort_set, instr_set = set(cohorts), set(instrs)
+    sections = {bid.split("#")[0] for bid in blocks}
     coh_day = defaultdict(set)
+    coh_slot = defaultdict(set)
+    coh_days_used = defaultdict(set)
+    instr_day = defaultdict(set)
+    sec_rooms = defaultdict(set)
     for bid, c in state.placed.items():
         s = state.sec_of[bid]
-        if s.cohort_key not in cohort_set:
-            continue
-        for hh in range(c.start, c.start + c.length):
-            coh_slot[(s.cohort_key, c.day, hh)].add(s.code)
-            coh_day[(s.cohort_key, c.day)].add(hh)
-    conf = sum(max(0, len(v) - 1) for v in coh_slot.values())
-    gap = _gap_of(coh_day)
-    rooms_used = sum(1 for r in rooms if state.room_hours_used.get(r, 0) > 0)
-    days = sum(len(state.instr_active_days.get(iid, ())) for iid in instrs)
-    return {"evening": evening, "gap": gap, "rooms": rooms_used, "days": days, "conf": conf}
+        if s.section_id in sections:
+            sec_rooms[s.section_id].add(c.room)
+        if s.cohort_key in cohort_set:
+            coh_days_used[s.cohort_key].add(c.day)
+            for hh in range(c.start, c.start + c.length):
+                coh_day[(s.cohort_key, c.day)].add(hh)
+                coh_slot[(s.cohort_key, c.day, hh)].add(s.code)
+        for iid in state.sec_instr.get(s.section_id, []):
+            if iid in instr_set:
+                for hh in range(c.start, c.start + c.length):
+                    instr_day[(iid, c.day)].add(hh)
+    T = cfg.max_consecutive_hours
+    maxrun = (sum(_run_excess(h, T) for h in coh_day.values())
+              + sum(_run_excess(h, T) for h in instr_day.values()))
+    years = {str(y) for y in cfg.free_day_year_levels}
+    n_days = len(cfg.days())
+    free_day = sum(max(0, len(days) - (n_days - 1))
+                   for cohort, days in coh_days_used.items()
+                   if cohort.rsplit("-", 1)[-1] in years) if years else 0
+    return {
+        "idle": _gap_of(coh_day),
+        "maxrun": maxrun,
+        "instr_days": sum(len(state.instr_active_days.get(iid, ())) for iid in instr_set),
+        "room_stable": sum(max(0, len(rs) - 1) for rs in sec_rooms.values()),
+        "free_day": free_day,
+        "conf": sum(max(0, len(v) - 1) for v in coh_slot.values()),
+    }
 
 
 def _norm_obj(terms, base, cfg) -> float:

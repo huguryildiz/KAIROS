@@ -1,6 +1,6 @@
 """Tests for the pure School-Settings layer (settings.py): the Settings dict, its
 mapping into Config, availability closed-slots, weight presets, and profile JSON."""
-from timetabling.settings import (build_config, DEFAULT_SETTINGS, WEIGHT_PRESETS,
+from timetabling.settings import (build_config, DEFAULT_SETTINGS, WEIGHT_LEVELS,
                                   availability_closed_slots, profile_to_json,
                                   profile_from_json)
 
@@ -16,12 +16,13 @@ def test_default_settings_build_config_matches_today():
     assert cfg.midday_split_hour == 13
     assert cfg.max_theory_session == 2
     assert cfg.max_block_len == 4
+    # uniform 0-1 UI scale: every "normal" toggle -> 0.5 x UI_REF(20) = 10
     assert cfg.w_evening == 10
     assert cfg.w_cohort_conflict == 50
-    assert cfg.w_cohort_gap == 3
-    assert cfg.w_room_count == 2
-    assert cfg.w_instr_days == 3
-    assert cfg.w_parttime_days == 5
+    assert cfg.w_cohort_gap == 10
+    assert cfg.w_room_count == 10
+    assert cfg.w_instr_days == 10
+    assert cfg.w_parttime_days == 14
     assert cfg.w_instr_daily_overload == 0
     assert cfg.w_instr_weekly_overload == 0
     assert cfg.max_instr_weekly_days == 5
@@ -116,22 +117,27 @@ def test_clamp_guard():
 
 # --- Block 3: weight presets ------------------------------------------------
 
-def test_weight_presets_off_and_strong():
+def test_weight_presets_off_and_max():
+    # uniform 0-1 scale: off -> 0 ; max -> 1.0 x UI_REF(20) = 20 for every toggle
     off = build_config(dict(DEFAULT_SETTINGS, weights={
         "evening": "off", "cohort_gap": "off", "room_count": "off", "instr_days": "off"}),
         {}, 60.0)
     assert (off.w_evening, off.w_cohort_gap, off.w_room_count,
             off.w_instr_days, off.w_parttime_days) == (0, 0, 0, 0, 0)
-    strong = build_config(dict(DEFAULT_SETTINGS, weights={
-        "evening": "strong", "cohort_gap": "strong", "room_count": "strong",
-        "instr_days": "strong"}), {}, 60.0)
-    assert (strong.w_evening, strong.w_cohort_gap, strong.w_room_count,
-            strong.w_instr_days, strong.w_parttime_days) == (30, 8, 6, 8, 10)
+    mx = build_config(dict(DEFAULT_SETTINGS, weights={
+        "evening": "max", "cohort_gap": "max", "room_count": "max",
+        "instr_days": "max"}), {}, 60.0)
+    assert (mx.w_evening, mx.w_cohort_gap, mx.w_room_count,
+            mx.w_instr_days, mx.w_parttime_days) == (20, 20, 20, 20, 24)
 
 
-def test_weight_presets_normal_parttime_offset():
+def test_weight_presets_levels_and_parttime_offset():
+    # uniform levels (low/high) and the +4 part-time offset on top of instr_days
     cfg = build_config(DEFAULT_SETTINGS, {}, 60.0)
-    assert cfg.w_instr_days == 3 and cfg.w_parttime_days == 5
+    assert cfg.w_instr_days == 10 and cfg.w_parttime_days == 14   # normal
+    lo = build_config(dict(DEFAULT_SETTINGS, weights={"evening": "low"}), {}, 60.0)
+    hi = build_config(dict(DEFAULT_SETTINGS, weights={"evening": "high"}), {}, 60.0)
+    assert lo.w_evening == 5 and hi.w_evening == 15
 
 
 # --- Block 7: availability closed-slots -------------------------------------

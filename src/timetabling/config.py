@@ -51,17 +51,21 @@ class Config:
     compact_cohort_years: tuple = (2, 3, 4)
     # phase 2 soft weights
     w_cohort_conflict: int = 50  # soft cohort (student course-conflict); high but not hard
-    w_cohort_gap: int = 3
+    # The four UI-toggle weights are absolute numbers, but the UI presents them on a uniform
+    # 0-1 preference scale (settings.WEIGHT_LEVELS x UI_REF); "normal" = 0.5 x 20 = 10, the
+    # same for all four (no hidden per-term priority). The repair polish (soft_search) divides
+    # each by its solve-time baseline, so only their RATIOS matter there; model_cpsat (<=50
+    # path) uses them as absolute coefficients alongside w_order/w_englab/w_cohort_conflict.
+    w_cohort_gap: float = 10.0
     w_order: int = 1
     w_englab: int = 1
     eng_lab_days: tuple = ("Th", "Fr")
     eng_faculty_match: str = "Engineering"
     w_nonadjacent: int = 0
-    # objective weights (light)
-    w_evening: int = 10
-    w_room_count: int = 2
-    w_instr_days: int = 3
-    w_parttime_days: int = 5
+    w_evening: float = 10.0
+    w_room_count: float = 10.0
+    w_instr_days: float = 10.0
+    w_parttime_days: float = 14.0
     # soft: penalize each teaching-hour beyond this many per (instructor, day).
     # 0 = disabled (opt-in). A hard cap is INFEASIBLE: ~19 instructors carry
     # >20h/week (service courses) and cannot fit 5 days at 4h. See TODO.md.

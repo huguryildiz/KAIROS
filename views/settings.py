@@ -12,7 +12,7 @@ from timetabling.i18n import t, DAY_LABELS, DAY_LABELS_FULL
 from timetabling.settings import profile_to_json, profile_from_json
 from timetabling.ui_input import normalize_name
 
-_LEVELS = ("off", "normal", "strong")
+_LEVELS = ("off", "low", "normal", "high", "max")
 _MIDDAY = 13  # hardcoded AM/PM boundary; no longer a user-facing setting
 _WEIGHT_KNOBS = ("evening", "cohort_gap", "room_count", "instr_days")
 

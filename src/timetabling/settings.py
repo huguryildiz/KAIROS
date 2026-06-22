@@ -48,13 +48,12 @@ DEFAULT_SETTINGS: dict = {
     },
 }
 
-# Plain-language presets -> vetted weight values. Keeps the calibrated relative scale intact.
-WEIGHT_PRESETS: dict = {
-    "evening":    {"off": 0, "normal": 10, "strong": 30},   # -> w_evening
-    "cohort_gap": {"off": 0, "normal": 3,  "strong": 8},    # -> w_cohort_gap
-    "room_count": {"off": 0, "normal": 2,  "strong": 6},    # -> w_room_count
-    "instr_days": {"off": 0, "normal": 3,  "strong": 8},    # -> w_instr_days (+2 -> w_parttime_days)
-}
+# Uniform 0-1 preference scale, identical for all four toggles (normalization removes the
+# need for per-term magnitudes — only the relative dial matters). UI_REF lifts the 0-1
+# preference to an absolute weight ("normal" 0.5 -> 10), comparable to w_order/w_englab and
+# below w_cohort_conflict in the <=50 CP-SAT path; the repair polish normalizes it away.
+UI_REF: float = 20.0
+WEIGHT_LEVELS: dict = {"off": 0.0, "low": 0.25, "normal": 0.5, "high": 0.75, "max": 1.0}
 
 
 def default_settings() -> dict:
@@ -101,9 +100,11 @@ def availability_closed_slots(availability: Dict[str, list], settings: dict) -> 
     return frozenset(out)
 
 
-def _preset(weights: dict, knob: str) -> int:
-    table = WEIGHT_PRESETS[knob]
-    return table.get(weights.get(knob, "normal"), table["normal"])
+def _preset(weights: dict, knob: str) -> float:
+    """Map a knob's 0-1 preference level to an absolute weight (UI_REF x level). Uniform
+    across all four toggles."""
+    lvl = weights.get(knob, "normal")
+    return round(UI_REF * WEIGHT_LEVELS.get(lvl, WEIGHT_LEVELS["normal"]), 1)
 
 
 def build_config(settings: dict, availability: Dict[str, list],
@@ -149,7 +150,7 @@ def build_config(settings: dict, availability: Dict[str, list],
     # preference weights
     weights = s.get("weights", {}) or {}
     w_instr = _preset(weights, "instr_days")
-    w_parttime = w_instr + 2 if w_instr else 0
+    w_parttime = round(w_instr + 4, 1) if w_instr else 0.0
 
     # instructor daily-hours soft cap
     cap = _int(s.get("daily_hours_cap"), 0)

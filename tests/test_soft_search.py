@@ -18,7 +18,8 @@ def _state(*secs):
 
 
 def test_soft_total_includes_instr_days_and_room_count():
-    cfg = Config()  # w_instr_days=3, w_room_count=2
+    from dataclasses import replace
+    cfg = replace(Config(), w_instr_days=3, w_room_count=2)   # pin weights (default-independent)
     a = _sec("A_01", "i1", code="ADA 101")
     b = _sec("B_01", "i1", code="ADA 102")     # same instructor i1
     st = _state(a, b)

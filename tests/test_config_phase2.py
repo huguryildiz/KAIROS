@@ -6,7 +6,7 @@ def test_phase2_defaults():
     assert c.max_theory_session == 2
     assert c.extra_rooms == ()
     assert c.compact_cohort_years == (2, 3, 4)
-    assert c.w_cohort_gap == 3
+    assert c.w_cohort_gap == 10.0   # uniform 0-1 UI scale: "normal" = 0.5 x UI_REF(20)
     assert c.w_order == 1
     assert c.w_englab == 1
     assert c.eng_lab_days == ("Th", "Fr")

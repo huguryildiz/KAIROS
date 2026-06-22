@@ -40,9 +40,12 @@ DEFAULT_SETTINGS: dict = {
     "lunch_start": 12,        # inclusive hour
     "lunch_end": 13,          # exclusive hour
     "weights": {              # preset levels, never raw numbers
-        "cohort_gap": "normal",
+        "maxrun": "normal",
         "instr_days": "normal",
+        "room_stable": "normal",
+        "free_day": "normal",
     },
+    "free_day_years": [],     # -> Config.free_day_year_levels (cohort years that want a free day)
 }
 
 # Uniform 0-1 preference scale, identical for all four toggles (normalization removes the
@@ -152,10 +155,12 @@ def build_config(settings: dict, availability: Dict[str, list],
                     blackout_rows.append((d, h, False))
     blackout_rows = list(dict.fromkeys(blackout_rows))   # dedupe, preserve order
 
-    # preference weights
+    # preference weights (the surviving soft dials; idle is fixed always-on, not a dial)
     weights = s.get("weights", {}) or {}
     w_instr = _preset(weights, "instr_days")
     w_parttime = round(w_instr + 4, 1) if w_instr else 0.0
+    free_day_years = tuple(int(y) for y in s.get("free_day_years", []) or []
+                           if str(y).strip().isdigit())
 
     closed = availability_closed_slots(
         availability, {"day_start": day_start})
@@ -171,6 +176,10 @@ def build_config(settings: dict, availability: Dict[str, list],
         max_block_len=_int(s.get("max_block_len"), 4),
         blackout=tuple(blackout_rows),
         w_cohort_gap=_preset(weights, "cohort_gap"),
+        w_maxrun=_preset(weights, "maxrun"),
+        w_room_stable=_preset(weights, "room_stable"),
+        w_free_day=_preset(weights, "free_day"),
+        free_day_year_levels=free_day_years,
         w_instr_days=w_instr,
         w_parttime_days=w_parttime,
         instr_unavailable=closed,

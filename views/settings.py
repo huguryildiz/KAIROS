@@ -10,7 +10,7 @@ import streamlit as st
 from timetabling.ui_style import eyebrow_html
 from timetabling.i18n import t, DAY_LABELS, DAY_LABELS_FULL
 from timetabling.settings import profile_to_json, profile_from_json
-from timetabling.ui_input import normalize_name
+from timetabling.ui_input import normalize_name, grad_dept_codes
 
 _LEVELS = ("off", "low", "normal", "high", "max")
 _MIDDAY = 13  # hardcoded AM/PM boundary; no longer a user-facing setting
@@ -111,16 +111,10 @@ def _policy(lang: str, s: dict) -> None:
                                                   max_value=6, value=int(s["max_theory_session"]),
                                                   step=1, help=t("set_max_theory_help", lang),
                                                   key="set_maxtheory")
-        c4, c5, c6 = st.columns(3)
+        c4, _c4b = st.columns(2)
         s["max_block_len"] = c4.number_input(t("set_max_block", lang), min_value=1, max_value=8,
                                              value=int(s["max_block_len"]), step=1,
                                              help=t("set_max_block_help", lang), key="set_maxblock")
-        s["daily_hours_cap"] = c5.number_input(t("set_daily_cap", lang), min_value=0, max_value=12,
-                                               value=int(s["daily_hours_cap"]), step=1,
-                                               help=t("set_daily_cap_help", lang), key="set_dailycap")
-        s["instr_days_cap"] = c6.number_input(t("set_days_cap", lang), min_value=0, max_value=6,
-                                              value=int(s.get("instr_days_cap", 0)), step=1,
-                                              help=t("set_days_cap_help", lang), key="set_dayscap")
         c7, c8 = st.columns(2)
         s["saturday"] = c7.toggle(t("set_saturday", lang), value=bool(s["saturday"]),
                                   help=t("set_saturday_help", lang), key="set_sat")
@@ -132,16 +126,12 @@ def _policy(lang: str, s: dict) -> None:
                 gc2, t("set_grad_start", lang), 6, 20,
                 s.get("grad_start", 18), "set_grad_start",
                 help=t("set_grad_start_help", lang))
+            _grad_by_dept(lang, s)
 
-        s["lunch_enabled"] = st.toggle(t("set_lunch", lang),
-                                       value=bool(s.get("lunch_enabled", False)),
-                                       help=t("set_lunch_help", lang), key="set_lunch")
-        if s["lunch_enabled"]:
-            lc1, lc2, _ = st.columns([1, 1, 2])
-            s["lunch_start"] = _hour_select(lc1, t("set_lunch_start", lang), 9, 16,
-                                            s.get("lunch_start", 12), "set_lunch_start")
-            s["lunch_end"] = _hour_select(lc2, t("set_lunch_end", lang), 10, 17,
-                                          s.get("lunch_end", 13), "set_lunch_end")
+        # blackouts are a hard constraint -> keep them contiguous with the time-window/grad
+        # block, above the preference-weights divider.
+        st.divider()
+        _blackouts(lang, s)
 
         st.divider()
         st.markdown(f"**{t('set_weights_header', lang)}**")
@@ -157,8 +147,29 @@ def _policy(lang: str, s: dict) -> None:
             if chosen is not None:
                 s["weights"][knob] = _LEVELS[disp.index(chosen)]
 
-        st.divider()
-        _blackouts(lang, s)
+
+def _grad_by_dept(lang: str, s: dict) -> None:
+    """Per-department graduate earliest-start overrides. Lists the graduate dept codes from
+    the uploaded course list; for each picked dept, an hour select sets its floor. Writes
+    s['grad_start_by_dept'] = {dept: hour} (build_config validates + upper-cases)."""
+    courses = st.session_state.get("courses", []) or []
+    depts = grad_dept_codes(courses)
+    if not depts:
+        return
+    cur = dict(s.get("grad_start_by_dept", {}) or {})
+    rev = st.session_state.get("set_rev", 0)
+    picked = st.multiselect(t("set_grad_dept_pick", lang), depts,
+                            default=[d for d in depts if d in cur],
+                            help=t("set_grad_dept_help", lang), key=f"grad_dept_{rev}")
+    new: dict = {}
+    if picked:
+        gcols = st.columns(min(len(picked), 3))
+        for i, d in enumerate(picked):
+            h = _hour_select(gcols[i % len(gcols)], d, 6, 20,
+                             int(cur.get(d, s.get("grad_start", 18))),
+                             f"grad_dept_h_{d}_{rev}")
+            new[d] = int(h)
+    s["grad_start_by_dept"] = new
 
 
 def _blackouts(lang: str, s: dict) -> None:

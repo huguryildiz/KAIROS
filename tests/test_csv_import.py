@@ -181,9 +181,11 @@ def test_map_columns_accepts_classroom_col_map():
     assert m["has_header"] is True
     assert m["col_index"]["Room"] == 0
     assert m["col_index"]["Capacity"] == 1
-    # No Type column in the file -> positional fallback for Type.
-    typ = next(d for d in m["detected_columns"] if d["field"] == "Type")
-    assert typ["source"] == "positional"
+    # No Type column in the file + a header present -> Type is left unmapped
+    # (no positional guess, no chip). It reads as blank and is derived later.
+    fields = {d["field"] for d in m["detected_columns"]}
+    assert "Type" not in fields
+    assert m["col_index"]["Type"] == -1
     room = next(d for d in m["detected_columns"] if d["field"] == "Room")
     assert room["source"] == "header" and room["label"] == "ROOM"
 

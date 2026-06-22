@@ -29,15 +29,6 @@ def test_greedy_places_both_in_distinct_slots():
     assert st.placed["B_01#T"].start == 11   # forced off the taken 9:00 slot
 
 
-def test_greedy_prefers_daytime_under_soft_shaping():
-    a = _sec("A_01", "i1")
-    st = State({"A_01#T": a}, {"A_01": ["i1"]}, set())
-    cands = {"A_01#T": [Candidate("A_01#T", "R1", "Mo", 17, 2),   # evening, listed first
-                        Candidate("A_01#T", "R1", "Mo", 9, 2)]}   # daytime
-    greedy_construct(st, ["A_01#T"], cands, Config())
-    assert st.placed["A_01#T"].start == 9    # shaping picked daytime over the first (evening)
-
-
 def test_greedy_avoids_cohort_conflict_under_soft_shaping():
     a = _sec_code("A_01", "i1", "MATH 101", "X-1")
     b = _sec_code("B_01", "i2", "PHYS 101", "X-1")   # same cohort, diff instructor+room

@@ -18,7 +18,7 @@ def test_cohort_conflict_is_soft_not_hard():
     closed = tuple([(d, h) for d in ["Mo", "Tu", "We", "Th"] for h in (9, 10, 11)]
                    + [("Fr", 10), ("Fr", 11)])
     W = 50
-    cfg = Config(w_cohort_conflict=W, w_evening=0, w_room_count=0, w_instr_days=0,
+    cfg = Config(w_cohort_conflict=W, w_instr_days=0,
                  w_parttime_days=0, w_order=0, w_englab=0, w_nonadjacent=0, w_cohort_gap=0,
                  horizon_start=9, undergrad_end=12, blackout=closed)
     rooms = [Room("R1", 50, False, True), Room("R2", 50, False, True)]
@@ -38,7 +38,7 @@ def test_cohort_conflict_is_soft_not_hard():
 def test_no_conflict_when_room_free_and_slots_available():
     # Same two sections but the full window is open and two rooms exist -> the solver can separate
     # them in time at zero penalty. objective 0, no cohort conflict.
-    cfg = Config(w_cohort_conflict=50, w_evening=0, w_room_count=0, w_instr_days=0,
+    cfg = Config(w_cohort_conflict=50, w_instr_days=0,
                  w_parttime_days=0, w_order=0, w_englab=0, w_nonadjacent=0, w_cohort_gap=0)
     rooms = [Room("R1", 50, False, True), Room("R2", 50, False, True)]
     instr = {"a": Instructor("a", "n", False, "D"), "b": Instructor("b", "n", False, "D")}

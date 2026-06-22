@@ -113,11 +113,19 @@ def map_columns(raw_rows: List[List], col_map: Dict[str, List[str]] = COURSE_COL
     col_index: Dict[str, int] = {}
     detected: List[Dict] = []
     for pos, canonical in enumerate(positional):
-        if has_header and canonical in header_idx:
-            idx = header_idx[canonical]
-            col_index[canonical] = idx
-            detected.append({"field": canonical, "label": first_row[idx],
-                             "source": "header"})
+        if has_header:
+            # A header exists: trust it exclusively. Columns absent from the
+            # header are left unmapped (idx -1 -> read as blank) rather than
+            # guessed by position, which would misread a neighbouring column
+            # and surface a misleading "by position" chip. Positional fallback
+            # applies only to genuinely header-less files (the else branch).
+            if canonical in header_idx:
+                idx = header_idx[canonical]
+                col_index[canonical] = idx
+                detected.append({"field": canonical, "label": first_row[idx],
+                                 "source": "header"})
+            else:
+                col_index[canonical] = -1
         else:
             col_index[canonical] = pos
             detected.append({"field": canonical, "label": f"column {pos + 1}",

@@ -1471,10 +1471,10 @@ def hero_html(lang: str = DEFAULT_LANG, chips=None) -> str:
     ``ui_app.hero_chips``)."""
     if chips is None:
         chips = [
-            ("793", t("hero_stat_sections", lang), ""),
-            ("0", t("hero_stat_conflicts", lang), ""),
-            (t("hero_stat_speed_v", lang), t("hero_stat_speed", lang), ""),
-            ("CP-SAT", t("hero_stat_engine", lang), ""),
+            (t("feat_input_v", lang), t("feat_input_label", lang), ""),
+            (t("feat_conflict_v", lang), t("feat_conflict_label", lang), ""),
+            (t("feat_pref_v", lang), t("feat_pref_label", lang), ""),
+            (t("feat_export_v", lang), t("feat_export_label", lang), ""),
         ]
     cells = "".join(
         f'<div class="chip-stat {escape(tone)}"><span class="v">{escape(str(v))}</span>'
@@ -1559,8 +1559,9 @@ _IMP_STATUS_LABEL = {
 }
 # Columns shown in the import preview (canonical field -> i18n-free short header).
 _IMP_COLS = ("Course Code", "Course Name", "Section No", "T", "P", "L",
-             "Instructor Name", "Instructor Email", "~Students")
-_IMP_NUM = {"T", "P", "L", "~Students"}
+             "Instructor Name", "Instructor Email", "~Students",
+             "Section Capacity", "Year", "Part-time", "Room Type", "Fixed", "Dept")
+_IMP_NUM = {"T", "P", "L", "~Students", "Section Capacity", "Year"}
 
 
 _REQUIRED_COURSE_FIELDS = (
@@ -1684,14 +1685,22 @@ def import_preview_html(report: dict, lang: str = DEFAULT_LANG) -> str:
     and a per-row preview table with colored status pills. ``report`` is the dict
     from ``csv_import.parse_courselist``."""
     rows = report.get("rows", [])
-    detect_html = detected_columns_html(report.get("detected_columns", []), lang)
+    detected = report.get("detected_columns", [])
+    detect_html = detected_columns_html(detected, lang)
     stats_html = import_stats_html(report.get("stats", {}), lang)
+
+    # Only preview columns that were actually mapped from the file. With a header,
+    # unmatched canonical fields are absent from ``detected_columns`` — showing
+    # them as all-"—" columns is noise. Fall back to the full set if detection is
+    # empty (defensive; shouldn't happen for a parsed report).
+    detected_fields = {d["field"] for d in detected}
+    cols = tuple(c for c in _IMP_COLS if c in detected_fields) or _IMP_COLS
 
     head = (f'<th class="num">{t("import_col_row", lang)}</th>'
             + "".join((f'<th class="num">{escape(field_label(c, lang))}</th>'
                        if c in _IMP_NUM
                        else f'<th>{escape(field_label(c, lang))}</th>')
-                      for c in _IMP_COLS)
+                      for c in cols)
             + f'<th>{t("import_col_status", lang)}</th>')
     trs = []
     for r in rows:
@@ -1699,14 +1708,14 @@ def import_preview_html(report: dict, lang: str = DEFAULT_LANG) -> str:
         rcls = (" row-dup" if status == "duplicate"
                 else " row-err" if status == "error" else "")
         tds = [f'<td class="num">{escape(str(r.get("row_num", "")))}</td>']
-        for c in _IMP_COLS:
+        for c in cols:
             cls = ' class="num"' if c in _IMP_NUM else ""
             tds.append(f'<td{cls}>{escape(str(r.get(c, "") or "—"))}</td>')
         label = t(_IMP_STATUS_LABEL.get(r.get("status_label", ""), "import_status_ok"), lang)
         tds.append(f'<td><span class="st-pill {escape(status)}">{escape(label)}</span></td>')
         trs.append(f'<tr class="{rcls.strip()}">{"".join(tds)}</tr>')
     body = "".join(trs) or (
-        f'<tr><td class="tt-td-empty" colspan="{len(_IMP_COLS) + 2}">—</td></tr>')
+        f'<tr><td class="tt-td-empty" colspan="{len(cols) + 2}">—</td></tr>')
 
     table = (f'<div class="tt-table-wrap" style="--tt-table-h:360px">'
              f'<table class="tt-data"><thead><tr>{head}</tr></thead>'

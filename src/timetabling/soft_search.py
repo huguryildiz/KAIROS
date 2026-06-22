@@ -14,8 +14,8 @@ CHAIN_MAX_DEPTH = 4   # bounded ejection-chain length in anneal_soft
 
 def _local_soft(state, cohorts, instrs, rooms, blocks, cfg: Config) -> int:
     """Weighted soft over only the given entities. Each term is owned by one entity type
-    (per-candidate->block, cohort-conflict/gap->cohort, instr_days->instructor,
-    room_count->room), so summing over the FULL entity sets equals _soft_total."""
+    (per-candidate->block, cohort-conflict/gap->cohort, instr_days->instructor), so summing
+    over the FULL entity sets equals _soft_total."""
     total = 0
     # per-candidate over the given blocks
     for bid in blocks:
@@ -41,8 +41,6 @@ def _local_soft(state, cohorts, instrs, rooms, blocks, cfg: Config) -> int:
                                     for h in coh_hours.values() if len(h) >= 2)
     # instr_days over the given instructors
     total += cfg.w_instr_days * sum(len(state.instr_active_days.get(iid, ())) for iid in instrs)
-    # room_count over the given rooms (a room counts once if it has any occupied slot)
-    total += cfg.w_room_count * sum(1 for r in rooms if state.room_hours_used.get(r, 0) > 0)
     return total
 
 
@@ -169,7 +167,7 @@ def try_relocate(state, cand_by_block, bid, rng, eval_fn):
     """Move bid to a random alternative legal+free candidate. Leaves state in the new
     config; returns (dobj, dterms, revert) or None. eval_fn(state, cohorts, instrs, rooms,
     blocks) -> (objective, terms) over the affected entities; dobj is the objective delta
-    and dterms the per-term delta dict (evening/gap/rooms/days/conf). revert() restores the
+    and dterms the per-term delta dict (idle/maxrun/instr_days/room_stable/free_day/conf). revert() restores the
     original placement."""
     s = state.sec_of[bid]
     iids = state.sec_instr.get(s.section_id, [])

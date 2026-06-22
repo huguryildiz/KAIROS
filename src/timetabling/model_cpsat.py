@@ -116,10 +116,8 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
     cohort_course_occ = defaultdict(list)  # (cohort, course, day, hour) -> vars
     cohort_hour_occ = defaultdict(list)   # (cohort, day, hour) -> vars (compact cohorts only)
     section_occ = defaultdict(list)       # (section_id, day, hour) -> vars
-    room_used_vars = defaultdict(list)            # room -> vars
     instr_day_vars = defaultdict(list)            # (instr_id, day) -> vars
     instr_day_load = defaultdict(list)            # (instr_id, day) -> per-hour vars (sum = daily hours)
-    evening_vars = []
 
     compact_years = {str(y) for y in cfg.compact_cohort_years}
     virtual_names = {r.room for r in rooms if r.is_virtual}
@@ -164,10 +162,6 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
                 if s.cohort_key.rsplit("-", 1)[-1] in compact_years:
                     cohort_hour_occ[(s.cohort_key, c.day, hh)].append(v)
                 section_occ[(s.section_id, c.day, hh)].append(v)
-                if hh >= cfg.evening_from_hour:
-                    evening_vars.append(v)
-            if c.room not in virtual_names:
-                room_used_vars[c.room].append(v)
             for iid in s.instructor_ids:
                 instr_day_vars[(iid, c.day)].append(v)
         model.AddExactlyOne(bvars)   # H1
@@ -237,14 +231,6 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
         if len(zs) >= 2:
             model.Add(sum(zs) <= 1)
 
-    # soft: room-used indicators
-    room_used = {}
-    for room, vs in room_used_vars.items():
-        y = model.NewBoolVar(f"room_used|{room}")
-        model.Add(sum(vs) >= 1).OnlyEnforceIf(y)
-        model.Add(sum(vs) == 0).OnlyEnforceIf(y.Not())
-        room_used[room] = y
-
     # soft: instructor-day indicators (heavier weight for part-time)
     instr_day = {}
     for (iid, day), vs in instr_day_vars.items():
@@ -283,8 +269,6 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
             weekday_overload_terms.append(over)
 
     obj = []
-    obj += [cfg.w_evening * v for v in evening_vars]
-    obj += [cfg.w_room_count * y for y in room_used.values()]
     for (iid, day), d in instr_day.items():
         ins = instructors.get(iid, default_instr)
         w = cfg.w_instr_days if ins.is_staff else cfg.w_parttime_days

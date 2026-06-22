@@ -141,3 +141,23 @@ def test_schc_refreshes_bound_every_counter_limit():
     acc.accept(-40, 0)     # cost -> 60 (bound still 100 for first window)
     acc.accept(-10, 1)     # cost -> 50; after 2 steps bound refreshes to current (50)
     assert acc.accept(+30, 2) is False     # cost 50+30=80 > bound 50 now
+
+
+def test_anneal_soft_never_raises_soft_and_keeps_placement():
+    from timetabling.soft_search import anneal_soft
+    cfg = Config()
+    secs = [_sec(f"S{n}_01", f"i{n}", level=1, code=f"ADA 10{n}") for n in range(8)]
+    cand = {}
+    st = _state(*secs)
+    for n, s in enumerate(secs):
+        bid = f"S{n}_01#T"
+        # each block: an evening option (parked) + a free morning option in its own room
+        cand[bid] = [Candidate(bid, f"R{n}", "Mo", 16, 2), Candidate(bid, f"R{n}", "Mo", 9, 2)]
+        st.occupy(bid, cand[bid][0])             # park all in evening
+    start_soft = _soft_total(st, cfg)
+    placed_before = len(st.placed)
+    stats = anneal_soft(st, cand, cfg, budget_s=2.0, seed=0)
+    assert len(st.placed) == placed_before       # placement invariant
+    assert stats["soft_end"] <= stats["soft_start"]
+    assert _soft_total(st, cfg) <= start_soft     # never worse than start
+    assert _soft_total(st, cfg) < start_soft      # and here it strictly improves (all evenings clearable)

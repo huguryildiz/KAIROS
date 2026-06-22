@@ -150,3 +150,50 @@ class SCHC:
             self.bound = self.cost
             self.counter = 0
         return accepted
+
+
+import random as _random
+
+
+def _make_acceptor(cfg):
+    # extended in Task 7; SCHC for now
+    return SCHC(cfg.soft_polish_counter_limit)
+
+
+def anneal_soft(state, cand_by_block, cfg, budget_s, seed=0):
+    """Relocate already-placed blocks to lower the joint soft objective, guided by the
+    acceptor. Never unplaces; restores the best incumbent so soft never regresses."""
+    rng = _random.Random(seed)
+    placed = [bid for bid in state.placed if cand_by_block.get(bid)]
+    soft_start = _soft_total(state, cfg)
+    acc = _make_acceptor(cfg)
+    acc.init(soft_start)
+    cur = soft_start
+    best = soft_start
+    best_snapshot = dict(state.placed)
+    iters = accepted = 0
+    t0 = perf_counter()
+    if placed:
+        while perf_counter() - t0 < budget_s:
+            for _ in range(512):                 # amortize the clock check
+                iters += 1
+                bid = placed[rng.randrange(len(placed))]
+                res = try_relocate(state, cand_by_block, bid, rng, cfg)
+                if res is None:
+                    continue
+                delta, revert = res
+                if acc.accept(delta, iters):
+                    cur += delta
+                    accepted += 1
+                    if cur < best:
+                        best = cur
+                        best_snapshot = dict(state.placed)
+                else:
+                    revert()
+    # restore best incumbent
+    if cur != best:
+        for bid in list(state.placed):
+            state.release(bid)
+        for bid, c in best_snapshot.items():
+            state.occupy(bid, c)
+    return {"iters": iters, "accepted": accepted, "soft_start": soft_start, "soft_end": best}

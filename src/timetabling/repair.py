@@ -535,27 +535,16 @@ def solve_repair(sections, rooms, instructors, cfg):
         if gained == 0 or sweep >= 25:
             break
 
-    # SOFT-POLISH Pass C (cohort-centric): give each cohort's whole set of blocks to
-    # repair_round so cohort_gap/cohort-conflict can move blocks across days. Worst-gap
-    # cohort first; accept-guarded -> placement never drops. OFF by default: a measured
-    # no-op at production scale (frozen-LNS pinning), kept for a future redesign.
+    # SOFT-POLISH: move-based local search (soft_search.anneal_soft). Replaces the
+    # CP-SAT frozen-LNS passes, which were a measured no-op at scale. OFF by default
+    # (cfg.soft_polish_in_repair) until the 841 gate is green.
     soft_polish_rounds = 0
     if cfg.soft_polish_in_repair:
-        by_cohort = defaultdict(list)
-        for b, s in blocks:
-            by_cohort[s.cohort_key].append(b.block_id)
-        t_c = perf_counter()
-        c_budget = min(SOFT_POLISH_BUDGET_S, max(0.0, deadline - (t_c - t0)))
-        cohorts = sorted(by_cohort,
-                         key=lambda ck: -_cohort_gap_now(state, by_cohort[ck], cfg))
-        for ck in cohorts:
-            if perf_counter() - t_c > c_budget:
-                break
-            batch = [bid for bid in by_cohort[ck] if bid in state.placed]
-            if batch:
-                repair_round(state, batch, cand_by_block, cfg, tl=SOFT_POLISH_TL,
-                             staff_ids=staff_ids)
-                soft_polish_rounds += 1
+        from .soft_search import anneal_soft
+        budget = min(SOFT_POLISH_BUDGET_S, max(0.0, deadline - (perf_counter() - t0)))
+        if budget > 0:
+            anneal_soft(state, cand_by_block, cfg, budget, seed=cfg.soft_polish_seed)
+            soft_polish_rounds = 1
 
     # POLISH (overload only): once placement converges, re-optimize the days of
     # overloaded eligible instructors. repair_round never lowers placement (its accept

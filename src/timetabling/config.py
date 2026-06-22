@@ -88,6 +88,10 @@ class Config:
     # guard (_soft_total) and the per-pass code are kept (invariant-safe, unit-tested) for
     # a future neighborhood/budget redesign. See docs/TODO.md §4.8.
     soft_polish_in_repair: bool = False
+    # move-based soft polish (soft_search.anneal_soft): acceptor + its single parameter.
+    soft_polish_acceptor: str = "schc"        # schc | lahc | deluge | sa
+    soft_polish_counter_limit: int = 5000     # SCHC counter / LAHC history length
+    soft_polish_seed: int = 0
     evening_from_hour: int = 17   # an hour-slot >= this counts as "evening" for the soft penalty
 
     def days(self) -> list:

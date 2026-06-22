@@ -180,3 +180,23 @@ def test_anneal_uses_swaps_for_dense_schedule():
     anneal_soft(st, cand, cfg, budget_s=2.0, seed=0)
     assert _soft_total(st, cfg) < start      # swap found: A->Mo9, B->Mo13
     assert st.placed["A_01#T"].start == 9
+
+
+def test_lahc_accepts_against_history():
+    from timetabling.soft_search import LAHC
+    acc = LAHC(history_len=3)
+    acc.init(cost=100)
+    assert acc.accept(-10, 0) is True       # 90 <= hist[0]=100 -> accept, cost=90
+    assert acc.accept(+5, 1) is True        # 95 <= hist[1]=100 -> accept, cost=95
+    assert acc.accept(+30, 2) is False      # 125 > hist[2]=100 and > cur 95 -> reject
+
+
+def test_make_acceptor_dispatches():
+    from timetabling.config import Config
+    from timetabling.soft_search import _make_acceptor, SCHC, LAHC, GreatDeluge, SimAnneal
+    import random
+    rng = random.Random(0)
+    assert isinstance(_make_acceptor(Config(soft_polish_acceptor="schc"), rng), SCHC)
+    assert isinstance(_make_acceptor(Config(soft_polish_acceptor="lahc"), rng), LAHC)
+    assert isinstance(_make_acceptor(Config(soft_polish_acceptor="deluge"), rng), GreatDeluge)
+    assert isinstance(_make_acceptor(Config(soft_polish_acceptor="sa"), rng), SimAnneal)

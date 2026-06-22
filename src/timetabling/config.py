@@ -82,7 +82,7 @@ class Config:
     # while never regressing placement (accept guard) or conf. Bounded by the repair deadline.
     soft_polish_in_repair: bool = True
     # move-based soft polish (soft_search.anneal_soft): acceptor + its single parameter.
-    soft_polish_acceptor: str = "schc"        # schc | lahc | deluge | sa
+    soft_polish_acceptor: str = "lahc"        # schc | lahc | deluge | sa (lahc > schc, measured)
     soft_polish_counter_limit: int = 5000     # SCHC counter / LAHC history length
     soft_polish_seed: int = 0
     evening_from_hour: int = 17   # an hour-slot >= this counts as "evening" for the soft penalty

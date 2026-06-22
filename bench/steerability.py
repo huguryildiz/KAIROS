@@ -60,6 +60,7 @@ cfg0 = replace(cfg0, soft_polish_acceptor=acceptor)
 cfg0 = replace(cfg0, free_day_year_levels=(2, 3, 4))       # activate free_day so it can steer
 import os as _os                                            # W_IDLE override for idle-dominance retest
 cfg0 = replace(cfg0, w_idle=float(_os.environ.get("W_IDLE", cfg0.w_idle)))
+cfg0 = replace(cfg0, max_instr_days=int(_os.environ.get("MAX_INSTR_DAYS", 2)))  # excess headroom for DAYS_MAX
 cfg0 = replace(cfg0, max_rooms_per_block=max(cfg0.max_rooms_per_block, REPAIR_MAX_ROOMS))
 
 secs, _ = build_sections_from_courselist(courses, "001", cfg0)

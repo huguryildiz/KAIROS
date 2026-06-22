@@ -24,10 +24,10 @@ def test_global_terms_keys_and_room_stable():
     sec_of = {"A#T": _sec("A", "PSY-2", "PSY101", ["i1"])}
     state = State(sec_of, {"A": ["i1"]}, set())
     state.occupy("A#T", Candidate("A#T", "R1", "Mo", 9, 2))
-    t = _global_terms(state, Config())
+    t = _global_terms(state, Config(max_instr_days=0))   # threshold 0 -> term == raw teaching-day count
     assert set(t) == {"idle", "maxrun", "instr_days", "room_stable", "free_day", "conf"}
     assert t["room_stable"] == 0          # one section, one room
-    assert t["instr_days"] == 1
+    assert t["instr_days"] == 1           # i1 teaches 1 day, excess over 0 = 1
 
 
 def test_local_terms_consistency_with_global():

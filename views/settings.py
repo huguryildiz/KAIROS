@@ -9,10 +9,10 @@ import streamlit as st
 
 from timetabling.ui_style import eyebrow_html
 from timetabling.i18n import t, DAY_LABELS, DAY_LABELS_FULL
-from timetabling.settings import profile_to_json, profile_from_json
+from timetabling.settings import profile_to_json, profile_from_json, _LEGACY_LEVEL
 from timetabling.ui_input import normalize_name, grad_dept_codes
 
-_LEVELS = ("off", "low", "normal", "high", "max")
+_LEVELS = ("low", "medium", "high")
 _MIDDAY = 13  # hardcoded AM/PM boundary; no longer a user-facing setting
 _WEIGHT_KNOBS = ("maxrun", "instr_days", "room_stable")
 
@@ -140,7 +140,7 @@ def _policy(lang: str, s: dict) -> None:
         disp = [t(f"set_w_{lv}", lang) for lv in _LEVELS]
         wc = st.columns(2)
         for i, knob in enumerate(_WEIGHT_KNOBS):
-            cur = s["weights"].get(knob, "normal")
+            cur = _LEGACY_LEVEL.get(s["weights"].get(knob, "medium"), s["weights"].get(knob, "medium"))
             idx = _LEVELS.index(cur) if cur in _LEVELS else 1
             chosen = wc[i % 2].segmented_control(t(f"set_w_{knob}", lang), disp,
                                                  default=disp[idx], key=f"set_w_{knob}",

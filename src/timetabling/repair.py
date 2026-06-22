@@ -97,13 +97,22 @@ class State:
 
 def _soft_score(state: State, c, s, cfg: Config) -> int:
     """Weighted soft penalty for placing candidate c. Lower is better. cohort conflict
-    is gated by cfg.soft_shaping_in_repair."""
+    is gated by cfg.soft_shaping_in_repair. A unit instr_days tie-break (strictly below one
+    cohort-conflict unit, so it never trades a student conflict for concentration) discourages
+    opening a NEW teaching day for an instructor already at/over the day target — the
+    construction-stage analog of the CP-SAT instr_days objective; inert when the dial is off
+    (max_instr_days >= week length)."""
     score = 0
     if cfg.soft_shaping_in_repair:
         for h in range(c.start, c.start + c.length):
             slot = state.cohort_slot_courses.get((s.cohort_key, c.day, h))
             if slot and any(cc != s.code for cc in slot):
                 score += cfg.w_cohort_conflict
+    if cfg.max_instr_days < len(cfg.days()):
+        for iid in state.sec_instr.get(s.section_id, ()):
+            days = state.instr_active_days.get(iid, ())
+            if c.day not in days and len(days) >= cfg.max_instr_days:
+                score += 1
     return score
 
 
@@ -484,13 +493,15 @@ def solve_repair(sections, rooms, instructors, cfg):
             break
 
     # SOFT-POLISH: move-based local search (soft_search.anneal_soft). Replaces the
-    # CP-SAT frozen-LNS passes, which were a measured no-op at scale. OFF by default
-    # (cfg.soft_polish_in_repair) until the 841 gate is green.
+    # CP-SAT frozen-LNS passes, which were a measured no-op at scale.
     soft_polish_rounds = 0
     soft_pre = soft_post = None
     if cfg.soft_polish_in_repair:
         from .soft_search import anneal_soft, _global_terms
-        budget = min(SOFT_POLISH_BUDGET_S, max(0.0, deadline - (perf_counter() - t0)))
+        # Scale cap by problem size (~0.75 s/block); prevents tiny inputs from burning
+        # the full 600 s budget (e.g. 100 blocks → ≈75 s, 841 blocks → 600 s).
+        size_cap = max(30.0, len(state.placed) * 0.75)
+        budget = min(min(SOFT_POLISH_BUDGET_S, size_cap), max(0.0, deadline - (perf_counter() - t0)))
         if budget > 0:
             # within-run before/after: the only correct soft comparison (placement is
             # CP-SAT-nondeterministic, so a separate flag-off run is a different baseline).

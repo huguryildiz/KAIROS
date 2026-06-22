@@ -99,7 +99,7 @@ def test_relocate_lowers_normalized_objective_and_keeps_placement():
 
 def test_swap_lowers_objective_where_relocate_cannot():
     from timetabling.soft_search import try_swap, _global_terms
-    cfg = Config()
+    cfg = Config(max_instr_days=0)        # threshold 0 -> instr_days term == raw teaching-day count
     # i1 teaches A,B ; i2 teaches C,D. Distinct cohorts (no conflict/gap interaction).
     # A and C sit at a DIFFERENT hour on the packing day so packing won't double-book the
     # instructor. Initial: i1 on {Mo,We}, i2 on {We,Mo} -> 4 teaching-days. R2 Mo/We slots
@@ -128,6 +128,33 @@ def test_swap_lowers_objective_where_relocate_cannot():
     assert dterms["conf"] == 0
     assert st.placed["B_01#T"].day == "Mo" and st.placed["D_01#T"].day == "We"
     assert len(st.placed) == 4
+
+
+def test_consolidate_instr_collapses_teaching_days():
+    from timetabling.soft_search import try_consolidate_instr, _global_terms
+    cfg = Config(max_instr_days=0)        # threshold 0 -> instr_days term == raw teaching-day count
+    # i1 teaches A (Mo) and B (We): 2 teaching-days. Each block has a candidate on the day the
+    # OTHER sits, so consolidation collapses i1 onto one day whichever sparse day it vacates.
+    # Generic relocate rarely targets an already-used day; this primitive proposes it directly.
+    a = _sec("A_01", "i1", code="ADA 101")
+    b = _sec("B_01", "i1", code="BBB 101")
+    cand = {
+        "A_01#T": [Candidate("A_01#T", "R1", "Mo", 9, 2), Candidate("A_01#T", "R1", "We", 14, 2)],
+        "B_01#T": [Candidate("B_01#T", "R2", "We", 9, 2), Candidate("B_01#T", "R2", "Mo", 14, 2)],
+    }
+    st = _state(a, b)
+    st.occupy("A_01#T", cand["A_01#T"][0])        # i1 Mo 9-11
+    st.occupy("B_01#T", cand["B_01#T"][0])        # i1 We 9-11
+    t0 = _global_terms(st, cfg)
+    assert t0["instr_days"] == 2
+    res = try_consolidate_instr(st, cand, "i1", random.Random(0), _eval_fn(cfg, t0))
+    assert res is not None
+    dobj, dterms, revert = res
+    assert dterms["instr_days"] == -1             # 2 teaching-days -> 1
+    assert dobj < 0
+    assert len(st.placed) == 2                    # placement invariant
+    revert()
+    assert _global_terms(st, cfg)["instr_days"] == 2   # revert restores the snapshot
 
 
 def test_moves_keep_hard_feasibility():
@@ -197,7 +224,7 @@ def test_anneal_lowers_objective_keeps_placement_and_conf():
 
 def test_anneal_lowers_objective_via_swap_dense():
     from timetabling.soft_search import anneal_soft, _global_terms
-    cfg = Config()
+    cfg = Config(max_instr_days=0)        # threshold 0 -> instr_days term == raw teaching-day count
     # No empty slot exists -> only a B<->D swap can lower teaching-days (4 -> 2). A/C sit at
     # hour 14 on the packing day so packing won't double-book the instructor.
     a = _sec("A_01", "i1", code="ADA 101")
@@ -327,7 +354,7 @@ def test_anneal_conflict_guard_holds():
 
 def test_global_terms_raw_terms_plus_conf():
     from timetabling.soft_search import _global_terms
-    cfg = Config()
+    cfg = Config(max_instr_days=0)        # threshold 0 -> instr_days term == raw teaching-day count
     a = _sec("A_01", "i1", level=2, code="ADA 201")
     b = _sec("B_01", "i1", level=2, code="ADA 202")   # same cohort ADA-2 + instr i1
     d = _sec("D_01", "i1", level=2, code="ADA 203")   # same cohort ADA-2 + instr i1
@@ -364,13 +391,63 @@ def test_local_terms_match_global_over_all_entities():
     assert _local_terms(st, all_cohorts, all_instrs, all_rooms, all_blocks, cfg) == _global_terms(st, cfg)
 
 
-def test_lahc_accepts_against_history():
+def test_lahc_initializes_history_and_cursor():
     from timetabling.soft_search import LAHC
     acc = LAHC(history_len=3)
     acc.init(cost=100)
-    assert acc.accept(-10, 0) is True       # 90 <= hist[0]=100 -> accept, cost=90
-    assert acc.accept(+5, 1) is True        # 95 <= hist[1]=100 -> accept, cost=95
-    assert acc.accept(+30, 2) is False      # 125 > hist[2]=100 and > cur 95 -> reject
+    assert acc.cost == 100.0
+    assert acc.hist == [100.0, 100.0, 100.0]
+    assert acc.pos == 0
+
+
+def test_lahc_accepts_downhill_flat_and_late_uphill():
+    from timetabling.soft_search import LAHC
+    acc = LAHC(history_len=3)
+    acc.init(cost=100)
+    assert acc.accept(-10, 999) is True
+    assert acc.cost == 90.0
+    assert acc.accept(0, 999) is True
+    assert acc.cost == 90.0
+    assert acc.accept(+5, 999) is True       # 95 <= hist slot (100) -> late-accept
+    assert acc.cost == 95.0
+
+
+def test_lahc_rejects_above_current_and_late_history_but_advances():
+    from timetabling.soft_search import LAHC
+    acc = LAHC(history_len=3)
+    acc.init(cost=100)
+    assert acc.accept(-10, 0) is True        # 90, pos 0->1
+    assert acc.accept(+5, 1) is True         # 95 <= hist[1]=100, pos 1->2
+    assert acc.pos == 2
+    assert acc.accept(+30, 2) is False       # 125 > cur 95 and > hist[2]=100 -> reject
+    assert acc.cost == 95.0
+    assert acc.hist[2] == 95.0               # reject still writes current cost
+    assert acc.pos == 0                       # cursor advances on reject
+
+
+def test_lahc_history_len_one_is_greedy_hill_climbing():
+    from timetabling.soft_search import LAHC
+    acc = LAHC(history_len=1)
+    acc.init(cost=100)
+    assert acc.accept(+1, 0) is False
+    assert acc.cost == 100.0
+    assert acc.accept(0, 0) is True
+    assert acc.cost == 100.0
+    assert acc.accept(-1, 0) is True
+    assert acc.cost == 99.0
+
+
+def test_lahc_uses_internal_cursor_not_external_iteration_id():
+    from timetabling.soft_search import LAHC
+    acc = LAHC(history_len=3)
+    acc.init(cost=100)
+    assert acc.pos == 0
+    acc.accept(-1, 100)
+    assert acc.pos == 1
+    acc.accept(-1, 7)
+    assert acc.pos == 2
+    acc.accept(-1, 1000)
+    assert acc.pos == 0
 
 
 def test_make_acceptor_dispatches():
@@ -382,3 +459,44 @@ def test_make_acceptor_dispatches():
     assert isinstance(_make_acceptor(Config(soft_polish_acceptor="lahc"), rng), LAHC)
     assert isinstance(_make_acceptor(Config(soft_polish_acceptor="deluge"), rng), GreatDeluge)
     assert isinstance(_make_acceptor(Config(soft_polish_acceptor="sa"), rng), SimAnneal)
+
+
+def test_soft_score_instr_days_tiebreak_is_dial_gated():
+    """Construction-time instr_days bias: an instructor already at/over the day target pays a
+    unit penalty for a NEW teaching day, zero for a day they already use; OFF (target == week
+    length) adds nothing either way."""
+    from dataclasses import replace
+    from timetabling.repair import _soft_score
+    a = _sec("A_01", "i1", code="ADA 101")
+    b = _sec("B_01", "i1", code="ADA 102")            # same instructor i1
+    st = _state(a, b)
+    st.occupy("A_01#T", Candidate("A_01#T", "R1", "Mo", 9, 2))   # i1 active days = {Mo}
+    s_b = st.sec_of["B_01#T"]
+    used = Candidate("B_01#T", "R2", "Mo", 11, 2)     # reuses Mo (no conflict at 11-13)
+    new = Candidate("B_01#T", "R2", "Tu", 9, 2)       # opens a new day for i1
+
+    off = replace(Config(), max_instr_days=5)          # 5 == len(days()) -> inert
+    assert _soft_score(st, used, s_b, off) == 0
+    assert _soft_score(st, new, s_b, off) == 0
+
+    tight = replace(Config(), max_instr_days=1)         # i1 at 1 day -> a new day costs +1
+    assert _soft_score(st, used, s_b, tight) == 0
+    assert _soft_score(st, new, s_b, tight) == 1
+
+
+def test_soft_score_cohort_conflict_dominates_instr_days():
+    """The instr_days tie-break is strictly below one cohort-conflict unit, so greedy never
+    trades a student conflict for instructor concentration."""
+    from dataclasses import replace
+    from timetabling.repair import _soft_score
+    a = _sec("A_01", "i1", level=2, code="ADA 201")     # cohort ADA-2
+    b = _sec("B_01", "i1", level=2, code="ADA 202")     # same cohort + instructor
+    st = _state(a, b)
+    st.occupy("A_01#T", Candidate("A_01#T", "R1", "Mo", 9, 2))   # ADA-2 busy Mo 9-11; i1 {Mo}
+    s_b = st.sec_of["B_01#T"]
+    tight = replace(Config(), max_instr_days=1)
+    on_mo = Candidate("B_01#T", "R2", "Mo", 9, 2)       # reuses Mo (0 days) but 2h conflict
+    on_tu = Candidate("B_01#T", "R2", "Tu", 9, 2)       # new day (+1) but conflict-free
+    assert _soft_score(st, on_mo, s_b, tight) == 2 * Config().w_cohort_conflict
+    assert _soft_score(st, on_tu, s_b, tight) == 1
+    assert _soft_score(st, on_mo, s_b, tight) > _soft_score(st, on_tu, s_b, tight)

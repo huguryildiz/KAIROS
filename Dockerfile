@@ -16,7 +16,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY src/ ./src/
 COPY views/ ./views/
 COPY assets/ ./assets/
-COPY examples/ ./examples/
 COPY .streamlit/ ./.streamlit/
 COPY app.py ./
 

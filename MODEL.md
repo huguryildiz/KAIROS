@@ -69,27 +69,27 @@ A placement that breaks one of these is never even generated, so it cannot occur
 
 ### Soft preferences — penalized in the objective (never block a schedule)
 
-Listed heaviest weight first; weights live in `config.py`.
+Listed heaviest weight first; weights live in `config.py`. The CP-SAT monolith (§7a) and the
+repair soft polish (§7b) use separate objectives — see §5 for which terms belong to which path.
 
-- **Avoid evenings** (`w_evening=10`) — penalize each teaching-hour at or after 17:00.
 - **Cohort course-conflict** (`w_cohort_conflict=50`) — penalize each extra distinct course a
-  `(dept, year)` cohort runs in the same slot. A *soft proxy* — a hard version was infeasible.
-- **Compress instructor weeks** (`w_instr_days=3` full-time, `w_parttime_days=5` part-time) —
-  penalize each distinct day an instructor must come to campus; part-timers weigh more.
-- **Cohort daily compactness** (`w_cohort_gap=3`) — penalize idle gaps within a year-2/3/4
-  cohort's day.
-- **Fewer rooms** (`w_room_count=2`) — penalize each physical room used at all (consolidate).
+  `(dept, year)` cohort runs in the same slot (CP-SAT monolith objective; no-regress guard in
+  repair polish). A *soft proxy* — a hard version was infeasible.
+- **Student idle gaps** (`w_idle=15.0` repair / `w_cohort_gap=10.0` monolith) — penalize idle
+  hours inside a cohort's day; always-on in the repair polish (fixed weight, not a UI dial).
+- **Maxrun — anti-fatigue** (`w_maxrun=10.0`) — penalize consecutive teaching runs longer than
+  `max_consecutive_hours`=3 h, over cohorts and instructors (repair polish).
+- **Compress instructor weeks** (`w_instr_days=10.0` full-time, `w_parttime_days=14.0`
+  part-time) — penalize teaching-days beyond target `max_instr_days`; gated on the
+  `instr_days_target` UI dial (No target = off; ≤4/≤3/≤2 = active).
+- **Room stability** (`w_room_stable=10.0`) — penalize each section that uses more than one
+  room across its blocks (repair polish).
+- **Free day** (`w_free_day=10.0`, year-scoped) — penalize each configured year-level cohort
+  that occupies all working days (repair polish; scope = year multiselect, not a weight dial).
 - **Level ordering** (`w_order=1`) — prefer low-level courses early, high-level courses late;
-  level-1 and graduate excluded.
-- **Engineering labs late-week** (`w_englab=1`) — prefer Engineering lab blocks on Thu/Fri.
-- **Instructor daily overload** (`w_instr_daily_overload=0`, opt-in) — penalize teaching-hours
-  beyond 4 h/day per instructor; only for instructors with ≤16 h/week total. Off by default
-  because a hard daily cap is infeasible (service-course instructors carry >20 h/week).
-- **Instructor weekly-days overload** (`w_instr_weekly_overload=0`, opt-in) — penalize each
-  distinct teaching day beyond a weekly cap (`max_instr_weekly_days=5`) per instructor (no
-  high-load exemption — it applies to every instructor). Off by default; the School-Settings
-  "instructor weekly-days cap" turns it on. Distinct from the day-compression term, which
-  minimizes days outright rather than penalizing only those beyond a cap.
+  level-1 and graduate excluded (CP-SAT monolith).
+- **Engineering labs late-week** (`w_englab=1`) — prefer Engineering lab blocks on Thu/Fri
+  (CP-SAT monolith).
 - **Non-adjacent split** (`w_nonadjacent=0`, disabled) — superseded by the hard theory
   different-day rule.
 
@@ -98,8 +98,8 @@ Listed heaviest weight first; weights live in `config.py`.
 `validate.py` independently re-checks: placement, capacity, lab-room, daytime window,
 blackouts, room/instructor/self no-overlap, theory different-day, and the School-Settings
 hard rules — **room-type** (lab requirement), **fixed** (pinned first block), and
-**instructor-unavailable**. Cohort conflict and instructor overload are **soft metrics**,
-never hard violations.
+**instructor-unavailable**. Cohort conflict is a **soft metric**,
+never a hard violation.
 
 ### Per-school configuration (School Settings)
 
@@ -107,7 +107,7 @@ Every value above is a default tuned to our own institution; the **School Settin
 lets another school override them without touching code. A session **Settings** dict plus an
 instructor-availability map are turned into a `Config` by `settings.build_config` at solve
 time: the day window, blackout slots, Saturday / graduate toggles, block-split policy, the
-instructor daily-hours cap, and the soft-preference weights (as off / normal / strong presets)
+instructor-days target, and the soft-preference weights (as low / medium / high presets)
 are all configurable; optional course-list columns (`Year`, `Part-time`, `Room Type`, `Fixed`)
 override the string-derived cohort / part-time / lab / pin. Unconfigured settings reproduce the
 defaults documented here exactly, so this section stays the ground truth for the out-of-the-box
@@ -150,12 +150,10 @@ behavior. A downloadable "school profile" JSON persists a school's settings + av
 | $n_s$ | students in section $s$ | — | enrollment |
 | $\ell_b$ | length of block $b$ (hours) | — | T/P/L |
 | $\mathrm{lvl}_s$ | course level of section $s$ ($1\dots4$) | — | course code |
-| $C$ | daily teaching-hours cap | $4$ | `max_instr_daily_hours` |
-| $C_w$ | weekly distinct-day cap | $5$ | `max_instr_weekly_days` |
-| $W$ | weekly-load exemption threshold | $16$ | `overload_exempt_weekly` |
+| $T$ | instructor-days target (soft; excess days penalized) | $5=\text{off}$ | `max_instr_days` |
+| $T_{\text{run}}$ | maxrun threshold (soft; consecutive-hour excess) | $3$ | `max_consecutive_hours` |
 | — | undergrad end-of-day | 18:00 | `undergrad_end` |
 | — | graduate window | 18:00–21:00 | `grad_start`, `grad_end` |
-| — | evening threshold | 17:00 | `evening_from_hour` |
 | — | blackout slots (universal / full-time-only) | none | `blackout` (School Settings) |
 | — | AM/PM boundary (legacy half-day availability) | 13:00 (fixed) | `midday_split_hour` |
 | — | per-instructor unavailable slots | — | `instr_unavailable` (School Settings) |
@@ -172,7 +170,7 @@ behavior. A downloadable "school profile" JSON persists a school's settings + av
   pruning note below. The full index product is never materialized.
 - Auxiliary variables used by the objective and the different-day rule are derived from
   $x$: day-activity $z_{s,b,d}=\max_{r,h}x_{b,r,d,h}$, room-used, instructor-day indicators,
-  cohort slot-busy / first / last, and overload integers $o_{i,d}$.
+  and cohort slot-busy / first / last.
 
 **Candidate pruning (key design decision).** Per-block hard rules are enforced by *not
 creating* the variable rather than by adding a model row. `gen_candidates` emits
@@ -264,34 +262,19 @@ $$
 
 ## 5. Soft objective
 
-Minimize a weighted sum of penalties. Every preference is soft, so none can cause
-infeasibility. Weights live in `config.py`.
+The CP-SAT monolith (§7a) and the repair soft polish (§7b) minimize different weighted-sum
+objectives. Weights live in `config.py`. The two paths share the weight fields
+`w_instr_days` / `w_parttime_days` (but with different semantics — see §5.1). The repair
+polish has terms absent from the monolith (`w_idle`, `w_maxrun`, `w_room_stable`,
+`w_free_day`); the monolith has terms not in the polish objective (`w_cohort_gap`, `w_order`,
+`w_englab`). `w_cohort_conflict` appears in both but as an objective term in the monolith and
+as a no-regress guard in the polish.
 
 $$
 \min \;\; \sum_{t} w_t \cdot \mathrm{pen}_t
 $$
 
-The terms, stacked:
-
-### 5.1 S-Evening — $w_{\text{evening}}=10$
-
-$$
-\mathrm{pen}_{\text{eve}} \;=\; \sum_{b,r,d}\ \sum_{\substack{h \in \text{span}(b,h')\\ h \,\ge\, 17}} x_{b,r,d,h'}
-$$
-
-- One unit of penalty for each scheduled hour at or after `evening_from_hour` $=17$.
-- Pushes undergraduate teaching into daytime slots.
-
-### 5.2 Room count — $w_{\text{room}}=2$
-
-$$
-\mathrm{pen}_{\text{room}} \;=\; \sum_{r \in R_{\text{phys}}} y_r,
-\qquad y_r = \big[\, \textstyle\sum x_{\cdot,r,\cdot,\cdot} \ge 1 \,\big]
-$$
-
-- One unit per physical room that is used at all → consolidate into fewer rooms.
-
-### 5.3 Instructor-days — $w_{\text{instr}}=3$ (full-time), $w_{\text{pt}}=5$ (part-time)
+### 5.1 Instructor-days — $w_{\text{instr}}=10.0$ (full-time), $w_{\text{pt}}=14.0$ (part-time)
 
 $$
 \mathrm{pen}_{\text{days}} \;=\; \sum_{i,d} w_i\, \delta_{i,d},
@@ -300,18 +283,19 @@ $$
 
 - One unit per distinct day an instructor teaches → compress each instructor's week.
 - Part-time staff carry the heavier weight (fewer trips to campus).
-- This term pushes **toward** packed days — directly in tension with the overload term
-  (§6), which the weights balance.
 
-**Target lever (`instr_days_target` → `max_instr_days`).** In production this term is the
-day-count *beyond a target*, not every day: the penalty is $\max(0,\ \text{days}_i - T)$ where
-$T = $ `max_instr_days`. The School-Settings control maps **No target → $T = $ week length**
-(5, or 6 with Saturday) which is the term's **off state** (no headroom ⇒ inert ⇒ the build
-forces $w_{\text{instr}} = w_{\text{pt}} = 0$), and **≤4 / ≤3 / ≤2 → $T = 4/3/2$**, which
-creates headroom so the priority dial steers. Default is **No target** (opt-in; an untouched
-settings step reproduces today's schedule). The consolidation move in the soft polish
-(`soft_search`) is gated on $T < $ week length, so a weight alone cannot steer this term — *the
-target must create headroom first*.
+**Semantics differ by path.** In the CP-SAT monolith the weight applies to *every* teaching
+day; in the repair soft polish it applies to days **beyond the target** $T = $ `max_instr_days`
+($\max(0,\ \text{days}_i - T)$). Both paths force $w = 0$ when `instr_days_target` is "No
+target" (the default), making the term inert until the target dial is activated.
+
+**Target lever (`instr_days_target` → `max_instr_days`).** The School-Settings control maps
+**No target → $T = $ week length** (5, or 6 with Saturday) which is the term's **off state**
+(no headroom ⇒ inert ⇒ the build forces $w_{\text{instr}} = w_{\text{pt}} = 0$), and **≤4 /
+≤3 / ≤2 → $T = 4/3/2$**, which creates headroom so the priority dial steers. Default is **No
+target** (opt-in; an untouched settings step reproduces today's schedule). The consolidation
+move in the soft polish (`soft_search`) is gated on $T < $ week length, so a weight alone
+cannot steer this term — *the target must create headroom first*.
 
 **Measured steerability (2026-06-23, deluge polish, both datasets).** Same-snapshot sweep
 (`bench/instr_days_target_sweep.py`; converge once, polish each target from the identical
@@ -340,7 +324,7 @@ snapshot, $w_{\text{instr}}$ maxed). Metric = real per-instructor teaching-day d
   run `maxrun` (+28 %) and `room_stable` (+15 %) also steer stably; `free_day` flips sign —
   it is scope-controlled, not weight-steerable.
 
-### 5.4 Cohort-gap — $w_{\text{gap}}=3$
+### 5.2 Cohort idle gaps — $w_{\text{gap}}=10.0$ (monolith) / $w_{\text{idle}}=15.0$ (repair polish)
 
 $$
 \mathrm{gap}_{k,d} \;\ge\; \mathrm{last}_{k,d} - \mathrm{first}_{k,d} - \mathrm{load}_{k,d},
@@ -350,8 +334,29 @@ $$
 - Penalizes idle gaps inside a cohort's day: span (last $-$ first) minus busy hours.
 - Applies to cohorts of year level $\in\{2,3,4\}$ (`compact_cohort_years`).
 - $\mathrm{first}/\mathrm{last}$ are min/max active hour of the cohort that day.
+- In the CP-SAT monolith the weight is `w_cohort_gap=10.0`; in the repair soft polish the
+  same metric is `idle`, weighted `w_idle=15.0` (always-on, fixed — not a UI dial).
 
-### 5.5 S-Order — $w_{\text{order}}=1$
+### 5.3 Maxrun — $w_{\text{maxrun}}=10.0$ (repair polish)
+
+- Penalizes cumulative consecutive teaching hours beyond `max_consecutive_hours`=3, over both
+  cohorts and instructors.
+- Repair soft polish term only. UI dial: low / medium / high (default medium = 10.0).
+
+### 5.4 Room stability — $w_{\text{room\_stable}}=10.0$ (repair polish)
+
+- Penalizes each section that uses more than one distinct physical room across its blocks
+  ($\max(0,\lvert\text{rooms}(s)\rvert - 1)$).
+- Repair soft polish term only. UI dial: low / medium / high (default medium = 10.0).
+
+### 5.5 Free day — $w_{\text{free\_day}}=10.0$ (repair polish, year-scoped)
+
+- Penalizes each configured year-level cohort ($\in$ `free_day_year_levels`) that occupies
+  all working days (i.e. has no completely empty day in the week).
+- Controlled by year scope (multiselect in the UI), not by a weight dial — the dial cannot
+  steer this term (move-on/off verified; see §7b). Fixed weight 10.0.
+
+### 5.6 S-Order — $w_{\text{order}}=1$ (monolith)
 
 $$
 \mathrm{pen}_{\text{order}} \;=\; \sum_{b,r,d,h} w_{\text{order}}\,(4-\mathrm{lvl}_s)\,(h-9)\; x_{b,r,d,h}
@@ -362,7 +367,7 @@ $$
 - Coefficient grows with start hour and with how low the level is; level-1 and graduate
   excluded.
 
-### 5.6 S-EngLab — $w_{\text{englab}}=1$
+### 5.7 S-EngLab — $w_{\text{englab}}=1$ (monolith)
 
 $$
 \mathrm{pen}_{\text{englab}} \;=\; \sum_{\substack{b \text{ Eng. lab}\\ (r,d,h):\, d \notin \{\mathrm{Th,Fr}\}}} x_{b,r,d,h}
@@ -371,7 +376,7 @@ $$
 - One unit per Engineering **lab** block placed off Thursday/Friday (`eng_lab_days`).
 - Matches sections whose faculty contains `eng_faculty_match` $=$ "Engineering".
 
-### 5.7 Cohort-conflict — $w_{\text{coh}}=50$
+### 5.8 Cohort-conflict — $w_{\text{coh}}=50$
 
 $$
 \mathrm{excess}_{k,d,h} \;\ge\; \Big(\textstyle\sum_{c} \mathrm{busy}_{k,c,d,h}\Big) - 1,
@@ -382,79 +387,14 @@ $$
   ($\mathrm{busy}_{k,c,d,h}=\max x$ over that course's blocks in the slot).
 - A *soft* proxy: $(\text{dept},\text{year})$ over-counts conflict because students split
   across electives, so a hard rule was infeasible. High weight (50) but not prohibitive.
+- In the CP-SAT monolith this enters the objective directly; in the repair solver it is a
+  **no-regress guard** (`conf`): soft-polish moves are rejected if `conf` would increase.
 - Reported as `cohort_conflicts`; **never** a `Violation` in `validate`.
 
-### 5.8 Non-adjacent split — $w_{\text{nonadj}}=0$ (disabled)
+### 5.9 Non-adjacent split — $w_{\text{nonadj}}=0$ (disabled)
 
 - Would penalize a section's split blocks sharing a day; **superseded** for theory by the
   hard different-day rule (H_day), so the weight is $0$.
-
-### 5.9 Instructor daily overload — $w_{\text{overload}}=0$ (opt-in)
-
-- See §6.
-
-### 5.10 Instructor weekly-days overload — $w_{\text{wkover}}=0$ (opt-in)
-
-- See §6.1.
-
----
-
-## 6. Instructor daily overload (soft, opt-in)
-
-Penalizes each teaching-hour beyond the daily cap $C$, per instructor, per day.
-
-$$
-\mathrm{load}_{i,d} \;=\; \sum_{b \,:\, i \in I_b} \ell_b \cdot z_{\cdot,b,d},
-\qquad
-o_{i,d} \;\ge\; \mathrm{load}_{i,d} - C, \quad o_{i,d} \ge 0,
-\qquad
-\mathrm{pen}_{\text{over}} = \sum_{i \in \mathcal{E},\, d} o_{i,d}
-$$
-
-- $o_{i,d}$ is the hours over the cap on that day; only positive overflow is charged.
-- The objective gains $w_{\text{overload}}\sum o_{i,d}$.
-
-**Why soft, not hard.**
-
-- A hard $\mathrm{load}_{i,d}\le C$ is **infeasible**: in period 001, ~19 instructors carry
-  $>20$ h/week (service courses) and cannot fit five weekdays at 4 h.
-- As a soft term it never blocks a schedule; it just biases days apart where possible.
-- In the `model_cpsat` solve the term enters `Minimize` directly; in the `--repair` solver
-  it is realized as overload-aware greedy construction plus a polish pass (see §7b).
-
-**Weekly-load exemption set $\mathcal{E}$.**
-
-$$
-\mathcal{E} \;=\; \Big\{\, i \;:\; \sum_{s \,:\, i \in I_s}\ \sum_{b \in B_s} \ell_b \;\le\; W \,\Big\}
-$$
-
-- The penalty applies **only** to instructors with total weekly load $\le W$
-  (`overload_exempt_weekly` $=16$).
-- High-load instructors (e.g. Basic Sciences service teaching) are exempt: a 4 h/day
-  target is unreachable for them, and penalizing them only distorts placement without
-  helping. With $W=0$ the exemption is off (penalize everyone).
-- Helpers: `model.weekly_load_hours`, `model.overload_eligible_ids`.
-
-**CLI.** `--instr-overload-weight`, `--instr-daily-cap`, `--overload-exempt-weekly`.
-
-### 6.1 Weekly distinct-day overload (soft, opt-in)
-
-A parallel term penalizes each distinct teaching **day** beyond a weekly cap $C_w$
-(`max_instr_weekly_days` $=5$), per instructor:
-
-$$
-o^{\text{wk}}_i \;\ge\; \Big(\textstyle\sum_{d} \delta_{i,d}\Big) - C_w, \quad o^{\text{wk}}_i \ge 0,
-\qquad \mathrm{pen}_{\text{wkover}} = \sum_{i} o^{\text{wk}}_i
-$$
-
-- $\delta_{i,d}$ is the instructor-day indicator of §5.3, so $\sum_d \delta_{i,d}$ is the
-  instructor's distinct teaching days that week; only days **beyond** $C_w$ are charged.
-- Weight `w_instr_weekly_overload` $=0$ by default (opt-in); the School-Settings *instructor
-  weekly-days cap* (§9.1) turns it on (weight 8). Like §6 it is soft — a hard cap would be
-  infeasible for high-load instructors.
-- **No exemption set:** unlike the daily term it applies to **every** instructor (not just
-  $\mathcal{E}$). Realized in both solvers — `model_cpsat.build_and_solve` adds it to
-  `Minimize`; `repair._soft_score` charges it during greedy construction.
 
 ---
 
@@ -472,23 +412,22 @@ Both solvers share the same candidate generation and constraints.
 **(b) Repair — `repair.solve_repair` (`--repair`, production).**
 
 1. **Greedy construction (soft-shaping)** — place each block in its **lowest soft-score**
-   feasible candidate (ties broken by candidate order = best-fit room). The unified score is
-   `w_evening·evening_hours + w_cohort_conflict·new_cohort_conflicts + w_instr_overload·overload_added`.
-   Evening + cohort-conflict are **on by default** (`soft_shaping_in_repair=True`,
-   `--no-soft-shaping` to disable); overload is opt-in via its own weight. This construction
-   shaping is the main lever for soft quality — far more effective than post-hoc polish, which
-   has little maneuvering room. `new_cohort_conflicts` is myopic (sees only already-placed
-   blocks), so the reduction is partial but cheap and placement-safe.
+   feasible candidate (ties broken by candidate order = best-fit room). The soft score is
+   `w_cohort_conflict·new_cohort_conflicts` (with an `instr_days` tie-break of 1 per new
+   instructor-day beyond target, when the target is active). Cohort-conflict shaping is **on
+   by default** (`soft_shaping_in_repair=True`, `--no-soft-shaping` to disable).
+   `new_cohort_conflicts` is myopic (sees only already-placed blocks), so the reduction is
+   partial but cheap and placement-safe.
 2. **Warm-started small-neighbourhood repair** — repeatedly free a small batch of unplaced
    blocks plus their competitors and re-solve that neighbourhood with CP-SAT (soft H1,
    warm-started from the current placement); frozen blocks stay as reservations. Loop until
-   no gains. The overload term is **not** added here, so the placement objective stays pure.
-3. **Polish (overload only)** — once placement converges, re-optimize the days of
-   overloaded *eligible* instructors over already-placed blocks; the repair round's accept
-   guard never lowers placement within a neighbourhood. Bounded by `POLISH_SWEEPS`,
-   `POLISH_TL`, `POLISH_BUDGET_S`. Post-hoc polish has little maneuvering room (most blocks
-   are frozen), so it is a cheap secondary cleanup — the construction shaping in step 1 does
-   the bulk of the work.
+   no gains.
+3. **Move-based soft polish** (`soft_search.anneal_soft`) — once placement converges,
+   re-seat already-placed blocks to lower the normalized five-term objective
+   (idle / maxrun / instr_days / room_stable / free_day) under a `conf` no-regress guard.
+   Moves: relocate, chain, swap, consolidate_instr, free_cohort_day. Acceptor: Great Deluge
+   (default). Bounded by the `repair_time_limit_s` deadline; the placement count never
+   decreases (hard placement guard + accept guard).
 
 **Repair solver — top-level flow**
 
@@ -506,13 +445,8 @@ flowchart TD
     I -- Yes --> G
     I -- No --> J{gained > 0\nAND sweep < 25?}
     J -- Yes --> E
-    J -- No --> P[Polish phase\noverload opt-in]
-    P --> Q{Eligible instructor\nload > cap today?}
-    Q -- No --> R([Done\nassignments + stats])
-    Q -- Yes --> S[repair_round over\noverloaded instructor's blocks]
-    S --> T{Budget / sweeps\nexhausted?}
-    T -- No --> Q
-    T -- Yes --> R
+    J -- No --> P[Soft polish\nanneal_soft · deluge\nidle/maxrun/instr_days/room_stable/free_day]
+    P --> R([Done\nassignments + stats])
 ```
 
 **repair\_round — neighbourhood sub-solver**
@@ -537,34 +471,17 @@ Full-period result on TED University's Fall/Spring sample course lists
 arm64): 001 ≈ 99.2 % placed, 002 = 100 %, both at **0 hard conflicts** — only a 14-block
 Fall tail (0.8 %) remains, Spring fully placed.
 
-**Measured effect of the overload penalty** (period 001, $w_{\text{overload}}=30$, two
-baselines for the noise band — measured on the Grades-roster CLI path, 793 undergraduate
-sections):
-
-| metric | baseline | overload on |
-|---|---|---|
-| placed assignments | 1585–1588 | ~1570 (≈ 1 % fewer) |
-| eligible instructors with a day $>4$ h | ~50 | ~28 (≈ −45 %) |
-| eligible overload-hours | ~100 | ~47 (≈ −54 %) |
-
-The penalty is **opt-in** (`w_instr_daily_overload=0` by default), so the default schedule
-is the baseline. Enabling it trades roughly **1 % placement** for a large drop in eligible
-instructors teaching more than the cap. Exempt (high-load) instructors are unchanged by
-design — the worst single day stays at 9 h.
-
-**Measured effect of soft-shaping** (period 001, evening + cohort-conflict, **on by default**,
+**Measured effect of soft-shaping** (period 001, cohort-conflict, **on by default**,
 two `--no-soft-shaping` baselines for the noise band):
 
 | metric | baseline (off) | shaping on |
 |---|---|---|
 | placed assignments | 1581–1584 | 1602 (no loss — slightly higher) |
-| evening ratio | ~19.4 % | 12.6 % (≈ −35 %) |
 | cohort-conflict (proxy) | ~540–575 | 384 (≈ −31 %) |
 
-Unlike the overload penalty, soft-shaping costs **no placement** (spreading cohorts and
-avoiding evenings also distributes load and improves packing). Both student-facing metrics
-drop by roughly a third versus the manual program's far worse 32.5 % evening / 139
-cohort-conflicts (and 0 hard violations vs the program's 83).
+Soft-shaping costs **no placement** (spreading cohorts also distributes load and improves
+packing). The cohort-conflict proxy drops by roughly a third versus the manual program's
+far worse 139 cohort-conflicts (and 0 hard violations vs the program's 83).
 
 **Soft-polish acceptor — full Fall + Spring A/B** (the move-based polish
 `soft_search.anneal_soft` uses an *acceptance rule* to decide which neighbourhood moves to
@@ -594,9 +511,36 @@ follows the weight gradient predictably, so 3 of 4 dials steer sign-stably in *b
 LAHC/SCHC wander and steer noisily; at the production history length they coincide.
 
 ¹ `instr_days` only steers when its target is below the working-week length
-(`max_instr_days < len(days)`); the A/B set `max_instr_days = 2` for headroom. `free_day` does
-not reliably steer under deluge and ships scope-only (year selection). Timings are Apple M1
-Pro; the harness ran an x86_64 Rosetta Python, so native arm64 is somewhat faster.
+(`max_instr_days < len(days)`); the A/B set `max_instr_days = 2` for headroom. `free_day` is
+not weight-steerable and ships scope-only (year selection) — but it is *not* inert; see the
+move-on/off verification below. Timings are Apple M1 Pro; the harness ran an x86_64 Rosetta
+Python, so native arm64 is somewhat faster.
+
+**`free_day` — why the steerability table understates it, and how it is actually verified.**
+The `selected_gain` metric above is the *wrong* test for `free_day`. It compares maxing the dial
+($w_{\text{free\_day}}=20$) against the uniform profile ($w=10$) with the **compound move
+running in both arms**, so it measures only *weight*-responsiveness — and the move already does
+its job at $w=10$, so doubling the weight adds nothing (≈ 0 %, sign-unstable `~`). The right test
+is **move-on vs move-off** (`bench/free_day_move_ab.py`): from one converged snapshot, run the
+polish with the `try_free_cohort_day` compound move enabled vs disabled, the `free_day` weight
+fixed in both arms, and count the cohorts that end up with a free day. The move — which
+atomically vacates a configured cohort's least-loaded day, relocating every block off it or
+reverting wholesale — genuinely frees more cohort-days, sign-consistent across seeds with `conf`
+held at baseline, on **both** periods:
+
+| period | cohorts with a free day, move OFF → ON | `free_day` term | `conf` |
+| --- | --- | --- | --- |
+| Fall (001), N=400, 5 seeds | 25.8 [25,26] → **29.4 [29,30]** (+3.6 of 41) | 15.2 → 11.6 | 52 (held) |
+| Spring (002), N=250, 3 seeds | 13.0 [13,13] → **14.7 [14,15]** (+1.7 of 24) | 11.0 → 9.3 | 40 (held) |
+
+So the feature **works in absolute terms** — the *move* frees cohort-days; the *weight dial*
+simply cannot steer it, which is why the UI exposes `free_day` as a **scope control only** (the
+year multiselect; `_WEIGHT_KNOBS = ("maxrun", "instr_days", "room_stable")` omits it) rather than
+an off/normal/strong dial. The cohorts that keep all five days are feasibility-locked — their
+blocks cannot fit into four days under the room/instructor constraints, so no weight or move can
+free them. (Operational note: `gen_candidates` for Spring is memory-superlinear in $N$ — N=400
+needs ≈ 2.5 GiB resident and thrashes a low-free-RAM machine into a 0 %-CPU swap hang during
+converge; use a smaller $N$ for Spring polish benches.)
 
 ---
 
@@ -606,9 +550,9 @@ Pro; the harness ran an x86_64 Rosetta Python, so native arm64 is somewhat faste
 no solver internals, so a model/encoding bug cannot pass silently. It checks: room,
 instructor, capacity, **lab_room**, **room_type** (categorical room demand), **fixed** (pinned
 first block), window ($<$ 18:00 undergrad), blackout, **instructor_unavailable** (per-instructor
-availability), H_self, and **split_day** (theory different-day). Cohort conflict and instructor
-overload (daily and weekly) are **soft metrics**, not
-`Violation`s — reported in `mode_b_<period>.json` / `unmet_soft`, never failing validation.
+availability), H_self, and **split_day** (theory different-day). Cohort conflict is a **soft
+metric**, not a `Violation` — reported in `mode_b_<period>.json` / `unmet_soft`, never failing
+validation.
 
 ### 8.1 Independent verification run (2026-06-23)
 
@@ -628,7 +572,7 @@ violations across all 11 checked kinds**:
 | soft: instr_days / free_day / conf | 0 / 0 / 229 | 0 / 0 / 230 |
 
 `instr_days = 0` and `free_day = 0` because their controls are off by default (No target / no
-year scope, §5.3); `conf` is the **soft** cohort-conflict proxy (§5.7), not a hard violation.
+year scope, §5.1 / §5.5); `conf` is the **soft** cohort-conflict proxy (§5.8), not a hard violation.
 
 **Why this run uses CP-SAT — and what that implies.** `repair` is *not* solver-free. The
 production solver is `greedy_construct` (pure Python: candidate pruning + `State` no-overlap)
@@ -667,8 +611,7 @@ every bad field falls back to its default and the solve proceeds.
 | Day end | 13–21 | `undergrad_end` | undergrad end-of-day window (default 18:00) |
 | Max theory session | 1–6 | `max_theory_session` | longest single theory session before splitting (default 2 h) |
 | Max block length | 1–8 | `max_block_len` | longest lab block before splitting (default 4 h) |
-| Instructor daily cap | 0–12 | `max_instr_daily_hours` + `w_instr_daily_overload` | **0 = off** (cap 4 h, weight 0); **N>0** sets cap = N h and turns the soft daily-overload term on (weight 5). See §6. |
-| Instructor weekly-days cap | 0–6 | `max_instr_weekly_days` + `w_instr_weekly_overload` | **0 = off** (cap 5 days, weight 0); **N>0** sets the weekly distinct-day cap = N and turns the soft weekly-overload term on (weight 8). See §6.1. |
+| Instructor-days target | No target / ≤4 / ≤3 / ≤2 | `max_instr_days` + `w_instr_days` | No target → term off (weight forced 0); ≤4/≤3/≤2 sets target and activates the instr_days soft term. See §5.1. |
 | Saturday | checkbox | `saturday_enabled` | add Sa to the teaching week |
 | Graduate | checkbox | `include_grad` | enable the graduate window (blocks end by 21:00) |
 | Graduate earliest start | 6–20 | `grad_start` | earliest hour a graduate block may start (default 18:00; only shown/used when Graduate is on). Lower it to allow daytime graduate classes; guarded to `day_start ≤ grad_start < 21`, else reverts to 18. |
@@ -678,19 +621,21 @@ The day window is guarded (`0 ≤ day_start < day_end ≤ 21`); out-of-order val
 revert to `9 / 18`. The AM/PM boundary for legacy half-day availability is no longer a
 user-facing control — it is fixed at 13:00.
 
-### 9.2 Preference weights (off / normal / strong presets)
+### 9.2 Preference weights (low / medium / high presets)
 
-Schools pick a **plain-language level**, never a raw number — the presets (`WEIGHT_PRESETS`)
-keep the calibrated relative scale intact.
+Schools pick a **plain-language level**, never a raw number. Presets: `UI_REF=20.0` ×
+`WEIGHT_LEVELS` → low=5.0, medium=10.0, high=20.0 (uniform across all dials).
 
-| UI control | `Config` field(s) | off / normal / strong |
+| UI control | `Config` field(s) | low / medium / high |
 |---|---|---|
-| Avoid evenings | `w_evening` (§5.1) | 0 / 10 / 30 |
-| Cohort compactness | `w_cohort_gap` (§5.4) | 0 / 3 / 8 |
-| Fewer rooms | `w_room_count` (§5.2) | 0 / 2 / 6 |
-| Compress instructor weeks | `w_instr_days` (§5.3) | 0 / 3 / 8 |
+| Maxrun | `w_maxrun` (§5.3) | 5.0 / 10.0 / 20.0 |
+| Instructor days¹ | `w_instr_days` / `w_parttime_days` (§5.1) | 5.0 / 10.0 / 20.0 |
+| Room stability | `w_room_stable` (§5.4) | 5.0 / 10.0 / 20.0 |
 
-`w_parttime_days` is derived, not exposed: `w_instr_days + 2` when on, else 0.
+`free_day` (§5.5) has a fixed weight of 10.0 and is not exposed as a dial — only its year scope
+(multiselect) is configurable. `w_cohort_gap=10.0` is fixed at medium and not exposed.
+¹ Only active when `instr_days_target` is set; `w_parttime_days = w_instr_days + 4.0` when
+active, else 0.
 
 ### 9.3 Blackouts (add/remove list)
 
@@ -729,9 +674,10 @@ when the upload path validates the schema defensively.
   `Part-time`, `Room Type`, and `Fixed` override the string-derived cohort / part-time / lab /
   pinned-slot per row (§0, §3).
 - **Fixed at `config.py` defaults — deliberately not exposed:** the cohort-conflict weight
-  (`w_cohort_conflict=50`, §5.7), level-ordering (`w_order`, §5.5), Engineering-lab preference
-  (`w_englab`, §5.6), the weekly-load overload exemption (`overload_exempt_weekly=16`, §6), and
-  the repair soft-shaping toggle (§7b). These are calibrated globals, not per-school policy.
+  (`w_cohort_conflict=50`, §5.8), the always-on idle weight (`w_idle=15.0`, §5.2),
+  cohort-compactness (`w_cohort_gap=10.0`, §5.2), level-ordering (`w_order`, §5.6),
+  Engineering-lab preference (`w_englab`, §5.7), and the repair soft-shaping toggle (§7b).
+  These are calibrated globals, not per-school policy.
 
 ---
 
@@ -856,7 +802,7 @@ neighbourhoods.
 | Greedy construction | $O(BP\ell\iota)$ | $O(B\ell\iota)$ state | repair.py:120 |
 | Repair sweep loop | $\le 25\lceil B/30\rceil=O(B)$ rounds | $O(1)$ live model | repair.py:324-341 |
 | — each `repair_round` | build $O(FP\ell\iota)$; solve $\le$ 12 s | $O(1)$, $F\le 240$ | repair.py:177 |
-| Polish (overload, opt-in) | $\le 4$ sweeps, $\le$ `POLISH_BUDGET_S`=240 s | $O(1)$ | repair.py:346-369 |
+| Polish (move-based soft, opt-in) | remaining `repair_time_limit_s` budget | $O(1)$ | soft_search.py:anneal_soft |
 
 - **Greedy construction** checks each candidate with `free_to_place` ($O(\ell\iota)$) and, with
   soft-shaping on, `_soft_score` ($O(\ell)$) — repair.py:35-117. Linear overall.

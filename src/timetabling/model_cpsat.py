@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import List, Dict, Tuple
 from collections import defaultdict
+import os
 
 from ortools.sat.python import cp_model
 
@@ -251,7 +252,7 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
 
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = cfg.solve_time_limit_s
-    solver.parameters.num_search_workers = 8
+    solver.parameters.num_search_workers = int(os.environ.get("CPSAT_MAX_WORKERS", 8))
     status = solver.Solve(model)
 
     assignments: List[Assignment] = []

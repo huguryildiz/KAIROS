@@ -375,19 +375,30 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
 .smg-blk::after{content:"";position:absolute;left:5px;right:5px;top:5px;height:2px;border-radius:2px;background:rgba(255,255,255,.45);}
 .smg-sweep{position:absolute;inset:0;border-radius:6px;overflow:hidden;pointer-events:none;}
 .smg-sweep::after{content:"";position:absolute;top:-20%;bottom:-20%;left:-40%;width:30%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent);transform:skewX(-14deg);animation:gridSweep 8s 1.9s ease-in-out infinite;}
-/* Label row — !important needed; Streamlit's div{color:var(--ink)} overrides inherited white */
-.solve-label{display:flex;align-items:center;gap:9px;font:700 .95rem/1 var(--font);color:#fff!important;}
-/* Progress bar */
-.solve-progress-track{height:5px;border-radius:99px;background:rgba(255,255,255,.13);overflow:hidden;}
-.solve-progress-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,#8E9BF2,#B8C4F5);width:0%;transition:width .9s linear;}
-/* In-progress spinner gear */
-.solve-gear{width:18px;height:18px;flex:none;
-  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='white' d='M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z'/%3E%3C/svg%3E") center/contain no-repeat;
-  animation:solveSpin .9s linear infinite;}
-@keyframes solveSpin{to{transform:rotate(360deg);}}
-/* Solve button — LEFT-aligned, auto-width, shimmer on load; CSS SVG gear nudges on click
-   (the continuous gear rotation appears in the .solve-gear loading state while solving).
-   transform-origin centred so the gear spins about its own hub. */
+/* Step progress bar — 5-node horizontal stepper, Python-driven (views/solve.py _render_card).
+   Line fill uses CSS @keyframes reading --sp-fw so animation replays on each DOM refresh. */
+.sp-wrap{position:relative;margin:2px 0;}
+.sp-line-bg{position:absolute;top:17px;left:10%;right:10%;height:2px;background:rgba(255,255,255,.10);border-radius:2px;}
+.sp-line-fill{position:absolute;top:17px;left:10%;height:2px;background:linear-gradient(90deg,#4CAF7D,#6B7FE8 60%,#9BB5FF);border-radius:2px;box-shadow:0 0 8px rgba(155,181,255,.4);animation:spLine .75s ease-out forwards;}
+@keyframes spLine{from{width:0}to{width:var(--sp-fw,0%)}}
+.sp-nodes{display:flex;position:relative;}
+.sp-node{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px;}
+/* Base dot — upcoming step */
+.sp-dot{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:700 .78rem/1 var(--mono);position:relative;z-index:1;background:rgba(255,255,255,.07);color:rgba(255,255,255,.28);border:2px solid rgba(255,255,255,.10);}
+/* Completed dot — green pop-in with stagger via inline animation-delay */
+.sp-node.sp-done .sp-dot{background:linear-gradient(135deg,#3DA86B,#5EE89A);color:#fff;border-color:rgba(94,232,154,.45);box-shadow:0 0 14px -3px rgba(94,232,154,.5);animation:spPop .38s cubic-bezier(.34,1.32,.5,1) both;}
+@keyframes spPop{from{transform:scale(.5);opacity:0}to{transform:scale(1);opacity:1}}
+/* Active dot — blue/purple glow + infinite pulse ring */
+.sp-node.sp-active .sp-dot{background:linear-gradient(135deg,#6B7FE8,#9BB5FF);color:#fff;border-color:rgba(155,181,255,.55);box-shadow:0 0 16px -3px rgba(155,181,255,.65);}
+.sp-node.sp-active .sp-dot::after{content:"";position:absolute;inset:-8px;border-radius:50%;border:2px solid rgba(155,181,255,.38);animation:spRing 1.9s ease-out infinite;}
+@keyframes spRing{0%{transform:scale(1);opacity:.8}100%{transform:scale(1.6);opacity:0}}
+/* Labels */
+.sp-lbl{font:.55rem/1.2 var(--font);color:rgba(190,200,240,.42);text-align:center;letter-spacing:.02em;}
+.sp-node.sp-done .sp-lbl{color:rgba(94,232,154,.68);}
+.sp-node.sp-active .sp-lbl{color:#9BB5FF;font-weight:700;}
+/* Detail line below the stepper */
+.sp-detail{font:.78rem/1 var(--font);color:rgba(200,210,255,.62);text-align:center;padding-top:4px;}
+/* Solve button — LEFT-aligned, auto-width, shimmer on load; SVG gear nudges on click. */
 .st-key-solve_btn{display:flex;justify-content:flex-start;}
 .st-key-solve_btn button{position:relative;overflow:hidden;padding:12px 40px!important;display:inline-flex!important;align-items:center;justify-content:center;gap:7px;}
 .st-key-solve_btn button::before{content:"";display:inline-block;flex:none;width:20px;height:20px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='white' d='M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z'/%3E%3C/svg%3E") center/contain no-repeat;transform-origin:50% 50%;}

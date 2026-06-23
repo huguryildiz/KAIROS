@@ -1,4 +1,4 @@
-<!-- markdownlint-disable MD033 -->
+<!-- markdownlint-disable MD033 MD041 -->
 <!-- Inline HTML is intentional: centered hero header and badge row. -->
 
 <p align="center">
@@ -112,18 +112,27 @@ Most hard rules are enforced **during candidate generation** — only legal `(ro
 
 ### Soft objective (minimized)
 
-| Term | Weight | Intent |
-| --- | --- | --- |
-| **Cohort conflict** (`w_cohort_conflict`) | 50 | Same-course sections may run in parallel; different courses in a `(dept, year)` cohort incur a penalty — a hard cohort rule was proven INFEASIBLE at scale |
-| **Evening use** (`w_evening`) | 10 | Discourage ≥17:00 slots |
-| **Part-time day-compactness** (`w_parttime_days`) | 5 | Cluster a part-time instructor's days |
-| **Instructor day-compactness** (`w_instr_days`) | 3 | Fewer distinct teaching days per instructor |
-| **Cohort daily gap** (`w_cohort_gap`) | 3 | Minimize student idle gaps within a day |
-| **Room compactness** (`w_room_count`) | 2 | Reuse fewer distinct rooms |
-| **Course-level ordering** (`w_order`, S-Order) | 1 | Lower-level courses earlier in the day |
-| **Engineering lab days** (`w_englab`, S-EngLab) | 1 | Engineering labs prefer Thu/Fri |
+The CP-SAT monolith (small scopes, ≤50 sections) and the repair soft polish (full period) minimize separate weighted-sum objectives. All weights live in `Config` at [`src/timetabling/config.py`](src/timetabling/config.py).
 
-All weights live in the `Config` dataclass at [`src/timetabling/config.py`](src/timetabling/config.py).
+**Repair soft polish** (`soft_search.anneal_soft`, deluge acceptor — primary path for full-period solves):
+
+| Term | Default weight | Intent |
+| --- | --- | --- |
+| **Student idle gaps** (`w_idle`) | 15 | Minimize idle hours inside a cohort's day — always-on, fixed weight |
+| **Anti-fatigue** (`w_maxrun`) | 10 | Penalize consecutive teaching runs longer than `max_consecutive_hours` |
+| **Instructor day-compactness** (`w_instr_days` / `w_parttime_days`) | 10 / 14 | Fewer teaching days beyond the `instr_days_target` dial (No target = off) |
+| **Room stability** (`w_room_stable`) | 10 | Penalize sections that use more than one room across their blocks |
+| **Free day** (`w_free_day`) | 10 | Reward each configured year-level cohort that has at least one free weekday — scope-controlled (year multiselect), not weight-steerable |
+
+**CP-SAT monolith** (`model_cpsat.py` — small scopes):
+
+| Term | Default weight | Intent |
+| --- | --- | --- |
+| **Cohort conflict** (`w_cohort_conflict`) | 50 | Different courses in a `(dept, year)` cohort incur a penalty — a hard cohort rule was proven INFEASIBLE at scale |
+| **Student idle gaps** (`w_cohort_gap`) | 10 | Minimize idle hours inside a cohort's day |
+| **Instructor day-compactness** (`w_instr_days` / `w_parttime_days`) | 10 / 14 | Fewer distinct teaching days per instructor |
+| **Course-level ordering** (`w_order`) | 1 | Lower-level courses earlier in the day |
+| **Engineering lab days** (`w_englab`) | 1 | Engineering labs prefer Thu/Fri |
 
 ---
 
@@ -157,6 +166,14 @@ The pipeline is a chain of small, single-purpose modules. A course list becomes 
 │   different-day · soft objective         │
 └──────────────────────────────────────────┘
                       │
+                      ▼  (repair path only)
+┌──────────────────────────────────────────┐
+│   soft polish                            │
+│   anneal_soft · deluge acceptor          │
+│   idle / maxrun / instr_days /           │
+│   room_stable / free_day                 │
+└──────────────────────────────────────────┘
+                      │
                       ▼
 ┌──────────────────────────────────────────┐
 │   validate                               │
@@ -183,11 +200,11 @@ The pipeline is a chain of small, single-purpose modules. A course list becomes 
 | Validation | Solver-independent re-derivation (`validate.py`) |
 | Web app | **Streamlit** ≥ 1.40 — one container, no separate frontend build |
 | i18n / theming | Bilingual TR/EN · light/dark CSS design tokens |
-| Testing | **pytest** — 209 tests |
+| Testing | **pytest** — 269 tests |
 | Packaging | Docker (`python:3.11-slim`) |
 | Deployment | **Google Cloud Run** — EU region, IAM-gated, scale-to-zero |
 
-The architecture rests on a deliberate split between solving and checking: `model_cpsat.py` and `repair.py` produce a schedule, and `validate.py` re-derives every hard violation from the assignment list with no knowledge of the solver's internals — so a model bug surfaces as a reported violation instead of a silent error.
+The architecture rests on a deliberate split between solving and checking: `model_cpsat.py` and `repair.py` produce a schedule (the repair path adds a `soft_search.py` polish phase after convergence), and `validate.py` re-derives every hard violation from the assignment list with no knowledge of the solver's internals — so a model bug surfaces as a reported violation instead of a silent error.
 
 ---
 
@@ -199,8 +216,8 @@ A single-page progressive flow that walks a user from raw CSV to a placed timeta
 | --- | --- |
 | **1 · Data** | One numbered step bundling three sub-sections: **upload** a course-list CSV — or press **Try with sample dataset** (100 sections across 18 departments, bundled, PII-free); a **review** with a KPI summary (sections, courses, departments, instructors) and non-blocking data-quality warnings; and an editable **classroom** inventory — add / edit / delete rooms with capacity and a categorical **Type** (`normal/lab/pc/studio`), 103 PII-free defaults preloaded, the `Online` virtual room added automatically |
 | **2 · School Settings** | Optional per-school config: day window, lunch-break protection, blackout slots, Saturday / graduate toggles (incl. a configurable graduate earliest-start hour for daytime grad classes), block-split policy, instructor daily-hours and weekly-days caps, preference-weight presets, and per-hour instructor availability — backward-compatible (untouched = today's defaults) |
-| **3 · Solve** | One **Solve** button → blocking spinner → placement summary, under a fixed 3000 s budget |
-| **4 · Results** | Weekly Mon–Fri grid, view by cohort / room / instructor / department / course, conflict + unschedulable lists, and `schedule.json` / `schedule.csv` download |
+| **3 · Solve** | One **Solve** button → real-time 5-phase progress (candidates → construct → repair sweeps → soft polish → validate) with a Python-driven step indicator and premium animated progress bar, under a fixed 3000 s budget |
+| **4 · Results** | Weekly Mon–Fri grid, view by cohort / room / instructor / department / course, conflict + unschedulable lists, and `schedule.json` / `schedule.csv` / multi-page PDF download |
 
 The course-list CSV may carry optional columns — `Year`, `Part-time`, `Room Type`, `Fixed` — that override the cohort year / part-time flag / room-type demand (`normal/lab/pc/studio`) / pinned slot otherwise derived from the course code and instructor name (absent → derived as before).
 
@@ -233,14 +250,16 @@ src/timetabling/        The solver and pipeline (importable, framework-free)
 ├── pipeline.py         run_pipeline() — one solve path shared by CLI and UI
 ├── defaults.py         PII-free default classroom inventory (103 rooms)
 ├── i18n.py             Bilingual TR/EN string catalog
-├── drum_picker_widget.py  Custom hour-drum Streamlit component (School-Settings time pickers)
+├── soft_search.py      Move-based local-search soft polish (anneal_soft, deluge acceptor — post-convergence phase of repair)
+├── pdf_export.py       Landscape-A4 PDF timetable export (fpdf2, DejaVuSans for Turkish glyphs)
+├── csv_import.py       UI-side CSV upload helper (encoding detection, header validation)
 ├── ui_*.py             Streamlit theming, grid, input, app-shell helpers
 └── __main__.py         CLI / pipeline orchestration
 
 views/                  Streamlit step renderers — upload, review, classrooms, settings, solve, results
 app.py                  Single-page app shell (app bar + stepper + hero + sections)
 assets/                 Brand SVGs + bundled PII-free sample course list + sample classroom inventory
-tests/                  pytest suite (209 tests)
+tests/                  pytest suite (269 tests)
 MODEL.md                Full model + rules + design rationale
 Dockerfile              Streamlit + OR-Tools image for Cloud Run
 cloudbuild.yaml         Cloud Run continuous deploy (push to main)
@@ -260,10 +279,10 @@ python3 -m pip install -r requirements.txt   # pandas, ortools, pytest, streamli
 PYTHONPATH=src streamlit run app.py
 
 # Run the tests
-python3 -m pytest -q                         # 209 tests
+python3 -m pytest -q                         # 256 tests on the sample dataset (269 with institutional data in data/)
 ```
 
-> The web app and tests need **no private data** — classroom defaults come from `defaults.py` and a PII-free sample course list ships in `assets/`. The real institutional CSVs live in `data/`, which is git-ignored and absent from fresh clones.
+> The web app and **most** tests need **no private data** — classroom defaults come from `defaults.py` and a PII-free sample course list ships in `assets/`. The real institutional CSVs live in `data/`, which is git-ignored and absent from fresh clones; only the legacy CLI Grades-path tests (`io_csv` / `join` / `derive`, 13 tests) require them.
 
 ### Docker (local)
 

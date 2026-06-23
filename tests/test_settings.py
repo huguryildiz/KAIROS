@@ -12,15 +12,15 @@ def test_default_settings_build_config_matches_today():
     assert cfg.undergrad_end == 18
     assert cfg.blackout == ()
     assert cfg.saturday_enabled is False
-    assert cfg.include_grad is False
+    assert cfg.include_grad is True
     assert cfg.midday_split_hour == 13
     assert cfg.max_theory_session == 2
     assert cfg.max_block_len == 4
     # uniform 0-1 UI scale: every "normal" toggle -> 0.5 x UI_REF(20) = 10
     assert cfg.w_cohort_conflict == 50
     assert cfg.w_cohort_gap == 10
-    assert cfg.w_instr_days == 10
-    assert cfg.w_parttime_days == 14
+    assert cfg.w_instr_days == 0      # instr_days default target is "No target" -> dial off
+    assert cfg.w_parttime_days == 0
     assert cfg.solve_time_limit_s == 3000.0
     assert cfg.repair_time_limit_s == 3000.0
     assert cfg.instr_unavailable == frozenset()
@@ -148,7 +148,7 @@ def test_availability_labels_keyed_by_email_or_name():
         {"Instructor Name": "A. Yilmaz", "Instructor Email": "a@x.edu"},
         {"Instructor Name": "Mustafa Yuksel (S)", "Instructor Email": ""},
     ]
-    labels, label_to_id = _email_labels(courses)
+    labels, label_to_id, _id_to_name = _email_labels(courses)
     ids = set(label_to_id.values())
     assert "a@x.edu" in ids                 # email identity when present
     assert "mustafa yuksel" in ids          # normalized-name identity when no email

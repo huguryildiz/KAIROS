@@ -303,6 +303,43 @@ $$
 - This term pushes **toward** packed days — directly in tension with the overload term
   (§6), which the weights balance.
 
+**Target lever (`instr_days_target` → `max_instr_days`).** In production this term is the
+day-count *beyond a target*, not every day: the penalty is $\max(0,\ \text{days}_i - T)$ where
+$T = $ `max_instr_days`. The School-Settings control maps **No target → $T = $ week length**
+(5, or 6 with Saturday) which is the term's **off state** (no headroom ⇒ inert ⇒ the build
+forces $w_{\text{instr}} = w_{\text{pt}} = 0$), and **≤4 / ≤3 / ≤2 → $T = 4/3/2$**, which
+creates headroom so the priority dial steers. Default is **No target** (opt-in; an untouched
+settings step reproduces today's schedule). The consolidation move in the soft polish
+(`soft_search`) is gated on $T < $ week length, so a weight alone cannot steer this term — *the
+target must create headroom first*.
+
+**Measured steerability (2026-06-23, deluge polish, both datasets).** Same-snapshot sweep
+(`bench/instr_days_target_sweep.py`; converge once, polish each target from the identical
+snapshot, $w_{\text{instr}}$ maxed). Metric = real per-instructor teaching-day distribution
+(target-independent, so comparable across targets). As the target tightens **No target → ≤4 →
+≤3**, mean teaching-days falls **monotonically** and the matching $\le k$ share climbs, with
+`conf` held at baseline (no placement/conflict regression) on **both** Fall (001) and Spring
+(002):
+
+| target | 001 mean days | 001 %≤3 | 002 mean days | 002 %≤3 |
+| --- | --- | --- | --- | --- |
+| No target | 3.82 | 36% | 3.65 | 41% |
+| ≤4 | 3.54 | 39% | 3.40 | 43% |
+| ≤3 | 3.38 | **56%** | 3.22 | **61%** |
+| ≤2 | 3.38 | 55% | 3.23 | 60% |
+
+*(full data, ~97%/93% greedy snapshot, 2 seeds, 20 s polish; `conf` 229/230 held throughout.)*
+
+- **≤3 is the reliable sweet spot:** the largest clean monotone gain, %≤3 jumps to ~56–61%.
+- **≤2 saturates near ≤3 under a short polish budget.** With more relative budget it separates
+  (N=400, fully-converged snapshot, 12 s: ≤2 mean **2.79** vs ≤3 **2.96** on 001, and **2.76**
+  vs **2.86** on 002; %≤2 climbs to **54%** on both) — so ≤2 is realizable but wants the longer
+  production solve budget.
+- **Multi-seed gate** (`bench/acceptor_ab.py`, deluge, N=400, 5 seeds, $T=2$): `instr_days`
+  selected_gain **+57.8 % [+54 %, +61 %]**, sign-stable (no flip), `conf` held. In the same
+  run `maxrun` (+28 %) and `room_stable` (+15 %) also steer stably; `free_day` flips sign —
+  it is scope-controlled, not weight-steerable.
+
 ### 5.4 Cohort-gap — $w_{\text{gap}}=3$
 
 $$

@@ -78,7 +78,27 @@ def _work_days(s) -> list:
     return ["Mo", "Tu", "We", "Th", "Fr"] + (["Sa"] if s.get("saturday") else [])
 
 
+_SELECT_ALL_CSS = {
+    "tr": "Tümünü seç",
+    "en": "Select all",
+}
+
+
 def render(lang: str) -> None:
+    if lang == "tr":
+        st.markdown(
+            "<style>"
+            "[data-testid='stMultiSelectOption']:first-child span,"
+            "[data-testid='stMultiSelectOption']:first-child div[class*='label'],"
+            "[data-testid='stMultiSelectOption']:first-child p"
+            "{font-size:0!important;line-height:0!important;}"
+            "[data-testid='stMultiSelectOption']:first-child span::before,"
+            "[data-testid='stMultiSelectOption']:first-child div[class*='label']::before,"
+            "[data-testid='stMultiSelectOption']:first-child p::before"
+            "{content:'Tümünü seç';font-size:14px!important;line-height:1.5!important;}"
+            "</style>",
+            unsafe_allow_html=True,
+        )
     st.markdown(eyebrow_html(2, t("step_settings", lang), "settings"),
                 unsafe_allow_html=True)
     st.caption(t("set_caption", lang))
@@ -164,9 +184,14 @@ def _policy(lang: str, s: dict) -> None:
         # free_day: controlled by which cohort year-levels want a free day (the gate showed a
         # strength slider can't steer it; the year selection IS its on/off control).
         cur_years = [int(y) for y in s.get("free_day_years", []) if str(y).strip().isdigit()]
+        st.markdown(
+            "<style>.st-key-set_free_day_years{max-width:320px;}</style>",
+            unsafe_allow_html=True,
+        )
         picked = st.multiselect(t("set_free_day_years", lang), [1, 2, 3, 4, 5, 6],
                                 default=[y for y in cur_years if 1 <= y <= 6],
-                                format_func=lambda y: t("set_year_n", lang, n=y),
+                                format_func=lambda y: t(f"set_year_{y}", lang),
+                                placeholder=t("set_free_day_years_placeholder", lang),
                                 help=t("set_free_day_years_help", lang),
                                 key="set_free_day_years")
         s["free_day_years"] = list(picked)
@@ -313,7 +338,7 @@ def _fmt_ranges(hours) -> list:
 
 
 def _availability(lang: str) -> None:
-    with st.expander(t("set_avail_header", lang), icon=":material/event_available:"):
+    with st.expander(t("set_avail_header", lang), icon=":material/event_available:", expanded=True):
         labels, label_to_email, email_to_name = _email_labels(st.session_state.get("courses", []))
         if not labels:
             st.caption(t("set_avail_none_instr", lang))
@@ -323,7 +348,9 @@ def _availability(lang: str) -> None:
         dl = DAY_LABELS.get(lang, DAY_LABELS["en"])
         rev = st.session_state.get("set_rev", 0)
         st.caption(t("set_avail_hint", lang))
-        selected_label = st.selectbox(t("set_avail_pick", lang), labels, key=f"av_who_{rev}")
+        st.markdown("<style>.st-key-av_who_wrap{max-width:400px;}</style>", unsafe_allow_html=True)
+        with st.container(key="av_who_wrap"):
+            selected_label = st.selectbox(t("set_avail_pick", lang), labels, key=f"av_who_{rev}")
         who = label_to_email[selected_label]
 
         days = _work_days(s)

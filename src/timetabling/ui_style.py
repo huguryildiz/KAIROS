@@ -327,6 +327,7 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
 .imp-req-val.unmet{color:var(--error);}
 .imp-req-val.warn{color:var(--warn);}
 .imp-req-fields{font:500 .7rem/1 var(--mono);opacity:.65;color:inherit;}
+.imp-req-met{font:600 .8rem/1 var(--font);color:var(--good);flex:none;}
 .imp-detect{margin:0 0 4px;}
 .imp-detect-head{display:flex;align-items:center;gap:9px;margin-bottom:11px;}
 .imp-detect-head .lbl{font:700 .64rem/1 var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.13em;}
@@ -1666,12 +1667,20 @@ def detected_columns_html(detected: list, lang: str = DEFAULT_LANG,
     else:
         tone, icon = "met", _icon_met
         msg = t("import_min_met", lang)
-    req_val = (f'<span class="imp-req-val {tone}">'
-               f'<span class="imp-req-fields">{req_fields_str}</span>'
-               f'{msg}</span>')
+    if tone == "met":
+        met_badge = f'<span class="imp-req-met">{msg}</span>'
+        req_val = (f'<span class="imp-req-val {tone}">'
+                   f'<span class="imp-req-fields">{req_fields_str}</span>'
+                   f'</span>')
+    else:
+        met_badge = ""
+        req_val = (f'<span class="imp-req-val {tone}">'
+                   f'<span class="imp-req-fields">{req_fields_str}</span>'
+                   f'{msg}</span>')
 
     req_row = (f'<div class="imp-req-row {tone}">'
                f'{icon}'
+               f'{met_badge}'
                f'<span class="imp-req-lbl">{t("import_min_req", lang)}</span>'
                f'{req_val}</div>')
 

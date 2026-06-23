@@ -216,7 +216,7 @@ A single-page progressive flow that walks a user from raw CSV to a placed timeta
 | --- | --- |
 | **1 · Data** | One numbered step bundling three sub-sections: **upload** a course-list CSV — or press **Try with sample dataset** (100 sections across 18 departments, bundled, PII-free); a **review** with a KPI summary (sections, courses, departments, instructors) and non-blocking data-quality warnings; and an editable **classroom** inventory — add / edit / delete rooms with capacity and a categorical **Type** (`normal/lab/pc/studio`), 103 PII-free defaults preloaded, the `Online` virtual room added automatically |
 | **2 · School Settings** | Optional per-school config: day window, lunch-break protection, blackout slots, Saturday / graduate toggles (incl. a configurable graduate earliest-start hour for daytime grad classes), block-split policy, instructor daily-hours and weekly-days caps, preference-weight presets, and per-hour instructor availability — backward-compatible (untouched = today's defaults) |
-| **3 · Solve** | One **Solve** button → real-time 5-phase progress (candidates → construct → repair sweeps → soft polish → validate) with a Python-driven step indicator and premium animated progress bar, under a fixed 3000 s budget |
+| **3 · Solve** | **Solve** button — disabled with a targeted warning and a scroll-to link if course data has blocking errors (missing required columns / no rows) or the classroom inventory is empty; otherwise one click starts the 5-phase progress display (candidates → construct → repair sweeps → soft polish → validate) with a Python-driven step indicator and animated progress bar, under a fixed 3000 s budget |
 | **4 · Results** | Weekly Mon–Fri grid, view by cohort / room / instructor / department / course, conflict + unschedulable lists, and `schedule.json` / `schedule.csv` / multi-page PDF download |
 
 The course-list CSV may carry optional columns — `Year`, `Part-time`, `Room Type`, `Fixed` — that override the cohort year / part-time flag / room-type demand (`normal/lab/pc/studio`) / pinned slot otherwise derived from the course code and instructor name (absent → derived as before).
@@ -248,7 +248,6 @@ src/timetabling/        The solver and pipeline (importable, framework-free)
 ├── report.py           Data-quality report + Mode-B benchmark
 ├── export.py           schedule.json (UI contract) + CSV
 ├── pipeline.py         run_pipeline() — one solve path shared by CLI and UI
-├── defaults.py         PII-free default classroom inventory (103 rooms)
 ├── i18n.py             Bilingual TR/EN string catalog
 ├── soft_search.py      Move-based local-search soft polish (anneal_soft, deluge acceptor — post-convergence phase of repair)
 ├── pdf_export.py       Landscape-A4 PDF timetable export (fpdf2, DejaVuSans for Turkish glyphs)
@@ -282,7 +281,7 @@ PYTHONPATH=src streamlit run app.py
 python3 -m pytest -q                         # 256 tests on the sample dataset (269 with institutional data in data/)
 ```
 
-> The web app and **most** tests need **no private data** — classroom defaults come from `defaults.py` and a PII-free sample course list ships in `assets/`. The real institutional CSVs live in `data/`, which is git-ignored and absent from fresh clones; only the legacy CLI Grades-path tests (`io_csv` / `join` / `derive`, 13 tests) require them.
+> The web app and **most** tests need **no private data** — a PII-free sample course list ships in `assets/` and classroom data is uploaded by the user. The real institutional CSVs live in `data/`, which is git-ignored and absent from fresh clones; only the legacy CLI Grades-path tests (`io_csv` / `join` / `derive`, 13 tests) require them.
 
 ### Docker (local)
 
@@ -346,7 +345,7 @@ CMPE 113,Introduction to Programming,Faculty of Engineering,CMPE 113_01,Jane Doe
 ECON 101,Principles of Economics,Faculty of Econ.,ECON 101_01,John Smith,john.smith@uni.edu,,3,0,0,120,118,
 ```
 
-**Classroom inventory** — `Room`, `Capacity`, `Type` (`normal/lab/pc/studio`; derived from the room-name token, e.g. `-PC`→`pc`, when seeding). Defaults ship in `defaults.py`.
+**Classroom inventory** — `Room`, `Capacity`, `Type` (`normal/lab/pc/studio`; derived from the room-name token, e.g. `-PC`→`pc`, when seeding). Upload your own CSV or use the built-in sample in the Classrooms step.
 
 **Derived automatically:** cohort `(program code, year level)` from the course code; instructor identity from email-or-name; teaching blocks from `T`/`P`/`L` (theory splits into ≤2 h same-section sessions on different days). The `section → room` assignment is the solver's **output**, never an input.
 
@@ -363,7 +362,7 @@ ECON 101,Principles of Economics,Faculty of Econ.,ECON 101_01,John Smith,john.sm
 
 ## Deployment
 
-Kairos ships as a single Docker image — Streamlit, OR-Tools CP-SAT, and PII-free defaults — on **Google Cloud Run**, in the institution's own GCP project, **`europe-west1`**, **scale-to-zero**. Access is locked to named Google accounts via IAM; the live service is mapped to `kairos.huguryildiz.com`. No PII enters the image — `.dockerignore` keeps `data/` out, and classroom defaults come from `defaults.py`.
+Kairos ships as a single Docker image — Streamlit and OR-Tools CP-SAT — on **Google Cloud Run**, in the institution's own GCP project, **`europe-west1`**, **scale-to-zero**. Access is locked to named Google accounts via IAM; the live service is mapped to `kairos.huguryildiz.com`. No PII enters the image — `.dockerignore` keeps `data/` out; classroom and course data are supplied by the user at runtime.
 
 **Continuous deploy.** Every push to `main` triggers [`cloudbuild.yaml`](cloudbuild.yaml), which deploys the `kairos` service to `europe-west1` with the resources below. To deploy by hand (same flags, so manual and CI stay in sync):
 
@@ -371,7 +370,7 @@ Kairos ships as a single Docker image — Streamlit, OR-Tools CP-SAT, and PII-fr
 gcloud run deploy kairos --source . --region europe-west1 \
   --no-allow-unauthenticated \
   --memory 8Gi --cpu 4 --cpu-boost \
-  --timeout 3600 --min-instances 0 --max-instances 2
+  --timeout 3600 --min-instances 0 --max-instances 5
 ```
 
 **Grant access** to the 1–2 named users, and reach the IAM-gated service through a local proxy:
@@ -386,6 +385,7 @@ gcloud run services proxy kairos --region europe-west1 --port 8080   # then open
 >
 > - **Memory:** a CP-SAT solve needs **≥ 4 GiB** (the Cloud Run default of 512 MiB OOM-kills the container — SIGKILL, uncatchable — and the Solve button silently does nothing while lighter clicks still work); the service runs at **8 GiB** for headroom at larger problem sizes. Keep `--memory 8Gi`.
 > - **Region:** `kairos.huguryildiz.com` is domain-mapped to the `europe-west1` service. Apply resource changes (`gcloud run services update kairos --region europe-west1 …`) there — not to a same-named service in another region. A deploy without `--memory/--cpu/--timeout` can revert the service to the 512 MiB / 1 vCPU / 300 s defaults, so bake them into `cloudbuild.yaml` (already done) or re-pass them.
+> - **Concurrency cap:** `--max-instances 5` limits simultaneous containers. Each solve job can hold a container for up to 50 min; five is enough for a small-scale rollout and keeps runaway cost bounded.
 >
 > **KVKK:** keep the service in an EU region and enable Cloud Audit Logs. The solve runs synchronously inside one long request under a fixed **3000 s / 50 min** budget (`_SOLVE_SECONDS` in [`views/solve.py`](views/solve.py)); `--timeout 3600` (60 min) keeps the request alive past it, a ~10 min margin for container startup and response streaming.
 

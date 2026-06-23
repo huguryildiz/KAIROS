@@ -15,7 +15,7 @@ def build_section_frame(period: str, include_plan_only: bool = False) -> pd.Data
         "period": grades["Period"].str.strip(),
         "code": grades["Code"].str.strip(),
         "name": grades["Name"].str.strip(),
-        "faculty": grades["Dept."].str.strip(),
+        "department": grades["Dept."].str.strip(),
         "T": grades["T"], "P": grades["P"], "L": grades["L"], "Cr": grades["Cr"],
         "category": grades["Category"].str.strip(),
         "staff_id": grades["Staff ID"].map(normalize_staff_id),

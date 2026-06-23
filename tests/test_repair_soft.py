@@ -3,8 +3,8 @@ from timetabling.model import Section, Block, Candidate
 from timetabling.repair import _cand_soft, State, repair_round
 
 
-def _sec(sid, iid, level=1, faculty="F", code="X 101"):
-    s = Section(sid, "001", code, "x", level, code.split()[0], faculty,
+def _sec(sid, iid, level=1, department="F", code="X 101"):
+    s = Section(sid, "001", code, "x", level, code.split()[0], department,
                 f"{code.split()[0]}-{level}", [iid], 30, 2, 0, 0, 2, "")
     s.blocks = [Block(f"{sid}#T", sid, "theory", 2, False)]
     return s

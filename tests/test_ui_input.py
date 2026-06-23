@@ -235,7 +235,7 @@ def test_dept_is_faculty_and_cohort_from_code():
              "L": "0", "Instructor Email": "a@x.edu", "Section Capacity": "45",
              "Dept": "Faculty of Econ"}]
     s = build_sections_from_courselist(rows, "001", Config())[0][0]
-    assert s.faculty == "Faculty of Econ"      # DEPT -> faculty
+    assert s.department == "Faculty of Econ"   # DEPT -> department
     assert s.cohort_key == "ADA-4"             # cohort from code prefix, NOT DEPT
     assert s.dept_code == "ADA"
     assert s.section_id == "ADA 403_01"        # SECTION used directly

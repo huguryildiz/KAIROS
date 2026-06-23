@@ -491,6 +491,11 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
 .stButton>button[kind="primary"]:focus-visible,
 .stButton>button[data-testid="stBaseButton-primary"]:focus-visible{
   outline:2px solid var(--primary)!important;outline-offset:3px!important;}
+.stButton>button[kind="primary"]:disabled,
+.stButton>button[data-testid="stBaseButton-primary"]:disabled{
+  opacity:.35!important;cursor:not-allowed!important;
+  filter:none!important;transform:none!important;pointer-events:none;}
+.st-key-solve_btn button:disabled::after{animation:none!important;}
 /* ── Secondary button ─────────────────────────────────────────────────────── */
 /* Surface card look. Hover uses inset box-shadow (no border width change →
    no layout shift). :active sinks back to rest level. */

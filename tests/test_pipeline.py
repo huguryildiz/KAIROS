@@ -7,7 +7,7 @@ def _section(sid="CMPE 113_01"):
     from timetabling.derive import blocks_from_tpl
     return Section(
         section_id=sid, period="001", code="CMPE 113", name="Intro",
-        level=1, dept_code="CMPE", faculty="", cohort_key="CMPE-1",
+        level=1, dept_code="CMPE", department="", cohort_key="CMPE-1",
         instructor_ids=["a@x.edu"], students=30, T=2, P=0, L=0, Cr=2,
         category="", blocks=blocks_from_tpl(sid, 2, 0, 0, 2), plan_room="",
     )

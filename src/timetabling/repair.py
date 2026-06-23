@@ -124,7 +124,7 @@ def _cand_soft(c, s, cfg: Config) -> int:
     cost = 0
     if 2 <= s.level <= 4:
         cost += cfg.w_order * (4 - s.level) * (c.start - cfg.horizon_start)
-    if (cfg.eng_faculty_match in s.faculty and "#L" in c.block_id
+    if (cfg.eng_department_match in s.department and "#L" in c.block_id
             and c.day not in cfg.eng_lab_days):
         cost += cfg.w_englab
     return cost

@@ -31,7 +31,7 @@ fallback order.
 |---|:---:|---|
 | `COURSE_CODE` | ✓ | Course code. Source of the **cohort program code** (`ADA 403` → `ADA`). |
 | `COURSE_NAME` | ✓ | Display name. |
-| `DEPT` | ✓ | **Faculty name** (e.g. "Faculty of Econ…") → `Section.faculty`. **Not** the cohort key (see §Cohort). |
+| `DEPT` | ✓ | **Department/faculty name** (e.g. "Faculty of Econ…") → `Section.department`. **Not** the cohort key (see §Cohort). |
 | `SECTION` | ✓ | Section identifier. `"ADA 403_01"` is used **directly** as `section_id`; a bare `"01"` is composed with the code. |
 | `LECTURER` | ✓ | Instructor **display name**. Fallback unique key when `Email` is absent. |
 | `Email` | optional · recommended | Instructor's **unique key** (instructor no-overlap + availability key when present). |

@@ -88,7 +88,7 @@ def build_sections(frame, cfg: Config) -> Tuple[List[Section], Dict]:
         s = Section(
             section_id=sid, period=r.get("period", "").strip(), code=code,
             name=r.get("name", "").strip(), level=level, dept_code=dept_code,
-            faculty=r.get("faculty", "").strip(), cohort_key=cohort,
+            department=r.get("department", "").strip(), cohort_key=cohort,
             instructor_ids=normalize_staff_ids(r.get("staff_id", "")), students=_students(r),
             T=T, P=P, L=L, Cr=Cr, category=category,
             blocks=blocks_from_tpl(sid, T, P, L, Cr, cfg.max_block_len, cfg.max_theory_session),

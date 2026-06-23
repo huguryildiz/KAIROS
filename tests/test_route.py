@@ -21,7 +21,7 @@ def test_mark_lab_rooms_pins_designated_lab_room():
 
 def _sec(sid, students, plan_room=""):
     return Section(section_id=sid, period="001", code="X 101", name="x", level=1,
-                   dept_code="X", faculty="F", cohort_key="X-1", instructor_ids=["i"],
+                   dept_code="X", department="F", cohort_key="X-1", instructor_ids=["i"],
                    students=students, T=2, P=0, L=0, Cr=2, category="",
                    plan_room=plan_room)
 

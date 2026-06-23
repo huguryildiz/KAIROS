@@ -9,9 +9,9 @@ from .model_cpsat import build_and_solve
 
 def solve_decomposed(sections: List[Section], rooms: List[Room],
                      instructors: Dict[str, Instructor], cfg: Config,
-                     group_key: Callable[[Section], str] = lambda s: s.faculty
+                     group_key: Callable[[Section], str] = lambda s: s.department
                      ) -> Tuple[List[Assignment], Dict]:
-    """Solve sections group-by-group (default: by faculty), largest group first,
+    """Solve sections group-by-group (default: by department), largest group first,
     reserving each group's used (room, day, hour) slots for later groups so the
     shared room pool stays conflict-free across the partition."""
     groups: Dict[str, List[Section]] = defaultdict(list)

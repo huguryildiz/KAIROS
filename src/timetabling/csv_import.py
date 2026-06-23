@@ -41,7 +41,7 @@ COURSE_COL_MAP: Dict[str, List[str]] = {
     "Part-time":      ["part_time", "parttime", "yari_zamanli", "saatlik", "pt", "adjunct"],
     "Room Type":      ["room_type", "oda_tipi", "roomtype", "venue_type"],
     "Fixed":          ["fixed", "fixed_slot", "sabit", "pinned", "pin"],
-    # DEPT = faculty name (e.g. "Faculty of Econ…") -> Section.faculty, and the
+    # DEPT = department/faculty name (e.g. "Faculty of Econ…") -> Section.department, and the
     # cohort-program fallback when COURSE_CODE is unparseable. Kept LAST so the
     # positional indices of the columns above stay stable for header-less files.
     "Dept":           ["dept", "department", "bolum", "faculty", "fakulte", "birim"],

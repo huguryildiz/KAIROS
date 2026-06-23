@@ -39,7 +39,7 @@ class Section:
     name: str
     level: int              # 1..6
     dept_code: str          # "ADA"
-    faculty: str            # Grades "Dept." column (faculty name)
+    department: str         # Grades "Dept." column (faculty/department name)
     cohort_key: str         # "ADA-4"
     instructor_ids: List[str]
     students: int

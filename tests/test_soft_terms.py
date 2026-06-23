@@ -15,7 +15,7 @@ def test_run_excess_counts_only_beyond_threshold():
 
 def _sec(sid, cohort, code, iids):
     return Section(section_id=sid, period="001", code=code, name=code, level=2,
-                   dept_code=cohort.split("-")[0], faculty="F", cohort_key=cohort,
+                   dept_code=cohort.split("-")[0], department="F", cohort_key=cohort,
                    instructor_ids=iids, students=10, T=0, P=0, L=0, Cr=0, category="",
                    blocks=[])
 

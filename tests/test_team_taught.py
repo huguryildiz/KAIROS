@@ -2,8 +2,8 @@ from timetabling.config import Config
 from timetabling.model import Section, Block, Room, Instructor
 from timetabling import model_cpsat, validate
 
-def _sec(sid, instr_ids, blocks, cohort="D-1", level=1, students=10, faculty="Fac"):
-    s = Section(sid, "001", "D 101", "n", level, "D", faculty, cohort, instr_ids,
+def _sec(sid, instr_ids, blocks, cohort="D-1", level=1, students=10, department="Fac"):
+    s = Section(sid, "001", "D 101", "n", level, "D", department, cohort, instr_ids,
                 students, 0, 0, 0, 0, "Course")
     s.blocks = blocks
     return s

@@ -13,7 +13,7 @@ steps:
       - --cpu-boost
       - --timeout=3600
       - --min-instances=0
-      - --max-instances=2
+      - --max-instances=5
       - --project=$PROJECT_ID
 
 options:

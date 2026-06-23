@@ -32,9 +32,9 @@ def feasible_rooms_for(block: Block, section: Section, rooms: List[Room],
         # non-lab block, or a lab held in a regular room (no designated lab room)
         fr = [r for r in rooms if r.is_physical and r.cap >= section.students]
     # Dept ownership: if a room declares owner dept(s), restrict to sections
-    # whose faculty matches one of them. Empty dept = open to all.
-    if fr and section.faculty:
-        fr = [r for r in fr if not r.dept or section.faculty in {
+    # whose department matches one of them. Empty dept = open to all.
+    if fr and section.department:
+        fr = [r for r in fr if not r.dept or section.department in {
             d.strip() for d in r.dept.split(";") if d.strip()
         }]
     fr.sort(key=lambda r: (r.cap, r.room))
@@ -146,7 +146,7 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
                 coeff = cfg.w_order * (4 - s.level) * (c.start - cfg.horizon_start)
                 if coeff:
                     order_terms.append(coeff * v)
-            if (cfg.eng_faculty_match in s.faculty and b.needs_lab
+            if (cfg.eng_department_match in s.department and b.needs_lab
                     and c.day not in cfg.eng_lab_days):
                 englab_terms.append(cfg.w_englab * v)
             if len(s.blocks) >= 2:

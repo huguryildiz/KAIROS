@@ -49,7 +49,7 @@ def test_section_carries_plan_room():
     from timetabling.config import Config
     frame = pd.DataFrame([{
         "section_id": "HIST 101_01", "period": "001", "code": "HIST 101",
-        "name": "History", "faculty": "Basic Sciences", "T": "2", "P": "0",
+        "name": "History", "department": "Basic Sciences", "T": "2", "P": "0",
         "L": "0", "Cr": "2", "category": "", "staff_id": "00000001",
         "grades_students": "148", "dept_code": "HIST", "year_level": "1",
         "plan_room": "Online",

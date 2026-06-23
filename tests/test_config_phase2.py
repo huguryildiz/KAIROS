@@ -10,7 +10,7 @@ def test_phase2_defaults():
     assert c.w_order == 1
     assert c.w_englab == 1
     assert c.eng_lab_days == ("Th", "Fr")
-    assert c.eng_faculty_match == "Engineering"
+    assert c.eng_department_match == "Engineering"
     assert c.w_nonadjacent == 0
 
 def test_phase2_overridable():

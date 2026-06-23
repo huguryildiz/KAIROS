@@ -24,8 +24,9 @@ and where it lives (pruning, model relation, or objective).
 
 - **Fixed inputs:** each section's instructor(s), Section Capacity (quota), and T/P/L hours.
 - **Decided:** for every block of every section, a `(room, day, start-hour)`.
-- A section is split into **blocks**: theory hours `T+P` into sessions of at most 2 h (e.g.
-  `T=3 → 2+1`), plus one lab block of `L` hours (split at 4 h). Each block is placed once.
+- A section is split into **blocks**: theory hours `T+P` into sessions of at most `max_theory_session` h
+  (default 2; e.g. `T=3 → 2+1`), plus one lab block of `L` hours (split when `L > max_block_len`,
+  default 4). Each block is placed once. Both thresholds are tunable via School Settings.
 
 ### Hard constraints — enforced by candidate pruning (per block)
 
@@ -35,19 +36,20 @@ A placement that breaks one of these is never even generated, so it cannot occur
   `Online` room is exempt (unlimited).
 - **Lab-room pinning** — a lab block is pinned to the section's designated real lab room; it
   can go nowhere else. Labs with no designated lab room use regular rooms.
-- **Daytime window** — an undergraduate block must end by **18:00** (start no earlier than
-  09:00). Graduate blocks (if enabled) end by **21:00** and start no earlier than a
-  **configurable** hour (default **18:00**; School Settings can lower it to allow daytime
-  graduate classes).
+- **Daytime window** — an undergraduate block must end by the **Day end** hour (default
+  **18:00**; tunable 13–21 in School Settings) and start no earlier than the **Day start**
+  hour (default **09:00**; tunable 6–12). Graduate blocks (if enabled) end by **21:00**
+  (fixed — `horizon_end` is not a settings field) and start no earlier than the configurable
+  **Graduate earliest start** hour (default **18:00**; tunable 6–20 in School Settings).
 - **Blackout slots** — closed `(day, hour)` slots are **school-specific and configurable**
   (none by default; add them in the School Settings step). Each slot has a scope: *everyone*
   (closed for all sections) or *full-time only* (closed only when a section has a full-time
   staff instructor — e.g. a faculty seminar). Common examples: a Friday 13:00–14:00
   congregational-prayer hour (everyone), or a Thursday 14:00–16:00 staff seminar
   (full-time only).
-- **Instructor availability** — a block is never placed in a half-day an instructor marked
+- **Instructor availability** — a block is never placed in any hour slot an instructor marked
   unavailable; every co-instructor's unavailability applies (a per-instructor blackout, set
-  in the School Settings step).
+  in the School Settings step). The availability grid is hourly.
 - **Fixed session** — if a section declares a fixed slot, its **first block** is pinned to
   exactly that `(day, start-hour)` (its remaining blocks schedule freely).
 - **Room type** — rooms carry a categorical type (`normal / lab / pc / studio`). When a section
@@ -64,8 +66,11 @@ A placement that breaks one of these is never even generated, so it cannot occur
 - **Instructor no-overlap** — no instructor is double-booked in any hour; every co-instructor
   of a team-taught section counts.
 - **Section self no-overlap** — two blocks of the same section never overlap in time.
-- **Theory different-day** — a section's theory sessions each fall on a **different day**
-  (a `2+1` split occupies two days). Lab blocks are exempt.
+- **Theory different-day** — a section's theory sessions each fall on a **different day**.
+  The number of sessions (and thus days) depends on `max_theory_session` (default 2 h,
+  tunable via School Settings "Teori oturumu üst sınırı"); e.g. with default 2 h, `T=3 →
+  2+1` across two days; with `max_theory_session=3`, `T=3` fits in one session (one day).
+  Lab blocks are exempt.
 
 ### Soft preferences — penalized in the objective (never block a schedule)
 
@@ -155,7 +160,7 @@ behavior. A downloadable "school profile" JSON persists a school's settings + av
 | — | undergrad end-of-day | 18:00 | `undergrad_end` |
 | — | graduate window | 18:00–21:00 | `grad_start`, `grad_end` |
 | — | blackout slots (universal / full-time-only) | none | `blackout` (School Settings) |
-| — | AM/PM boundary (legacy half-day availability) | 13:00 (fixed) | `midday_split_hour` |
+| — | AM/PM boundary (legacy half-day availability) | 13:00 (hardcoded in `settings.py`) | — (`Config.midday_split_hour` exists but is not read by `build_config`; vestigial field) |
 | — | per-instructor unavailable slots | — | `instr_unavailable` (School Settings) |
 
 ---
@@ -178,7 +183,7 @@ $(r,d,h)$ only when it already satisfies:
 
 - room capacity $\mathrm{cap}_r \ge n_s$ (the virtual `Online` room is exempt — unlimited);
 - lab-room pinning — a lab block only in the section's designated lab room;
-- undergrad window $h + \ell_b \le 18$;
+- undergrad window $h + \ell_b \le \texttt{cfg.undergrad\_end}$ (default 18; tunable via School Settings "Day end");
 - configured blackout slots (`Config.blackout`; none by default — each is universal or
   full-time-only, resolved per section via `cfg.closed_hours`);
 - per-instructor availability (`Config.instr_unavailable`) — a candidate is dropped if any of
@@ -696,7 +701,7 @@ converge; use a smaller $N$ for Spring polish benches.)
 `validate.py` re-derives every hard violation directly from the assignment list, importing
 no solver internals, so a model/encoding bug cannot pass silently. It checks: room,
 instructor, capacity, **lab_room**, **room_type** (categorical room demand), **fixed** (pinned
-first block), window ($<$ 18:00 undergrad), blackout, **instructor_unavailable** (per-instructor
+first block), window ($h + \ell_b \le \texttt{cfg.undergrad\_end}$, default 18:00), blackout, **instructor_unavailable** (per-instructor
 availability), H_self, and **split_day** (theory different-day). Cohort conflict is a **soft
 metric**, not a `Violation` — reported in `mode_b_<period>.json` / `unmet_soft`, never failing
 validation.

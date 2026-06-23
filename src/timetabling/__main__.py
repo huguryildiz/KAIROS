@@ -19,8 +19,8 @@ def _apply_scope(frame, scope: str):
     if scope == "all" or not scope:
         return frame
     key, _, val = scope.partition("=")
-    if key == "faculty":
-        return frame[frame["faculty"].str.contains(val, case=False, na=False)]
+    if key == "department":
+        return frame[frame["department"].str.contains(val, case=False, na=False)]
     if key == "dept":
         return frame[frame["dept_code"].str.strip() == val]
     return frame
@@ -29,14 +29,14 @@ def _apply_scope(frame, scope: str):
 def main():
     ap = argparse.ArgumentParser(prog="timetabling")
     ap.add_argument("--period", default="001", choices=["001", "002"])
-    ap.add_argument("--scope", default="all", help='all | faculty=<substr> | dept=<CODE>')
+    ap.add_argument("--scope", default="all", help='all | department=<substr> | dept=<CODE>')
     ap.add_argument("--mode", default="A,B")
     ap.add_argument("--out", default="out")
     ap.add_argument("--time-limit", type=float, default=60.0)
     ap.add_argument("--max-rooms-per-block", type=int, default=None,
                     help="cap candidate rooms per block (default from Config=12; lower = smaller/faster model)")
     ap.add_argument("--decompose", action="store_true",
-                    help="solve faculty-by-faculty sharing the room pool (for full --scope all)")
+                    help="solve department-by-department sharing the room pool (for full --scope all)")
     ap.add_argument("--repair", action="store_true",
                     help="warm-started small-neighborhood repair solver (full --scope all)")
     ap.add_argument("--no-soft-shaping", action="store_true",

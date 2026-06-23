@@ -21,13 +21,13 @@ def cohort_from_code(code: str) -> Tuple[str, str, str]:
 
 def dept_code_for(row: Dict) -> str:
     """Department code for a courselist row: the parsed course-code prefix, or the upper-cased
-    Dept (faculty) column when the code is unparseable. Mirrors build_sections' UNK fallback."""
+    Dept column when the code is unparseable. Mirrors build_sections' UNK fallback."""
     code = str(row.get("Course Code", "")).strip()
     dept, _, _ = cohort_from_code(code)
     if dept == "UNK":
-        faculty = str(row.get("Dept", "")).strip()
-        if faculty:
-            return faculty.upper()
+        department = str(row.get("Dept", "")).strip()
+        if department:
+            return department.upper()
     return dept
 
 
@@ -121,7 +121,7 @@ def build_sections_from_courselist(rows: List[Dict], period: str,
         sec_no = str(r.get("Section No", "")).strip()
         sid = section_id_for(code, sec_no)
         _, year, _ = cohort_from_code(code)
-        faculty = str(r.get("Dept", "")).strip()            # DEPT = faculty name
+        department = str(r.get("Dept", "")).strip()
         dept = dept_code_for(r)                              # code prefix, UNK -> DEPT fallback
         yr = parse_int(r.get("Year"), 0)        # optional Year column overrides cohort year (1-6 only)
         eff_year = yr if 1 <= yr <= 6 else year
@@ -145,7 +145,7 @@ def build_sections_from_courselist(rows: List[Dict], period: str,
         sections.append(Section(
             section_id=sid, period=period, code=code,
             name=str(r.get("Course Name", "")).strip(),
-            level=course_level(code), dept_code=dept, faculty=faculty,
+            level=course_level(code), dept_code=dept, department=department,
             cohort_key=cohort, instructor_ids=instructor_ids, students=students,
             T=T, P=P, L=L, Cr=(T + P + L), category="",
             blocks=blocks_from_tpl(sid, T, P, L, T + P + L,
@@ -163,7 +163,7 @@ def build_instructors_from_courselist(rows: List[Dict]) -> Dict[str, Instructor]
     for r in rows:
         emails = parse_emails(r.get("Instructor Email", ""))
         names = [n.strip() for n in str(r.get("Instructor Name", "")).split(",")]
-        faculty = str(r.get("Dept", "")).strip()           # DEPT = faculty name
+        department = str(r.get("Dept", "")).strip()
         # optional Part-time column overrides the "(S)" marker; absent -> fall back to "(S)"
         pt = r.get("Part-time")
         explicit_pt = _truthy(pt) if (pt is not None and str(pt).strip() != "") else None
@@ -178,7 +178,7 @@ def build_instructors_from_courselist(rows: List[Dict]) -> Dict[str, Instructor]
                 continue
             part_time = explicit_pt if explicit_pt is not None else is_part_time(name)
             out[key] = Instructor(staff_id=key, name=name.strip(),
-                                  is_staff=not part_time, home_dept=faculty)
+                                  is_staff=not part_time, home_dept=department)
     return out
 
 

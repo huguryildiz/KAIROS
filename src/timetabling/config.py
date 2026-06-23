@@ -70,7 +70,7 @@ class Config:
     w_order: int = 1
     w_englab: int = 1
     eng_lab_days: tuple = ("Th", "Fr")
-    eng_faculty_match: str = "Engineering"
+    eng_department_match: str = "Engineering"
     w_nonadjacent: int = 0
     w_instr_days: float = 10.0
     w_parttime_days: float = 14.0

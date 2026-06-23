@@ -10,7 +10,7 @@ import streamlit.components.v1 as _cmp
 from timetabling.settings import build_config
 from timetabling.ui_input import (build_sections_from_courselist,
                                   build_instructors_from_courselist, build_rooms_from_ui,
-                                  courselist_is_valid)
+                                  classrooms_is_valid, courselist_is_valid)
 from timetabling.route import mark_virtual
 from timetabling.pipeline import run_pipeline, AUTO_REPAIR_THRESHOLD
 from timetabling.i18n import t
@@ -61,12 +61,29 @@ def render(lang: str) -> None:
             height=0,
         )
 
-    # Gate solving on a validated courselist: disable the button while the upload
-    # has blocking validation errors (missing required columns / no rows).
-    valid = courselist_is_valid(courses)
+    # Gate solving on both a validated courselist and an explicitly loaded classroom
+    # inventory. session_state["classrooms"] starts empty, so cr_source being set
+    # is the reliable signal that the user actually loaded classroom data.
+    valid_courses = courselist_is_valid(courses)
+    valid_rooms = bool(st.session_state.get("cr_source")) and classrooms_is_valid(
+        st.session_state["classrooms"]
+    )
+    valid = valid_courses and valid_rooms
+
+    if not valid_courses:
+        st.warning(t("solve_blocked_courses", lang), icon="⚠️")
+        if st.button(t("solve_go_to_data", lang), key="go_to_data",
+                     type="secondary", icon=":material/arrow_upward:"):
+            st.session_state["scroll_to"] = "upload"
+            st.rerun()
+    if not valid_rooms:
+        st.warning(t("solve_blocked_classrooms", lang), icon="⚠️")
+        if st.button(t("solve_go_to_classrooms", lang), key="go_to_classrooms",
+                     type="secondary", icon=":material/arrow_upward:"):
+            st.session_state["scroll_to"] = "classrooms"
+            st.rerun()
+
     ph = st.empty()
-    if not valid:
-        st.caption(t("solve_blocked", lang))
     if ph.button(t("solve_button", lang), type="primary", key="solve_btn",
                  disabled=not valid):
         cfg = build_config(st.session_state["settings"],

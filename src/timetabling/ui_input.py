@@ -248,3 +248,8 @@ def courselist_is_valid(rows: List[Dict]) -> bool:
     """True when the uploaded courselist has no blocking validation errors."""
     return not any(code in COURSELIST_ERROR_CODES
                    for code, _ in validate_courselist(rows))
+
+
+def classrooms_is_valid(rooms: List[Dict]) -> bool:
+    """True when there is at least one classroom in the inventory."""
+    return bool(rooms)

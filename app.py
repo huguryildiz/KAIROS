@@ -7,7 +7,6 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 import streamlit as st
-from timetabling.defaults import DEFAULT_CLASSROOMS
 from timetabling.settings import default_settings
 from timetabling.ui_style import (brand_css, appbar_html, stepper_html,
                                   hero_html, footer_html, dropzone_drag_js,
@@ -22,7 +21,7 @@ st.set_page_config(page_title="Kairos | Course Timetabling", page_icon=_ICON, la
 
 # Session defaults
 st.session_state.setdefault("courses", [])
-st.session_state.setdefault("classrooms", [dict(r) for r in DEFAULT_CLASSROOMS])
+st.session_state.setdefault("classrooms", [])
 st.session_state.setdefault("result", None)
 st.session_state.setdefault("lang", "tr")
 st.session_state.setdefault("theme", "light")

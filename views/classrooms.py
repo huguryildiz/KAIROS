@@ -4,7 +4,6 @@ import os
 import streamlit as st
 
 from timetabling.csv_import import ok_rooms, parse_classrooms, read_raw
-from timetabling.defaults import DEFAULT_CLASSROOMS
 from timetabling.ui_style import (
     data_table_html, detected_columns_html, eyebrow_html, import_stats_html,
     kpi_chips_html, success_banner_html, upload_cta_html, upload_error_html,
@@ -93,7 +92,7 @@ def render(lang: str) -> None:
 
             if load_sample:
                 report = parse_classrooms(read_raw(_SAMPLE))
-                st.session_state["classrooms"] = ok_rooms(report) or [dict(r) for r in DEFAULT_CLASSROOMS]
+                st.session_state["classrooms"] = ok_rooms(report)
                 st.session_state["cr_report"] = report
                 st.session_state["cr_source"] = t("cr_sample_name", lang)
                 st.rerun()

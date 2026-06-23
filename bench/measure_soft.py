@@ -8,13 +8,13 @@ import os
 import sys
 from dataclasses import replace
 from time import perf_counter
-from timetabling.csv_import import read_raw, parse_courselist, ok_rows
+from timetabling.csv_import import read_raw, parse_courselist, ok_rows, parse_classrooms, ok_rooms
 from timetabling.settings import build_config
 from timetabling.ui_input import (build_sections_from_courselist,
                                    build_instructors_from_courselist, build_rooms_from_ui)
 from timetabling.route import mark_virtual
 from timetabling.pipeline import run_pipeline
-from timetabling.defaults import DEFAULT_CLASSROOMS
+from timetabling.csv_import import parse_classrooms, ok_rooms
 from timetabling.report import _metrics
 
 N = int(sys.argv[1]) if len(sys.argv) > 1 else 841
@@ -36,7 +36,7 @@ for _env, _field in (("W_IDLE", "w_idle"), ("W_MAXRUN", "w_maxrun"),
         cfg = replace(cfg, **{_field: float(os.getenv(_env))})
 secs, _ = build_sections_from_courselist(courses, "001", cfg)
 instr = build_instructors_from_courselist(courses)
-rooms = build_rooms_from_ui([dict(r) for r in DEFAULT_CLASSROOMS], cfg)
+rooms = build_rooms_from_ui(ok_rooms(parse_classrooms(read_raw("data/classrooms.csv"))), cfg)
 mark_virtual(secs, rooms, cfg)
 t0 = perf_counter()
 res = run_pipeline("001", secs, rooms, instr, cfg, solver="auto")

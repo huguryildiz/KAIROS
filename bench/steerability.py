@@ -26,12 +26,11 @@ import sys
 from dataclasses import replace
 from time import perf_counter
 
-from timetabling.csv_import import read_raw, parse_courselist, ok_rows
+from timetabling.csv_import import read_raw, parse_courselist, ok_rows, parse_classrooms, ok_rooms
 from timetabling.settings import build_config
 from timetabling.ui_input import (build_sections_from_courselist,
                                    build_instructors_from_courselist, build_rooms_from_ui)
 from timetabling.route import mark_virtual
-from timetabling.defaults import DEFAULT_CLASSROOMS
 from timetabling.model_cpsat import gen_candidates, _instructors_of
 from timetabling.repair import (State, greedy_construct, repair_round, BATCH,
                                 REPAIR_MAX_ROOMS)
@@ -65,7 +64,7 @@ cfg0 = replace(cfg0, max_rooms_per_block=max(cfg0.max_rooms_per_block, REPAIR_MA
 
 secs, _ = build_sections_from_courselist(courses, "001", cfg0)
 instr = build_instructors_from_courselist(courses)
-rooms = build_rooms_from_ui([dict(r) for r in DEFAULT_CLASSROOMS], cfg0)
+rooms = build_rooms_from_ui(ok_rooms(parse_classrooms(read_raw("data/classrooms.csv"))), cfg0)
 mark_virtual(secs, rooms, cfg0)
 
 room_list = list(rooms.values())

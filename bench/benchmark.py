@@ -36,7 +36,6 @@ from timetabling.ui_input import (
 )
 from timetabling.route import mark_virtual
 from timetabling.pipeline import run_pipeline
-from timetabling.defaults import DEFAULT_CLASSROOMS
 
 
 def load_courses(csv_path: str) -> list:
@@ -69,7 +68,7 @@ def solve_courses(courses: list, period: str, time_limit: float,
     classroom pool so tightness stays constant as size grows)."""
     cfg = build_config({}, {}, time_limit)
     if classroom_rows is None:
-        classroom_rows = [dict(r) for r in DEFAULT_CLASSROOMS]
+        classroom_rows = load_classrooms("data/classrooms.csv")
 
     secs, _ = build_sections_from_courselist(courses, period, cfg)
     instr = build_instructors_from_courselist(courses)
@@ -227,7 +226,7 @@ def run_synth(csv_path: str, period: str, args) -> tuple[list, list]:
     the curve isolates how solve TIME scales with raw problem size."""
     base = load_courses(csv_path)
     base_n = len(base)
-    base_rooms = [dict(r) for r in DEFAULT_CLASSROOMS]
+    base_rooms = load_classrooms("data/classrooms.csv")
     sizes = _sizes_for(max(args.max_n, base_n), args.sizes, args.steps)
     sizes = [n for n in sizes if n >= base_n] or [base_n]
     print(f"[synth] base={base_n} sections / {len(base_rooms)} rooms; "
@@ -293,7 +292,7 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=42, help="scale: shuffle seed")
     ap.add_argument("--classrooms", default="",
                     help="case: real classroom inventory CSV (ROOM,ROOM_CAP); "
-                         "default = embedded DEFAULT_CLASSROOMS")
+                         "default = data/classrooms.csv")
     ap.add_argument("--runs", type=int, default=3,
                     help="repeats per cell; report median (default 3)")
     ap.add_argument("--time-limit", type=float, default=3000.0,

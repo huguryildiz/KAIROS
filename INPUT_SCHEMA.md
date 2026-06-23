@@ -57,8 +57,7 @@ are solver output): `ROOM`, `ROOM_CAP`, `SCHEDULE`.
 | `Type` | ✓ | Room category: `normal / lab / pc / studio`. Derived from a name token (`-PC` → `pc`, `-L` → `lab`) when seeding; editable. |
 | `Dept` | optional | **Department ownership** for lab/pc rooms. Semicolon-separated list of department names (e.g. `"Department of Software Engineering;Dept.of Electric&Electronics Engineering"`). When set, only sections whose `DEPT` matches one of the listed values may be assigned to this room. Empty = open to all departments (general pool). Has no effect on `normal` / `studio` rooms. |
 
-When the user provides no room list, the table is pre-filled from the embedded
-`DEFAULT_CLASSROOMS` (with `Type`) and remains editable.
+The user must upload a classroom CSV or load the built-in sample in the Classrooms step before solving.
 
 ---
 

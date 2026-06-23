@@ -983,3 +983,44 @@ Apple M1 Pro / native arm64): **Fall ≈30 s / 99.2 %, Spring ≈53 s / 100 %, b
 confined** — to a *time* box in the monolith, and additionally to a *size* box ($O(1)$
 neighbourhoods) in repair. Candidate pruning buys the linear model; bounded neighbourhoods
 buy the scalable solve.
+
+## 11. Comparison with existing timetable
+
+**Existing** columns are parsed from the `Schedule` field in the Grades CSVs
+(`data/2025-01-Grades.csv` / `data/2025-02-Grades.csv`) and re-validated with the KAIROS
+validator (`out/existing_metrics.json`). **KAIROS** columns run the repair solver on the same
+roster (`out/mode_b_001.json` mode\_a for Fall; `out/ted_headline_arm64.json` for Spring).
+
+| Metric | Existing · Fall 001 | KAIROS · Fall 001 | Existing · Spring 002 | KAIROS · Spring 002 |
+| --- | --- | --- | --- | --- |
+| Blocks scheduled / total | 1 232 / 1 708 | 1 588 / 1 708 | 1 231 / — | 1 814 / 1 814¹ |
+| Coverage | 72 % | **93 %** | — | **100 %**¹ |
+| Hard violations (total) | 1 006 | **0** | 1 001 | **0** |
+| — Room conflicts | 325 | 0 | 312 | 0 |
+| — Instructor conflicts | 522 | 0 | 534 | 0 |
+| — Window violations (>18:00) | 91 | 0 | 92 | 0 |
+| — Capacity overflows | 6 | 0 | 0 | 0 |
+| — Split-day violations | 62 | 0 | 63 | 0 |
+| Rooms used | 248 | **94** | 218 | —² |
+| Room fill rate | 50.3 % | **70.8 %** | 53.1 % | 71.4 %² |
+| Evening blocks ratio | 22.2 % | **12.6 %** | 24.2 % | 7.8 %² |
+| Cohort conflicts (soft) | 549 | **370** | 584 | 100² |
+| Solve time | manual | ≈ 30 s | manual | ≈ 53 s |
+
+¹ `ted_headline_arm64.json`: sample course input (826 sections → 1 814 blocks), native arm64, Apple M1 Pro.  
+² `out/mode_b_002.json` mode\_a: departmental-scope run; ratios representative, absolute counts are not full-period.
+
+**Key takeaways:**
+
+- **Hard conflicts drop from ~1 000 → 0:** the existing timetable has 325 room overlaps, 522
+  instructor double-bookings, and 91 undergrad-window violations; KAIROS eliminates all of them
+  by construction (candidate pruning ensures only legal placements enter the model; hard
+  constraints H1–H3 / H_self prevent residual overlaps).
+- **Coverage rises from ~72 % → ≥93 %:** the Grades CSV leaves many blocks without a `Schedule`
+  entry; the repair solver fills them within the same wall-clock budget.
+- **Room utilisation improves by ~20 pp:** 248 → 94 rooms at 50 % → 71 % fill — fewer rooms
+  used, each more efficiently.
+- **Evening load falls** (22 % → 13 %): the undergrad end-of-day cap (default 18:00) is a hard
+  candidate-pruning rule, so daytime placements are preferred by construction.
+- **Cohort conflicts decrease:** the soft cohort-conflict weight penalises same-cohort
+  simultaneous offerings, reducing student scheduling pressure (Fall: 549 → 370).

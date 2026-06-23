@@ -468,8 +468,19 @@ flowchart TD
 
 **Pseudocode — `solve_repair`**
 
+`solve_repair` accepts an optional `progress_cb=None` callable. When provided, it is called once at each of the 4 phase boundaries below with an event tuple:
+
+| Call site | Tuple emitted |
+| --- | --- |
+| After candidate generation, before sort | `("gen_candidates", total_blocks)` |
+| Before greedy construction | `("construct", None)` |
+| After `unplaced` recheck, before sort (each sweep where `unplaced ≠ []`) | `("repair_sweep", sweep_number, n_unplaced)` |
+| Before `anneal_soft` (only if `soft_polish_in_repair`) | `("soft_polish", None)` |
+
+`pipeline.py` additionally fires `("validate", None)` immediately before calling `validate()`. The UI (`views/solve.py`) maps these 5 event keys to step labels ("1/5 · …" … "5/5 · …") and drives a Python-controlled progress bar (no JS timers).
+
 ```text
-solve_repair(sections, rooms, cfg):
+solve_repair(sections, rooms, cfg, progress_cb=None):
 
   # ── Phase 1: candidate generation ─────────────────────────────────────────
   FOR each (block, section):

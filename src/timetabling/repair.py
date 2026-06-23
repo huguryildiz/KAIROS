@@ -3,6 +3,7 @@ from typing import Dict, List
 from collections import defaultdict, Counter
 from dataclasses import replace
 from time import perf_counter
+import os
 
 from ortools.sat.python import cp_model
 
@@ -397,7 +398,7 @@ def repair_round(state: State, batch, cand_by_block, cfg=None,
 
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = tl
-    solver.parameters.num_search_workers = 8
+    solver.parameters.num_search_workers = int(os.environ.get("CPSAT_MAX_WORKERS", 8))
     st = solver.Solve(m)
     if st not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         return 0
@@ -449,7 +450,8 @@ def _cohort_gap_now(state, block_ids, cfg) -> int:
                for hrs in by_day.values() if len(hrs) >= 2)
 
 
-def solve_repair(sections, rooms, instructors, cfg):
+def solve_repair(sections, rooms, instructors, cfg, progress_cb=None):
+    _pb = progress_cb or (lambda _: None)
     cfg = replace(cfg, max_rooms_per_block=max(cfg.max_rooms_per_block, REPAIR_MAX_ROOMS))
     room_list = list(rooms.values())
     virtual_names = {r.room for r in room_list if r.is_virtual}
@@ -458,6 +460,7 @@ def solve_repair(sections, rooms, instructors, cfg):
     sec_of = {b.block_id: s for b, s in blocks}
     sec_instr = {s.section_id: s.instructor_ids for s in sections}
 
+    _pb(("gen_candidates", total))
     cand_by_block = {}
     for b, s in blocks:
         ins_list = _instructors_of(s, instructors)
@@ -472,6 +475,7 @@ def solve_repair(sections, rooms, instructors, cfg):
     # this for current sizes; the deadline is a hard upper bound that bounds runaway sweeps
     # on much larger inputs (and keeps the synchronous UI request under Cloud Run limits).
     deadline = getattr(cfg, "repair_time_limit_s", float("inf")) if cfg else float("inf")
+    _pb(("construct", None))
     greedy_construct(state, order, cand_by_block, cfg)
 
     sweep = 0
@@ -481,6 +485,7 @@ def solve_repair(sections, rooms, instructors, cfg):
                     if bid not in state.placed]
         if not unplaced:
             break
+        _pb(("repair_sweep", sweep, len(unplaced)))
         unplaced.sort(key=lambda bid: (len(cand_by_block[bid]), -sec_of[bid].students))
         gained = 0
         for i in range(0, len(unplaced), BATCH):
@@ -503,6 +508,7 @@ def solve_repair(sections, rooms, instructors, cfg):
         size_cap = max(30.0, len(state.placed) * 0.75)
         budget = min(min(SOFT_POLISH_BUDGET_S, size_cap), max(0.0, deadline - (perf_counter() - t0)))
         if budget > 0:
+            _pb(("soft_polish", None))
             # within-run before/after: the only correct soft comparison (placement is
             # CP-SAT-nondeterministic, so a separate flag-off run is a different baseline).
             soft_pre = _global_terms(state, cfg)

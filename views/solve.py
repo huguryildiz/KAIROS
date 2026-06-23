@@ -1,5 +1,7 @@
 """Step 5 — Solve: fixed time budget, run the pipeline. Upload-gated."""
 from html import escape
+import queue as _queue
+import threading
 
 import streamlit as st
 import streamlit.components.v1 as _cmp
@@ -31,46 +33,24 @@ def render(lang: str) -> None:
     st.caption(t("solve_ready", lang, c=len(courses),
                  r=len(st.session_state["classrooms"])))
 
-    # Display countdown scaled to expected solve time.
-    # Mirrors the runtime cap: 0.5s/section proxy (course rows ≈ 0.6× block count),
-    # floor 60s, brackets at 150/400 to match the runtime cap thresholds.
-    _n = len(courses)
-    if _n <= 150:
-        _display_seconds = max(60, int(_n * 0.8))   # e.g. 100 courses → 80s display
-    elif _n <= 400:
-        _display_seconds = 600
-    else:
-        _display_seconds = _SOLVE_SECONDS
-
-    # Client-side solve watcher. Delivered via a height:0 iframe component so the JS
-    # actually runs — inline <script> in st.markdown stays in the DOM but is never
-    # executed (React dangerouslySetInnerHTML), so it is inert (see app.py). The
-    # watcher polls the parent doc every second for .solve-running (present while a
-    # solve is in progress) and, while it is there, (a) arms window.onbeforeunload on
-    # the parent so navigating away prompts the browser's "Leave site?" dialog, and
-    # (b) live-updates the .solve-eta span with elapsed + approx remaining time
-    # (counted down from _display_seconds); it clears the guard once the page rerenders.
-    # The wrapping container is display:none (ui_style .st-key-solve_watch) so the
-    # 0-height iframe contributes no vertical gap between the caption and the button.
+    # Client-side watcher: arms window.onbeforeunload while .solve-running is present so
+    # navigating away shows the browser's "Leave site?" dialog. The 0-height iframe runs
+    # actual JS (inline <script> in st.markdown is inert under React). The wrapping
+    # container is display:none (ui_style .st-key-solve_watch) so it adds no vertical gap.
     with st.container(key="solve_watch"):
         _cmp.html(
-            f'<script>(function(){{'
-            f'var D=window.parent.document,W=window.parent;'
-            f'var B={_display_seconds},t0=null;'
-            f'function tick(){{'
-            f'var el=D.querySelector(".solve-running");'
-            f'if(el){{'
-            f'W.onbeforeunload=function(e){{e.preventDefault();e.returnValue="";}};'
-            f'if(!t0)t0=Date.now();'
-            f'var es=Math.round((Date.now()-t0)/1000);'
-            f'var pf=D.querySelector(".solve-progress-fill");'
-            f'if(pf)pf.style.width=Math.min(100,Math.round(es/B*100))+"%";'
-            f'}}else{{W.onbeforeunload=null;t0=null;}}'
-            f'setTimeout(tick,1000);}}'
-            f'tick();'
-            f'}})();</script>',
+            '<script>(function(){'
+            'var D=window.parent.document,W=window.parent;'
+            'function tick(){'
+            'if(D.querySelector(".solve-running")){'
+            'W.onbeforeunload=function(e){e.preventDefault();e.returnValue="";};'
+            '}else{W.onbeforeunload=null;}'
+            'setTimeout(tick,1000);}'
+            'tick();'
+            '})();</script>',
             height=0,
         )
+
     # Gate solving on a validated courselist: disable the button while the upload
     # has blocking validation errors (missing required columns / no rows).
     valid = courselist_is_valid(courses)
@@ -91,7 +71,37 @@ def render(lang: str) -> None:
             _cap = max(60.0, len(secs) * 0.5)
             cfg.solve_time_limit_s = min(cfg.solve_time_limit_s, _cap)
             cfg.repair_time_limit_s = min(cfg.repair_time_limit_s, _cap)
-        _days = ["Pzt","Sal","Çar","Per","Cum"] if lang == "tr" else ["Mon","Tue","Wed","Thu","Fri"]
+
+        # --- step progress bar helpers --------------------------------------
+        # 5 phases map to indexed steps; each event drives the active dot.
+        _STEP_KEYS = ["gen_candidates", "construct", "repair_sweep", "soft_polish", "validate"]
+        _STEP_IDX  = {k: i for i, k in enumerate(_STEP_KEYS)}
+        _STEPS_TR  = ["Adaylar", "Taslak", "Onarım", "Kalite", "Kontrol"]
+        _STEPS_EN  = ["Slots",   "Build",  "Repair", "Polish", "Check"]
+
+        def _fmt_detail(evt):
+            key, *args = evt
+            if lang == "tr":
+                m = {
+                    "gen_candidates": lambda n: f"{n} blok işleniyor...",
+                    "construct":      lambda _: "İlk taslak oluşturuluyor...",
+                    "repair_sweep":   lambda sw, n: f"Tur {sw} · {n} blok kaldı",
+                    "soft_polish":    lambda _: "Program kalitesi iyileştiriliyor...",
+                    "validate":       lambda _: "Kontroller yapılıyor...",
+                }
+            else:
+                m = {
+                    "gen_candidates": lambda n: f"Processing {n} blocks...",
+                    "construct":      lambda _: "Building initial schedule...",
+                    "repair_sweep":   lambda sw, n: f"Round {sw} · {n} remaining",
+                    "soft_polish":    lambda _: "Optimizing schedule quality...",
+                    "validate":       lambda _: "Validating schedule...",
+                }
+            fn = m.get(key)
+            return fn(*args) if fn else ""
+
+        # --- mini-grid animation card ---------------------------------------
+        _days = ["Pzt", "Sal", "Çar", "Per", "Cum"] if lang == "tr" else ["Mon", "Tue", "Wed", "Thu", "Fri"]
         _days_html = "".join(f"<span>{d}</span>" for d in _days)
         _cells_html = "<i></i>" * 25
         _BLOCKS = [
@@ -111,8 +121,7 @@ def render(lang: str) -> None:
             f'<div class="smg-blk" style="grid-column:{c};grid-row:{r}/span {s};--c:{col};--d:{d}"></div>'
             for c, r, s, col, d in _BLOCKS
         )
-        ph.markdown(
-            f'<div class="solve-running">'
+        _grid_html = (
             f'<div class="solve-mini-grid" aria-hidden="true">'
             f'<div class="smg-days">{_days_html}</div>'
             f'<div class="smg-board">'
@@ -121,17 +130,74 @@ def render(lang: str) -> None:
             f'<div class="smg-sweep"></div>'
             f'</div>'
             f'</div>'
-            f'<div class="solve-label">'
-            f'<span class="solve-gear"></span>'
-            f'{escape(t("solve_spinner", lang, n=len(secs)))}'
-            f'</div>'
-            f'<div class="solve-progress-track">'
-            f'<div class="solve-progress-fill"></div>'
-            f'</div>'
-            f'</div>',
-            unsafe_allow_html=True,
         )
-        res = run_pipeline(_PERIOD, secs, rooms, instr, cfg, solver="auto")
+
+        def _render_card(step_idx, detail=""):
+            labels = _STEPS_TR if lang == "tr" else _STEPS_EN
+            fill_w = step_idx * 20  # dot centers at 10/30/50/70/90% → fill 0/20/40/60/80%
+            nodes_html = ""
+            for i, lbl in enumerate(labels):
+                if i < step_idx:
+                    cls = "sp-done"
+                    dot = f'<div class="sp-dot" style="animation-delay:{i * 0.07:.2f}s">&#10003;</div>'
+                elif i == step_idx:
+                    cls = "sp-active"
+                    dot = f'<div class="sp-dot">{i + 1}</div>'
+                else:
+                    cls = ""
+                    dot = f'<div class="sp-dot">{i + 1}</div>'
+                nodes_html += (
+                    f'<div class="sp-node {cls}">'
+                    f'{dot}'
+                    f'<span class="sp-lbl">{lbl}</span>'
+                    f'</div>'
+                )
+            ph.markdown(
+                f'<div class="solve-running">'
+                f'{_grid_html}'
+                f'<div class="sp-wrap">'
+                f'<div class="sp-line-bg"></div>'
+                f'<div class="sp-line-fill" style="--sp-fw:{fill_w}%"></div>'
+                f'<div class="sp-nodes">{nodes_html}</div>'
+                f'</div>'
+                f'<div class="sp-detail">{escape(detail)}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+        # Render initial card before solver starts
+        _init_detail = (f"{len(secs)} blok işleniyor..." if lang == "tr"
+                        else f"Processing {len(secs)} blocks...")
+        _render_card(0, _init_detail)
+
+        # --- run solver in background thread, poll progress queue -----------
+        _q = _queue.Queue()
+        _result = [None]
+        _error = [None]
+        _done = threading.Event()
+
+        def _run():
+            try:
+                _result[0] = run_pipeline(_PERIOD, secs, rooms, instr, cfg,
+                                          solver="auto", progress_cb=_q.put)
+            except Exception as exc:
+                _error[0] = exc
+            finally:
+                _done.set()
+
+        threading.Thread(target=_run, daemon=True).start()
+
+        while not _done.is_set():
+            try:
+                evt = _q.get(timeout=1)
+                _render_card(_STEP_IDX.get(evt[0], 0), _fmt_detail(evt))
+            except _queue.Empty:
+                pass
+
+        if _error[0]:
+            raise _error[0]
+
+        res = _result[0]
         st.session_state["result"] = res
         st.success(t("solve_done", lang, a=len(res.assignments),
                      v=len(res.violations), u=len(res.unschedulable)))

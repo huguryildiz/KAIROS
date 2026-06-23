@@ -13,10 +13,6 @@ def _type(name: str) -> str:
     return "normal"
 
 
-def _lab(name: str) -> str:
-    """Back-compat shim (legacy boolean lab flag) — kept for older callers."""
-    return "x" if _type(name) != "normal" else ""
-
 
 DEFAULT_CLASSROOMS: list[dict] = [
     {"Room": r, "Capacity": str(c), "Type": _type(r)}

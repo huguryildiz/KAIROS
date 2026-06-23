@@ -719,11 +719,11 @@ subproblem of bounded size.
 
 | Symbol | Meaning | Typical (Fall / Spring) | Bounded by config? |
 |---|---|---|---|
-| $S$ | sections | 841 / 826 | input |
-| $B$ | blocks, $\Theta(S)$ ($\approx 2.1\,S$) | 1766 / 1814 | input |
-| $\lvert R\rvert$ | rooms (physical + `Online`) | few dozen | input |
-| $\lvert I\rvert$ | instructors | hundreds | input |
-| $K$ | cohorts $(\text{dept},\text{year})$ | ~100 | input |
+| $S$ | sections | 990 / 969 | input |
+| $B$ | blocks, $\Theta(S)$ ($\approx 2.0\,S$) | 1981 / 2011 | input |
+| $\lvert R\rvert$ | rooms (physical + `Online`) | 103 + 1 | input |
+| $\lvert I\rvert$ | instructors | 302 / 307 | input |
+| $K$ | cohorts $(\text{dept},\text{year})$ | 152 / 147 | input |
 | $\lvert D\rvert$ | days | 5 (6 with Sa) | **const** |
 | $\lvert H\rvert$ | hour-slots (legal undergrad starts $\le \lvert H\rvert$) | 12 (~8 starts) | **const** |
 | $\rho$ | `max_rooms_per_block` | 12 mono / 24 repair | **const** |
@@ -736,6 +736,29 @@ block length, co-instructors — is a **bounded configuration constant**. The on
 free-growing dimension is the roster ($S$, hence $B$). Define the per-block **candidate
 fan-out** $P=\max_b\lvert\mathcal C(b)\rvert\le\rho\lvert D\rvert(\lvert H\rvert-\ell+1)=O(1)$
 in roster size.
+
+**Dataset profile — TED University sample course lists** (`data/sample_courses_2025_0XX.csv`,
+the product datasets; gitignored, so the concrete numbers are recorded here):
+
+| Metric | Fall (`001`) | Spring (`002`) |
+| --- | --- | --- |
+| Schedulable sections (course rows) | 990 | 969 |
+| Distinct course codes | 624 | 600 |
+| Sessions to place (blocks) | 1,981 | 2,011 |
+| — theory / lab | 1,896 / 85 | 1,940 / 71 |
+| Instructors (unique) | 302 | 307 |
+| Departments (cohort codes) | 60 | 57 |
+| Cohorts (dept × year) | 152 | 147 |
+| Classrooms (real, of which labs) | 103 (17) | 103 (17) |
+| Online/oversize sections → virtual room | 28 | 13 |
+| Room capacity (min / median / max) | 20 / 45 / 100 | 20 / 45 / 100 |
+| Team-taught sections | 1 | 0 |
+
+Full-period solve (`--repair`): Fall ~**91.7 %** placed / 297 s, Spring ~**88.6 %** / 628 s,
+**0 hard conflicts**. Notes on the sample: every instructor is flagged full-time
+(`is_staff = True`), so `w_parttime_days` never engages on this data; the online/oversize
+sections carry a sentinel capacity (999 Fall / 500 Spring) and route to the single unlimited
+`Online` virtual room (exempt from room no-overlap), so they are not real seat counts.
 
 ### 10.2 Model size (shared by both solvers)
 

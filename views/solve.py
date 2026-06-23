@@ -2,6 +2,7 @@
 from html import escape
 import queue as _queue
 import threading
+import time as _time
 
 import streamlit as st
 import streamlit.components.v1 as _cmp
@@ -37,15 +38,24 @@ def render(lang: str) -> None:
     # navigating away shows the browser's "Leave site?" dialog. The 0-height iframe runs
     # actual JS (inline <script> in st.markdown is inert under React). The wrapping
     # container is display:none (ui_style .st-key-solve_watch) so it adds no vertical gap.
+    _warn_text = ("⚠ Çözüm devam ediyor — lütfen sayfadan ayrılmayın" if lang == "tr"
+                  else "⚠ Solving in progress — please don't leave the page")
     with st.container(key="solve_watch"):
         _cmp.html(
             '<script>(function(){'
             'var D=window.parent.document,W=window.parent;'
+            'function ensureBanner(){'
+            'if(!D.getElementById("sp-warn-banner")){'
+            'var b=D.createElement("div");b.id="sp-warn-banner";'
+            f'b.textContent="{_warn_text}";'
+            'D.body.appendChild(b);}}'
+            'function removeBanner(){var b=D.getElementById("sp-warn-banner");if(b)b.remove();}'
             'function tick(){'
             'if(D.querySelector(".solve-running")){'
             'W.onbeforeunload=function(e){e.preventDefault();e.returnValue="";};'
-            '}else{W.onbeforeunload=null;}'
-            'setTimeout(tick,1000);}'
+            'ensureBanner();'
+            '}else{W.onbeforeunload=null;removeBanner();}'
+            'setTimeout(tick,800);}'
             'tick();'
             '})();</script>',
             height=0,
@@ -132,7 +142,7 @@ def render(lang: str) -> None:
             f'</div>'
         )
 
-        def _render_card(step_idx, detail=""):
+        def _render_card(step_idx, detail="", elapsed_s=0.0):
             labels = _STEPS_TR if lang == "tr" else _STEPS_EN
             fill_w = step_idx * 20  # dot centers at 10/30/50/70/90% → fill 0/20/40/60/80%
             nodes_html = ""
@@ -152,6 +162,8 @@ def render(lang: str) -> None:
                     f'<span class="sp-lbl">{lbl}</span>'
                     f'</div>'
                 )
+            m, s = divmod(int(elapsed_s), 60)
+            elapsed_html = f'{m:02d}:{s:02d}'
             ph.markdown(
                 f'<div class="solve-running">'
                 f'{_grid_html}'
@@ -161,6 +173,7 @@ def render(lang: str) -> None:
                 f'<div class="sp-nodes">{nodes_html}</div>'
                 f'</div>'
                 f'<div class="sp-detail">{escape(detail)}</div>'
+                f'<div class="sp-elapsed">{elapsed_html}</div>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
@@ -168,7 +181,7 @@ def render(lang: str) -> None:
         # Render initial card before solver starts
         _init_detail = (f"{len(secs)} blok işleniyor..." if lang == "tr"
                         else f"Processing {len(secs)} blocks...")
-        _render_card(0, _init_detail)
+        _render_card(0, _init_detail, 0.0)
 
         # --- run solver in background thread, poll progress queue -----------
         _q = _queue.Queue()
@@ -187,12 +200,18 @@ def render(lang: str) -> None:
 
         threading.Thread(target=_run, daemon=True).start()
 
+        _t_start = _time.perf_counter()
+        _cur_step = 0
+        _cur_detail = _init_detail
         while not _done.is_set():
+            elapsed = _time.perf_counter() - _t_start
             try:
                 evt = _q.get(timeout=1)
-                _render_card(_STEP_IDX.get(evt[0], 0), _fmt_detail(evt))
+                _cur_step = _STEP_IDX.get(evt[0], _cur_step)
+                _cur_detail = _fmt_detail(evt)
             except _queue.Empty:
                 pass
+            _render_card(_cur_step, _cur_detail, elapsed)
 
         if _error[0]:
             raise _error[0]

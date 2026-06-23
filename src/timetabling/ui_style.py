@@ -398,6 +398,11 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
 .sp-node.sp-active .sp-lbl{color:#9BB5FF;font-weight:700;}
 /* Detail line below the stepper */
 .sp-detail{font:.78rem/1 var(--font);color:rgba(200,210,255,.62);text-align:center;padding-top:4px;}
+/* Elapsed timer — injected inside .solve-running card */
+.sp-elapsed{font:700 1.55rem/1 var(--mono);color:rgba(155,181,255,.9);text-align:center;letter-spacing:.12em;padding:10px 0 2px;text-shadow:0 0 20px rgba(155,181,255,.35);}
+/* Warning banner — injected into body by JS watcher while solve runs */
+#sp-warn-banner{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;background:rgba(22,28,68,.9);border:1px solid rgba(107,127,232,.45);border-radius:24px;padding:9px 26px;color:rgba(155,181,255,.9);font:.78rem/1.4 var(--font);font-weight:500;letter-spacing:.02em;backdrop-filter:blur(14px);white-space:nowrap;pointer-events:none;animation:spWarnPulse 2.4s ease-in-out infinite;}
+@keyframes spWarnPulse{0%,100%{opacity:.55;box-shadow:0 4px 18px rgba(0,0,0,.4)}50%{opacity:1;box-shadow:0 4px 18px rgba(0,0,0,.4),0 0 14px 3px rgba(107,127,232,.22)}}
 /* Solve button — LEFT-aligned, auto-width, shimmer on load; SVG gear nudges on click. */
 .st-key-solve_btn{display:flex;justify-content:flex-start;}
 .st-key-solve_btn button{position:relative;overflow:hidden;padding:12px 40px!important;display:inline-flex!important;align-items:center;justify-content:center;gap:7px;}

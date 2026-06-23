@@ -35,11 +35,14 @@ def render(lang: str) -> None:
     total_blocks = len(res.assignments) + sum(s.get("n_blocks", len(s.get("issues", []))) for s in res.unschedulable)
     placed_pct = (len(res.assignments) / total_blocks * 100) if total_blocks else 0
     conflicts = len(res.violations)
+    elapsed = res.stats.get("total_elapsed_s", 0)
+    elapsed_str = f"{elapsed:.0f} s" if elapsed < 60 else f"{elapsed/60:.1f} dk"
     st.markdown(metric_cards_html([
         (t("res_m_placed", lang), f"{placed_pct:.0f}%", "good" if placed_pct >= 99 else "brand"),
         (t("res_m_conflicts", lang), str(conflicts), "good" if conflicts == 0 else "bad"),
         (t("res_m_rooms", lang), str(len({a['room'] for a in sched['assignments']})), ""),
         (t("res_m_unsched", lang), str(len(res.unschedulable)), "" if not res.unschedulable else "bad"),
+        (t("res_m_solve_time", lang), elapsed_str, ""),
     ]), unsafe_allow_html=True)
 
     c1, c2 = st.columns([1, 2])

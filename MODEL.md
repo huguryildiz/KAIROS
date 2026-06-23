@@ -466,6 +466,142 @@ flowchart TD
     I --> J([return gained])
 ```
 
+**Pseudocode — `solve_repair`**
+
+```text
+solve_repair(sections, rooms, cfg):
+
+  # ── Phase 1: candidate generation ─────────────────────────────────────────
+  FOR each (block, section):
+      cand_by_block[block_id] = gen_candidates(block, section, cfg)
+      # pruned by capacity, lab-room, window, blackout, instructor-unavail
+
+  # sort: hardest-to-place first (fewest legal slots), break ties largest section
+  order = sort block_ids by (|cand_by_block[bid]| ASC, section.students DESC)
+
+  # ── Phase 2: greedy construction ──────────────────────────────────────────
+  state = State()   # empty occupancy dicts
+  FOR bid in order:
+      best, best_score = None, ∞
+      FOR c in cand_by_block[bid]:
+          IF state.free_to_place(c):      # O(ℓ·ι) — room/instr/sect/theory-day
+              score = _soft_score(state, c, s, cfg)
+              # = w_cohort_conflict × new_cohort_conflicts
+              #   + 1 if opening a new instr-day beyond target (tie-break, < 1 conflict unit)
+              IF score < best_score:
+                  best, best_score = c, score
+      IF best ≠ None: state.occupy(bid, best)
+
+  # ── Phase 3: repair sweep loop ────────────────────────────────────────────
+  t0 = now();  sweep = 0
+  WHILE now() − t0 < deadline AND sweep < 25:
+      sweep += 1
+      unplaced = [bid ∉ state.placed]
+      IF unplaced = []: BREAK
+
+      sort unplaced by (|cand_by_block[bid]| ASC, students DESC)
+      gained = 0
+      FOR batch in sliding_window(unplaced, BATCH=30):
+          IF now() − t0 ≥ deadline: BREAK
+          batch = [bid for bid in batch if bid ∉ state.placed]   # recheck after prior rounds
+          IF batch ≠ []:
+              gained += repair_round(state, batch, cand_by_block, cfg)
+
+      IF gained = 0: BREAK   # converged — no improvement possible
+
+  # ── Phase 4: move-based soft polish ───────────────────────────────────────
+  IF cfg.soft_polish_in_repair:
+      budget = min(SOFT_POLISH_BUDGET_S, 0.75 × |placed|, remaining_deadline)
+      # anneal_soft: deluge acceptor; moves = relocate / chain / swap /
+      #              consolidate_instr / free_cohort_day
+      # objective: normalized(idle + maxrun + instr_days + room_stable + free_day)
+      # guard: conf (cohort-conflict) must not increase
+      anneal_soft(state, cand_by_block, cfg, budget)
+
+  RETURN build_assignments(state), stats
+```
+
+---
+
+**Pseudocode — `repair_round`**
+
+```text
+repair_round(state, batch, cand_by_block, cfg, tl=12s):
+
+  # ── 1. Identify free neighbourhood ────────────────────────────────────────
+  comp = competitors(state, batch, cand_by_block)
+  # comp = all placed blocks that share a legal (room, day, h) or instructor
+  #        slot with ANY candidate of ANY block in batch, plus same-section blocks
+
+  free     = dedupe(batch + comp)[:MAX_FREE=240]   # capped: O(1) model size
+  free_set = set(free)
+
+  # ── 2. Derive reservations from the frozen part of state ──────────────────
+  reserved_room  = {(room, day, h) : bid ∉ free_set, h ∈ span(placed[bid])}
+  reserved_instr = {(iid,  day, h) : bid ∉ free_set, iid ∈ instructors(bid)}
+  frozen_theory_day = {section_id → {day} : bid ∉ free_set, bid is theory block}
+
+  # ── 3. Build mini CP-SAT model ────────────────────────────────────────────
+  m = CpModel()
+  FOR bid in free:
+      # filter candidates that would clash with frozen blocks
+      cands = [c for c in cand_by_block[bid]
+               IF ¬reserved_room_conflict(c)
+               AND ¬reserved_instr_conflict(c)
+               AND ¬(theory AND c.day ∈ frozen_theory_day[section])]
+
+      u[bid] = BoolVar()            # 1 ↔ left unplaced (soft H1)
+      FOR c in cands:
+          x[bid,c] = BoolVar()
+
+      m.AddExactlyOne({x[bid,c] : c ∈ cands} ∪ {u[bid]})
+
+  # no-overlap constraints over the free set (room / instructor / section / theory-day)
+  FOR (room, day, h): m.Add( Σ x[bid,c] ≤ 1 )   where c covers h, c.room=room, bid ∈ free
+  FOR (iid,  day, h): m.Add( Σ x[bid,c] ≤ 1 )   where iid ∈ instructors(bid)
+  FOR (sect, day, h): m.Add( Σ x[bid,c] ≤ 1 )   where bid.section = sect
+  FOR (sect, day):   m.Add( Σ x[bid,c] ≤ 1 )   theory only — one theory session per (sect, day)
+
+  # lexicographic objective: placement first, then soft (add_soft_objective)
+  BIG = max(10 000, soft_penalty_ub + 1)
+  m.Minimize( BIG × Σ u[bid] + soft_penalty )
+
+  # ── 4. Warm-start hints ───────────────────────────────────────────────────
+  FOR bid in free:
+      IF bid ∈ state.placed:
+          hint( x[bid, current_candidate] = 1,  u[bid] = 0 )
+      ELSE:
+          hint( u[bid] = 1 )
+
+  # ── 5. Solve ──────────────────────────────────────────────────────────────
+  solver.max_time_in_seconds = tl    # 12 s
+  solver.num_search_workers  = 8
+  status = solver.Solve(m)
+
+  IF status ∉ {OPTIMAL, FEASIBLE}: RETURN 0   # no improvement possible
+
+  new_assign = {bid: c  where solver.Value(x[bid,c]) = 1}
+  old_count  = |{bid ∈ free : bid ∈ state.placed}|
+
+  # ── 6. Accept guard ───────────────────────────────────────────────────────
+  IF |new_assign| < old_count:          # would drop placements
+      RETURN 0                          # → reject, state unchanged
+
+  IF soft_shaping AND |new_assign| = old_count:
+      # FEASIBLE (timed-out) solution may be soft-worse; guard against drift
+      old_soft = _soft_total(state, cfg)
+      release free_set from state
+      occupy new_assign into state
+      IF _soft_total(state, cfg) > old_soft:
+          revert to old_placed           # → soft-reject
+          RETURN 0
+  ELSE:
+      release free_set from state
+      occupy new_assign into state
+
+  RETURN |new_assign| − old_count       # ≥ 0; positive means new placements gained
+```
+
 Full-period result on TED University's Fall/Spring sample course lists
 (`sample_courses_2025_0XX.csv`, production classroom inventory, Apple M1 Pro / native
 arm64): 001 ≈ 99.2 % placed, 002 = 100 %, both at **0 hard conflicts** — only a 14-block

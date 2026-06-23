@@ -484,6 +484,151 @@ def test_soft_score_instr_days_tiebreak_is_dial_gated():
     assert _soft_score(st, new, s_b, tight) == 1
 
 
+def test_free_cohort_day_noop_when_year_not_configured():
+    from dataclasses import replace
+    from timetabling.soft_search import try_free_cohort_day, _global_terms
+    # cohort ADA-2 (year=2) but free_day_year_levels only covers year 3
+    cfg = replace(Config(), free_day_year_levels=(3,), w_free_day=10.0)
+    days = ["Mo", "Tu", "We", "Th", "Fr"]
+    secs = [_sec(f"S{i}", f"i{i}", level=2, code=f"ADA {200+i}") for i in range(5)]
+    cand = {f"S{i}#T": [Candidate(f"S{i}#T", f"R{i}", d, 9, 2)] for i, d in enumerate(days)}
+    st = _state(*secs)
+    for i, d in enumerate(days):
+        st.occupy(f"S{i}#T", cand[f"S{i}#T"][0])
+    base = _global_terms(st, cfg)
+    ev = _eval_fn(cfg, base)
+    res = try_free_cohort_day(st, cand, "ADA-2", random.Random(0), ev, cfg)
+    assert res is None
+
+
+def test_free_cohort_day_noop_when_cohort_has_free_day():
+    from dataclasses import replace
+    from timetabling.soft_search import try_free_cohort_day, _global_terms
+    # cohort ADA-2 only uses 4 of 5 days → already has a free day
+    cfg = replace(Config(), free_day_year_levels=(2,), w_free_day=10.0)
+    days_used = ["Mo", "Tu", "We", "Th"]  # Fr is free
+    secs = [_sec(f"S{i}", f"i{i}", level=2, code=f"ADA {200+i}") for i in range(4)]
+    cand = {f"S{i}#T": [Candidate(f"S{i}#T", f"R{i}", d, 9, 2)] for i, d in enumerate(days_used)}
+    st = _state(*secs)
+    for i, d in enumerate(days_used):
+        st.occupy(f"S{i}#T", cand[f"S{i}#T"][0])
+    base = _global_terms(st, cfg)
+    ev = _eval_fn(cfg, base)
+    res = try_free_cohort_day(st, cand, "ADA-2", random.Random(0), ev, cfg)
+    assert res is None
+
+
+def test_free_cohort_day_empties_target_day_and_lowers_free_day_term():
+    from dataclasses import replace
+    from timetabling.soft_search import try_free_cohort_day, _global_terms
+    # cohort ADA-2 uses all 5 days (1 block each); each block has candidates on every other day
+    cfg = replace(Config(), free_day_year_levels=(2,), w_free_day=10.0)
+    all_days = ["Mo", "Tu", "We", "Th", "Fr"]
+    secs = [_sec(f"S{i}", f"i{i}", level=2, code=f"ADA {200+i}") for i in range(5)]
+    cand = {}
+    for i, d in enumerate(all_days):
+        bid = f"S{i}#T"
+        # own day first so cand[bid][0] is the initial placement; alts follow
+        cand[bid] = [Candidate(bid, f"R{i}", d, 9, 2)] + [
+            Candidate(bid, f"R{i}", x, 9, 2) for x in all_days if x != d]
+    st = _state(*secs)
+    for i, d in enumerate(all_days):
+        st.occupy(f"S{i}#T", cand[f"S{i}#T"][0])  # place each on its own day
+    base = _global_terms(st, cfg)
+    assert base["free_day"] == 1  # all 5 days used: max(0, 5-4) = 1
+    ev = _eval_fn(cfg, base)
+    res = try_free_cohort_day(st, cand, "ADA-2", random.Random(0), ev, cfg)
+    assert res is not None
+    dobj, dterms, revert = res
+    assert dterms["free_day"] < 0            # free day created: term drops
+    assert dobj < 0                          # objective improved
+    assert len(st.placed) == 5              # placement invariant
+    days_in_use = {c.day for bid, c in st.placed.items()
+                   if st.sec_of[bid].cohort_key == "ADA-2"}
+    assert len(days_in_use) == 4            # one day vacated
+
+
+def test_free_cohort_day_revert_restores_state():
+    from dataclasses import replace
+    from timetabling.soft_search import try_free_cohort_day, _global_terms
+    cfg = replace(Config(), free_day_year_levels=(2,), w_free_day=10.0)
+    all_days = ["Mo", "Tu", "We", "Th", "Fr"]
+    secs = [_sec(f"S{i}", f"i{i}", level=2, code=f"ADA {200+i}") for i in range(5)]
+    cand = {}
+    for i, d in enumerate(all_days):
+        bid = f"S{i}#T"
+        cand[bid] = [Candidate(bid, f"R{i}", d, 9, 2)] + [
+            Candidate(bid, f"R{i}", x, 9, 2) for x in all_days if x != d]
+    st = _state(*secs)
+    for i, d in enumerate(all_days):
+        st.occupy(f"S{i}#T", cand[f"S{i}#T"][0])  # places each on its own day
+    base = _global_terms(st, cfg)
+    snapshot_before = {bid: (c.day, c.start) for bid, c in st.placed.items()}
+    ev = _eval_fn(cfg, base)
+    res = try_free_cohort_day(st, cand, "ADA-2", random.Random(0), ev, cfg)
+    assert res is not None
+    _, _, revert = res
+    revert()
+    snapshot_after = {bid: (c.day, c.start) for bid, c in st.placed.items()}
+    assert snapshot_before == snapshot_after
+    assert _global_terms(st, cfg)["free_day"] == 1  # back to all-days-used
+
+
+def test_free_cohort_day_returns_none_when_no_alt_available():
+    from dataclasses import replace
+    from timetabling.soft_search import try_free_cohort_day, _global_terms
+    # cohort ADA-2 uses all 5 days; the lightest day (Mo) has 1 block with NO off-day candidates
+    cfg = replace(Config(), free_day_year_levels=(2,), w_free_day=10.0)
+    all_days = ["Mo", "Tu", "We", "Th", "Fr"]
+    secs = [_sec(f"S{i}", f"i{i}", level=2, code=f"ADA {200+i}") for i in range(5)]
+    cand = {}
+    for i, d in enumerate(all_days):
+        bid = f"S{i}#T"
+        if i == 0:  # S0 on Mo: only same-day candidates (no alternatives off Mo)
+            cand[bid] = [Candidate(bid, f"R{i}", "Mo", 9, 2), Candidate(bid, f"R{i}", "Mo", 11, 2)]
+        else:
+            cand[bid] = [Candidate(bid, f"R{i}", d, 9, 2)]
+    st = _state(*secs)
+    for i, d in enumerate(all_days):
+        st.occupy(f"S{i}#T", cand[f"S{i}#T"][0])
+    # Ensure Mo is the chosen src_day by making its block the only one with alternatives filtered out
+    # (already guaranteed since all days have 1 block and Mo is first in dict iteration order)
+    base = _global_terms(st, cfg)
+    ev = _eval_fn(cfg, base)
+    res = try_free_cohort_day(st, cand, "ADA-2", random.Random(0), ev, cfg)
+    assert res is None
+    # state must be unchanged after failed attempt
+    assert all(st.placed[f"S{i}#T"].day == d for i, d in enumerate(all_days))
+
+
+def test_anneal_free_cohort_day_steers_free_day_term():
+    from dataclasses import replace
+    from timetabling.soft_search import anneal_soft, _global_terms
+    # cohort ADA-2 fills all 5 days; anneal_soft with free_day_year_levels=(2,) should
+    # trigger try_free_cohort_day and reduce the free_day term to 0
+    cfg = replace(Config(), free_day_year_levels=(2,), w_free_day=20.0)
+    all_days = ["Mo", "Tu", "We", "Th", "Fr"]
+    starts = [9, 11, 13, 15, 17]  # staggered: any two sections can share a day without time-overlap
+    secs = [_sec(f"S{i}", f"i{i}", level=2, code=f"ADA {200+i}") for i in range(5)]
+    cand = {}
+    for i, d in enumerate(all_days):
+        bid = f"S{i}#T"
+        # Each section keeps its own start time on any day so consolidation never creates conf
+        cand[bid] = [Candidate(bid, f"R{i}", d, starts[i], 1)] + [
+            Candidate(bid, f"R{i}", x, starts[i], 1) for x in all_days if x != d]
+    st = _state(*secs)
+    for i, d in enumerate(all_days):
+        st.occupy(f"S{i}#T", cand[f"S{i}#T"][0])  # places each on its own day
+    t0 = _global_terms(st, cfg)
+    assert t0["free_day"] == 1
+    placed_before = len(st.placed)
+    anneal_soft(st, cand, cfg, budget_s=2.0, seed=0)
+    t1 = _global_terms(st, cfg)
+    assert len(st.placed) == placed_before       # placement invariant
+    assert t1["conf"] <= t0["conf"]              # conflict guard
+    assert t1["free_day"] < t0["free_day"]       # free day created
+
+
 def test_soft_score_cohort_conflict_dominates_instr_days():
     """The instr_days tie-break is strictly below one cohort-conflict unit, so greedy never
     trades a student conflict for instructor concentration."""

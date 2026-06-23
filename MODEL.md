@@ -529,6 +529,38 @@ avoiding evenings also distributes load and improves packing). Both student-faci
 drop by roughly a third versus the manual program's far worse 32.5 % evening / 139
 cohort-conflicts (and 0 hard violations vs the program's 83).
 
+**Soft-polish acceptor — full Fall + Spring A/B** (the move-based polish
+`soft_search.anneal_soft` uses an *acceptance rule* to decide which neighbourhood moves to
+keep. `bench/acceptor_ab.py`, all ~990 courses per period, one converged snapshot, 3 seeds,
+30 s polish/run. Objective `E` is the normalized weighted sum, starts at 55, lower is better):
+
+| period | deluge | lahc / schc |
+|---|---|---|
+| **Fall (001)** — 1981 blocks, placement 43 s (99.3 %) | E **40.6** | E 54.4 |
+| **Spring (002)** — 2011 blocks, placement 58 s (100 %) | E **42.5** | E 54.3 |
+
+Per-dial steerability (`selected_gain` = how much maxing a dial improves its own term vs the
+same-run uniform profile; **bold** = sign-stable across seeds, `~` = not sign-stable):
+
+| dial | deluge (Fall / Spring) | lahc (Fall / Spring) |
+|---|---|---|
+| maxrun — long runs | **+28 % / +24 %** | +4 %~ / +14 % |
+| instr_days — concentrate days¹ | **+14 % / +12 %** | +3 %~ / −2 %~ |
+| room_stable — one room | **+5 % / +8 %** | +3 %~ / +4 %~ |
+| free_day — year-scoped | −4 %~ / +3 %~ | +9 % / −4 %~ |
+
+`conf` (cohort-conflict guard) stayed ≤ baseline in every run; placement 99–100 %.
+
+**Decision: `soft_polish_acceptor = "deluge"`** (default since commit `30e2ce6`). Deluge is a
+fast-decay great-deluge ≈ disciplined greedy descent: it digs far deeper (E ≈ 40 vs 54) and
+follows the weight gradient predictably, so 3 of 4 dials steer sign-stably in *both* periods.
+LAHC/SCHC wander and steer noisily; at the production history length they coincide.
+
+¹ `instr_days` only steers when its target is below the working-week length
+(`max_instr_days < len(days)`); the A/B set `max_instr_days = 2` for headroom. `free_day` does
+not reliably steer under deluge and ships scope-only (year selection). Timings are Apple M1
+Pro; the harness ran an x86_64 Rosetta Python, so native arm64 is somewhat faster.
+
 ---
 
 ## 8. Validation (independent)

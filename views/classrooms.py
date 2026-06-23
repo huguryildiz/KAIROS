@@ -99,7 +99,7 @@ def render(lang: str) -> None:
                 st.rerun()
 
         # Format hint — always visible (mirrors upload step behaviour).
-        st.caption(t("cr_format_label", lang))
+        st.markdown(f'<p style="text-align:center;font-size:.875em;color:var(--muted,#888);">{t("cr_format_label", lang)}</p>', unsafe_allow_html=True)
         _cr = [t("tbl_room", lang), t("tbl_cap", lang), t("tbl_type", lang), t("tbl_room_dept", lang)]
         st.markdown(
             data_table_html(

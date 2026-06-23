@@ -92,19 +92,19 @@ def test_clamp_guard():
 
 def test_weight_presets_off_and_max():
     # legacy 5-level inputs migrate onto the 3-level scale: off -> low(5), max -> high(20)
-    off = build_config(dict(DEFAULT_SETTINGS, weights={
+    off = build_config(dict(DEFAULT_SETTINGS, instr_days_target=3, weights={
         "cohort_gap": "off", "instr_days": "off"}),
         {}, 60.0)
     assert (off.w_cohort_gap, off.w_instr_days, off.w_parttime_days) == (5, 5, 9)
-    mx = build_config(dict(DEFAULT_SETTINGS, weights={
+    mx = build_config(dict(DEFAULT_SETTINGS, instr_days_target=3, weights={
         "cohort_gap": "max", "instr_days": "max"}), {}, 60.0)
     assert (mx.w_cohort_gap, mx.w_instr_days, mx.w_parttime_days) == (20, 20, 24)
 
 
 def test_weight_presets_levels_and_parttime_offset():
     # uniform levels (low/high) and the +4 part-time offset on top of instr_days
-    cfg = build_config(DEFAULT_SETTINGS, {}, 60.0)
-    assert cfg.w_instr_days == 10 and cfg.w_parttime_days == 14   # medium (default)
+    cfg = build_config(dict(DEFAULT_SETTINGS, instr_days_target=3), {}, 60.0)
+    assert cfg.w_instr_days == 10 and cfg.w_parttime_days == 14   # medium (default), active target
     lo = build_config(dict(DEFAULT_SETTINGS, weights={"cohort_gap": "low"}), {}, 60.0)
     hi = build_config(dict(DEFAULT_SETTINGS, weights={"cohort_gap": "high"}), {}, 60.0)
     assert lo.w_cohort_gap == 5 and hi.w_cohort_gap == 20

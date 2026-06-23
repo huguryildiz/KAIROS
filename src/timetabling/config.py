@@ -39,7 +39,7 @@ class Config:
     midday_split_hour: int = 13
     # toggles
     saturday_enabled: bool = False
-    include_grad: bool = False
+    include_grad: bool = True
     include_plan_only: bool = False
     excluded_categories: tuple = ("Internship",)
     online_room: str = "Online"

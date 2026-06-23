@@ -410,6 +410,84 @@ def try_consolidate_instr(state, cand_by_block, iid, rng, eval_fn):
     return None
 
 
+def try_free_cohort_day(state, cand_by_block, cohort_key, rng, eval_fn, cfg):
+    """Compound move for free_day: vacate the least-loaded day for cohort_key, creating a
+    cohort-wide free day. Only attempts when the cohort's year level is in
+    cfg.free_day_year_levels and the cohort currently occupies ALL working days. All blocks
+    on the chosen day must find feasible alternatives on other days; if any block cannot
+    relocate the whole move is reverted atomically. Same return contract as try_relocate;
+    returns None when infeasible or the cohort already has a free day."""
+    years = {str(y) for y in cfg.free_day_year_levels}
+    if cohort_key.rsplit("-", 1)[-1] not in years:
+        return None
+
+    blocks_by_day = defaultdict(list)
+    for bid, c in state.placed.items():
+        if state.sec_of[bid].cohort_key == cohort_key:
+            blocks_by_day[c.day].append(bid)
+
+    n_days = len(cfg.days())
+    if len(blocks_by_day) < n_days:
+        return None  # cohort already has a free day
+
+    src_day = min(blocks_by_day, key=lambda d: len(blocks_by_day[d]))
+    src_blocks = list(blocks_by_day[src_day])
+
+    old = {}        # bid -> original Candidate
+    new_c = {}      # bid -> new Candidate
+    cohorts = {cohort_key}
+    instrs, rooms, blocks_set = set(), set(), set()
+
+    def _revert_partial():
+        for b in list(new_c):
+            state.release(b)
+            state.occupy(b, old[b])
+
+    for bid in src_blocks:
+        s = state.sec_of[bid]
+        iids = state.sec_instr.get(s.section_id, [])
+        c_old = state.placed.get(bid)
+        if c_old is None:
+            _revert_partial()
+            return None
+        alts = [c for c in cand_by_block.get(bid, []) if c.day != src_day]
+        rng.shuffle(alts)
+        placed_ok = False
+        for c_new in alts:
+            state.release(bid)
+            if state.free_to_place(c_new, s.section_id, iids):
+                state.occupy(bid, c_new)
+                old[bid] = c_old
+                new_c[bid] = c_new
+                instrs.update(iids)
+                rooms |= {c_old.room, c_new.room}
+                blocks_set.add(bid)
+                placed_ok = True
+                break
+            else:
+                state.occupy(bid, c_old)
+        if not placed_ok:
+            _revert_partial()
+            return None
+
+    # All blocks moved off src_day — evaluate post → revert → pre → re-apply
+    o1, t1 = eval_fn(state, cohorts, instrs, rooms, blocks_set)
+    for b in list(new_c):
+        state.release(b)
+        state.occupy(b, old[b])
+    o0, t0 = eval_fn(state, cohorts, instrs, rooms, blocks_set)
+    for b in list(new_c):
+        state.release(b)
+        state.occupy(b, new_c[b])
+
+    def revert():
+        for b in list(new_c):
+            state.release(b)
+            state.occupy(b, old[b])
+
+    return o1 - o0, _dterms(t0, t1), revert
+
+
 class SCHC:
     """Step Counting Hill Climbing (Bykov & Petrovic 2016). Accept a move iff the resulting
     cost is <= a bound; refresh the bound to the current cost every `counter_limit` steps.
@@ -548,6 +626,10 @@ def anneal_soft(state, cand_by_block, cfg, budget_s, seed=0):
     # instr_days dial is on (max_instr_days below the working-day count gives the term headroom);
     # when off it would propose mostly-rejected moves and starve maxrun/room_stable, so skip it.
     consolidate_on = bool(instr_list) and cfg.max_instr_days < len(cfg.days())
+    years = {str(y) for y in cfg.free_day_year_levels}
+    cohort_list = sorted({state.sec_of[bid].cohort_key for bid in state.placed
+                          if state.sec_of[bid].cohort_key.rsplit("-", 1)[-1] in years})
+    free_day_on = bool(cohort_list)
     base = _global_terms(state, cfg)
 
     def eval_fn(st, cohorts, instrs, rooms, blocks):
@@ -580,12 +662,15 @@ def anneal_soft(state, cand_by_block, cfg, budget_s, seed=0):
                 elif r < 0.7:
                     bid = placed[rng.randrange(len(placed))]
                     res = try_chain(state, cand_by_block, bid, rng, eval_fn, CHAIN_MAX_DEPTH)
-                elif r < 0.85 or not consolidate_on:
+                elif r < 0.85 or (not consolidate_on and not free_day_on):
                     bid = placed[rng.randrange(len(placed))]
                     res = try_relocate(state, cand_by_block, bid, rng, eval_fn)
-                else:
+                elif consolidate_on and (not free_day_on or r < 0.925):
                     iid = instr_list[rng.randrange(len(instr_list))]
                     res = try_consolidate_instr(state, cand_by_block, iid, rng, eval_fn)
+                else:
+                    cohort = cohort_list[rng.randrange(len(cohort_list))]
+                    res = try_free_cohort_day(state, cand_by_block, cohort, rng, eval_fn, cfg)
                 if res is None:
                     continue
                 _dobj, dterms, revert = res

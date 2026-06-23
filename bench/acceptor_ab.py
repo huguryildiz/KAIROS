@@ -34,7 +34,8 @@ converge_s = float(sys.argv[2]) if len(sys.argv) > 2 else 400.0
 anneal_s = float(sys.argv[3]) if len(sys.argv) > 3 else 60.0
 n_seeds = int(sys.argv[4]) if len(sys.argv) > 4 else 3
 
-ACCEPTORS = ["lahc", "deluge", "schc"]
+import os as _os0
+ACCEPTORS = _os0.environ.get("ACCEPTORS", "lahc,deluge,schc").split(",")
 SEEDS = list(range(n_seeds))
 PROFILES = {
     "UNIFORM":    {},

@@ -357,25 +357,33 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
 .st-pill.duplicate{background:var(--warn-bg);border-color:var(--warn-bd);color:var(--warn);}
 .st-pill.error{background:var(--error-bg);border-color:var(--error-bd);color:var(--error);}
 
-/* Solve "loading button" — replaces the real Streamlit button while solver runs
-   so the spinner text appears in the same visual slot as the button. */
-.solve-running{display:inline-flex;align-items:center;justify-content:center;gap:10px;
-  padding:.55rem 1rem;min-height:42px;border-radius:10px;
-  background:radial-gradient(ellipse at 80% -20%,#7080D8 0%,rgba(112,128,216,0) 60%),
-             linear-gradient(135deg,#3A4EA0 0%,#2F42A0 46%,#233178 100%);
-  color:#fff;font:600 .9rem/1 var(--font);border:1px solid #2B3A8C;
-  box-shadow:0 1px 2px rgba(31,43,103,.3),0 6px 18px -8px rgba(31,43,103,.5);
-  opacity:.9;cursor:wait;}
-/* In-progress spinner = the same gear as the button, rotating continuously. */
+/* Solve card — replaces the button while the solver runs; shows animated grid + progress */
+.solve-running{display:flex;flex-direction:column;gap:14px;padding:20px 22px;max-width:480px;margin:0 auto;
+  border-radius:14px;cursor:wait;color:#fff;
+  background:radial-gradient(ellipse at 85% -15%,#5C6CC6 0%,rgba(92,108,198,0) 56%),
+             linear-gradient(135deg,#233178 0%,#2B3A8C 50%,#1C2766 100%);
+  box-shadow:0 1px 2px rgba(31,43,103,.3),0 10px 36px -10px rgba(31,43,103,.55);}
+/* Mini timetable grid inside the card */
+.smg-days{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-bottom:6px;}
+.smg-days span{font:600 .55rem/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:rgba(190,200,240,.6);text-align:center;}
+.smg-board{position:relative;}
+.smg-cells,.smg-blocks{display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(5,20px);gap:5px;}
+.smg-blocks{position:absolute;inset:0;}
+.smg-cells i{border-radius:4px;background:rgba(255,255,255,.045);box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);}
+.smg-blk{position:relative;border-radius:4px;--c:#8E9BF2;background:linear-gradient(158deg,color-mix(in srgb,var(--c) 78%,#fff) 0%,var(--c) 60%);box-shadow:0 4px 12px -4px var(--c),inset 0 1px 0 rgba(255,255,255,.35);opacity:0;transform:translateY(-10px) scale(.93);animation:solveIn 8s var(--d,0s) cubic-bezier(.34,1.32,.5,1) infinite;}
+.smg-blk::after{content:"";position:absolute;left:5px;right:5px;top:5px;height:2px;border-radius:2px;background:rgba(255,255,255,.45);}
+.smg-sweep{position:absolute;inset:0;border-radius:6px;overflow:hidden;pointer-events:none;}
+.smg-sweep::after{content:"";position:absolute;top:-20%;bottom:-20%;left:-40%;width:30%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent);transform:skewX(-14deg);animation:gridSweep 8s 1.9s ease-in-out infinite;}
+/* Label row — !important needed; Streamlit's div{color:var(--ink)} overrides inherited white */
+.solve-label{display:flex;align-items:center;gap:9px;font:700 .95rem/1 var(--font);color:#fff!important;}
+/* Progress bar */
+.solve-progress-track{height:5px;border-radius:99px;background:rgba(255,255,255,.13);overflow:hidden;}
+.solve-progress-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,#8E9BF2,#B8C4F5);width:0%;transition:width .9s linear;}
+/* In-progress spinner gear */
 .solve-gear{width:18px;height:18px;flex:none;
   background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='white' d='M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z'/%3E%3C/svg%3E") center/contain no-repeat;
   animation:solveSpin .9s linear infinite;}
 @keyframes solveSpin{to{transform:rotate(360deg);}}
-/* Remaining-time line — sits BELOW the solve button/pill, left-aligned to match it.
-   Empty until the watcher fills it, so it adds no vertical gap before the solve starts. */
-.solve-eta{display:block;margin-top:8px;font:500 .78rem/1 var(--font);opacity:.7;
-  color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;}
-.solve-eta:empty{display:none;}
 /* Solve button — LEFT-aligned, auto-width, shimmer on load; CSS SVG gear nudges on click
    (the continuous gear rotation appears in the .solve-gear loading state while solving).
    transform-origin centred so the gear spins about its own hub. */
@@ -404,12 +412,11 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
 [data-testid="stExpander"] summary *{color:var(--ink)!important;}
 [data-testid="stExpanderDetails"]{background:var(--surface)!important;}
 
-/* Widget help (?) icon — Streamlit wraps it in a flex:1 / justify-content:flex-end
-   div that shoves it to the far right of the label. Pull it back so it sits
-   immediately to the LEFT of the label text. */
+/* Widget help (?) icon — keep it at default DOM order (after the label text)
+   so ? sits immediately to the RIGHT of the label text. */
 [data-testid="stWidgetLabel"] > div:has([data-testid="stTooltipIcon"]){
-  flex:0 0 auto!important;order:-1;justify-content:flex-start!important;
-  margin:0 5px 0 0!important;}
+  flex:0 0 auto!important;justify-content:flex-start!important;
+  margin:0 0 0 5px!important;}
 [data-testid="stWidgetLabel"] [data-testid="stTooltipIcon"] [data-testid="stTooltipHoverTarget"],
 [data-testid="stWidgetLabel"] [data-testid="stTooltipIcon"] label{margin:0!important;}
 /* The ? glyph stroke defaults to a very faint tone that vanishes in dark mode;
@@ -798,6 +805,16 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
   background:var(--surface)!important;border:1.5px solid var(--faint)!important;border-radius:10px!important;color:var(--ink)!important;}
 [data-testid="stSelectbox"] [data-baseweb="select"] [data-baseweb="select-value-container"] *{color:var(--ink)!important;-webkit-text-fill-color:var(--ink)!important;}
 [data-testid="stSelectbox"] [data-baseweb="select"] svg{fill:var(--muted)!important;}
+/* Multiselect control — same border/surface as selectbox. */
+[data-testid="stMultiSelect"] [data-baseweb="select"]>div:first-child{
+  background:var(--surface)!important;border:1.5px solid var(--faint)!important;border-radius:10px!important;}
+[data-testid="stMultiSelect"] [data-baseweb="select"] [data-baseweb="select-value-container"] *{color:var(--ink)!important;-webkit-text-fill-color:var(--ink)!important;}
+[data-testid="stMultiSelect"] [data-baseweb="select"] [data-baseweb="tag"]{
+  background:var(--cta-bg)!important;border:none!important;border-radius:999px!important;
+  color:#fff!important;-webkit-text-fill-color:#fff!important;}
+[data-testid="stMultiSelect"] [data-baseweb="select"] [data-baseweb="tag"] *{color:#fff!important;-webkit-text-fill-color:#fff!important;}
+[data-testid="stMultiSelect"] [data-baseweb="select"] [data-baseweb="tag"] svg{fill:#fff!important;}
+[data-testid="stMultiSelect"] [data-baseweb="select"] svg{fill:var(--muted)!important;}
 /* Selectbox open menu — themed in brand_css() via _popover_css() with literal
    token values so the portal dropdown is always readable in dark mode. */
 /* Checkbox label + box border follow the theme; the tick uses the brand primary. */
@@ -907,6 +924,7 @@ hr{border-color:var(--border) !important;}
   color:#fff!important;border-color:transparent!important;
   box-shadow:0 1px 2px rgba(31,43,103,.28),0 4px 12px -6px rgba(31,43,103,.5),
     inset 0 1px 0 rgba(255,255,255,.22)!important;}
+[data-testid="stBaseButton-segmented_controlActive"] p{color:#fff!important;}
 [data-testid="stBaseButton-segmented_controlActive"]:hover{filter:brightness(1.05);}
 
 /* ── Premium language switch (st.segmented_control: 🇹🇷 TR | 🇬🇧 EN) ── */

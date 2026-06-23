@@ -94,7 +94,7 @@ def render(lang: str) -> None:
                 _ingest(_SAMPLE)
                 st.rerun()
 
-        st.caption(t("upload_format_label", lang))
+        st.markdown(f'<p style="text-align:center;font-size:.875em;color:var(--muted,#888);">{t("upload_format_label", lang)}</p>', unsafe_allow_html=True)
         _h = {k: t(k, lang) for k in (
             "tbl_course_code", "tbl_course_name", "tbl_dept", "tbl_section_no",
             "tbl_lecturer_name", "tbl_lecturer_email", "tbl_capacity", "tbl_room_type",

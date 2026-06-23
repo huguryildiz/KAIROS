@@ -24,8 +24,8 @@ DEFAULT_SETTINGS: dict = {
     "day_start": 9,            # -> Config.horizon_start
     "day_end": 18,            # -> Config.undergrad_end
     "saturday": False,        # -> Config.saturday_enabled
-    "include_grad": False,    # -> Config.include_grad
-    "grad_start": 18,         # -> Config.grad_start (earliest grad start hour; only used when include_grad)
+    "include_grad": True,     # -> Config.include_grad (graduate courses always scheduled)
+    "grad_start": 18,         # -> Config.grad_start (earliest grad start hour)
     "grad_start_by_dept": {}, # -> Config.grad_start_by_dept ({dept_code: hour} earliest-start exceptions)
     "max_theory_session": 2,  # -> Config.max_theory_session
     "max_block_len": 4,       # -> Config.max_block_len
@@ -39,6 +39,11 @@ DEFAULT_SETTINGS: dict = {
     "lunch_enabled": False,
     "lunch_start": 12,        # inclusive hour
     "lunch_end": 13,          # exclusive hour
+    # instructor-days target -> Config.max_instr_days. The instr_days priority dial only
+    # bites when this target creates headroom below the active week length; 0 = "No target"
+    # (term off: max_instr_days = week length, w_instr_days = 0). Active values: 4 / 3 / 2.
+    # Default 0 (opt-in) so an untouched Settings step reproduces today's schedule.
+    "instr_days_target": 0,
     "weights": {              # preset levels, never raw numbers
         "maxrun": "medium",
         "instr_days": "medium",
@@ -162,7 +167,19 @@ def build_config(settings: dict, availability: Dict[str, list],
 
     # preference weights (the surviving soft dials; idle is fixed always-on, not a dial)
     weights = s.get("weights", {}) or {}
-    w_instr = _preset(weights, "instr_days")
+
+    # instructor-days target. "No target" (0, invalid, or >= the active week length) leaves
+    # max_instr_days at the week length so there is no headroom and the term is inert — the
+    # priority dial is forced to 0 (its off state). An active target (2-4 days, below the week
+    # length) creates headroom and lets the priority dial steer the term.
+    week_len = 5 + (1 if bool(s.get("saturday", False)) else 0)
+    target = _int(s.get("instr_days_target"), 0)
+    if 2 <= target < week_len:
+        max_instr_days = target
+        w_instr = _preset(weights, "instr_days")
+    else:
+        max_instr_days = week_len
+        w_instr = 0.0
     w_parttime = round(w_instr + 4, 1) if w_instr else 0.0
     free_day_years = tuple(int(y) for y in s.get("free_day_years", []) or []
                            if str(y).strip().isdigit())
@@ -174,7 +191,7 @@ def build_config(settings: dict, availability: Dict[str, list],
         horizon_start=day_start,
         undergrad_end=day_end,
         saturday_enabled=bool(s.get("saturday", False)),
-        include_grad=bool(s.get("include_grad", False)),
+        include_grad=bool(s.get("include_grad", True)),
         grad_start=grad_start,
         grad_start_by_dept=tuple(grad_pairs.items()),
         max_theory_session=_int(s.get("max_theory_session"), 2),
@@ -185,6 +202,7 @@ def build_config(settings: dict, availability: Dict[str, list],
         w_room_stable=_preset(weights, "room_stable"),
         w_free_day=_preset(weights, "free_day"),
         free_day_year_levels=free_day_years,
+        max_instr_days=max_instr_days,
         w_instr_days=w_instr,
         w_parttime_days=w_parttime,
         instr_unavailable=closed,

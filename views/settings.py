@@ -97,9 +97,13 @@ def _policy(lang: str, s: dict) -> None:
         # Cap the hour dropdowns to the stepper width; responsive (shrinks on
         # narrow viewports, never overflows — see CLAUDE.md mobile-portrait rule).
         st.markdown(
-            "<style>.st-key-set_day_start,.st-key-set_day_end{max-width:260px;}</style>",
+            "<style>.st-key-set_day_start,.st-key-set_day_end,"
+            ".st-key-set_grad_start{max-width:260px;}</style>",
             unsafe_allow_html=True,
         )
+        # Graduate courses are always scheduled; grad_start sits beside the undergrad
+        # end-time as a third time-window control (no toggle).
+        s["include_grad"] = True
         c1, c2, c3 = st.columns(3)
         s["day_start"] = _hour_select(c1, t("set_day_start", lang), 6, 12,
                                       s["day_start"], "set_day_start",
@@ -107,26 +111,20 @@ def _policy(lang: str, s: dict) -> None:
         s["day_end"] = _hour_select(c2, t("set_day_end", lang), 13, 21,
                                     s["day_end"], "set_day_end",
                                     help=t("set_day_end_help", lang))
-        s["max_theory_session"] = c3.number_input(t("set_max_theory", lang), min_value=1,
+        s["grad_start"] = _hour_select(c3, t("set_grad_start", lang), 6, 20,
+                                       s.get("grad_start", 18), "set_grad_start",
+                                       help=t("set_grad_start_help", lang))
+        c4, c5, _ = st.columns(3)
+        s["max_theory_session"] = c4.number_input(t("set_max_theory", lang), min_value=1,
                                                   max_value=6, value=int(s["max_theory_session"]),
                                                   step=1, help=t("set_max_theory_help", lang),
                                                   key="set_maxtheory")
-        c4, _c4b = st.columns(2)
-        s["max_block_len"] = c4.number_input(t("set_max_block", lang), min_value=1, max_value=8,
+        s["max_block_len"] = c5.number_input(t("set_max_block", lang), min_value=1, max_value=8,
                                              value=int(s["max_block_len"]), step=1,
                                              help=t("set_max_block_help", lang), key="set_maxblock")
-        c7, c8 = st.columns(2)
-        s["saturday"] = c7.toggle(t("set_saturday", lang), value=bool(s["saturday"]),
+        s["saturday"] = st.toggle(t("set_saturday", lang), value=bool(s["saturday"]),
                                   help=t("set_saturday_help", lang), key="set_sat")
-        s["include_grad"] = c8.toggle(t("set_include_grad", lang),
-                                      value=bool(s["include_grad"]), key="set_grad")
-        if s["include_grad"]:
-            _gc1, gc2 = st.columns(2)
-            s["grad_start"] = _hour_select(
-                gc2, t("set_grad_start", lang), 6, 20,
-                s.get("grad_start", 18), "set_grad_start",
-                help=t("set_grad_start_help", lang))
-            _grad_by_dept(lang, s)
+        _grad_by_dept(lang, s)
 
         # blackouts are a hard constraint -> keep them contiguous with the time-window/grad
         # block, above the preference-weights divider.
@@ -136,7 +134,6 @@ def _policy(lang: str, s: dict) -> None:
         st.divider()
         st.markdown(f"**{t('set_weights_header', lang)}**")
         st.caption(t("set_weights_desc", lang))
-        st.caption(t("set_w_alwayson", lang))            # idle is always-on (no control)
         disp = [t(f"set_w_{lv}", lang) for lv in _LEVELS]
         wc = st.columns(2)
         for i, knob in enumerate(_WEIGHT_KNOBS):
@@ -147,6 +144,23 @@ def _policy(lang: str, s: dict) -> None:
                                                  help=t(f"set_w_{knob}_help", lang))
             if chosen is not None:
                 s["weights"][knob] = _LEVELS[disp.index(chosen)]
+        # instr_days target: companion to the "compact instructor days" priority dial above.
+        # "No target" keeps the term off (no headroom); ≤4/≤3/≤2 give the dial something to
+        # optimize toward. The priority dial is inert until a target is picked (build_config
+        # forces w_instr_days=0 at "No target").
+        _t_opts = (0, 4, 3, 2)
+        t_disp = [t("set_instr_days_no_target", lang) if v == 0
+                  else t("set_instr_days_at_most", lang, n=v) for v in _t_opts]
+        try:
+            cur_t = int(s.get("instr_days_target", 0) or 0)
+        except (TypeError, ValueError):
+            cur_t = 0
+        t_idx = _t_opts.index(cur_t) if cur_t in _t_opts else 0
+        chosen_t = wc[1].segmented_control(t("set_instr_days_target", lang), t_disp,
+                                           default=t_disp[t_idx], key="set_instr_days_target",
+                                           help=t("set_instr_days_target_help", lang))
+        if chosen_t is not None:
+            s["instr_days_target"] = _t_opts[t_disp.index(chosen_t)]
         # free_day: controlled by which cohort year-levels want a free day (the gate showed a
         # strength slider can't steer it; the year selection IS its on/off control).
         cur_years = [int(y) for y in s.get("free_day_years", []) if str(y).strip().isdigit()]
@@ -213,26 +227,27 @@ def _blackouts(lang: str, s: dict) -> None:
                     st.rerun()
                 ci += 1
     else:
-        st.caption(t("set_blackout_none", lang))
+        st.markdown(
+            f'<div style="padding:6px 0 10px;">'
+            f'<span class="bl-chip" style="opacity:.55;background:var(--surface-2)!important;'
+            f'border-color:var(--border)!important;color:var(--muted)!important;">'
+            f'<span class="bl-ic">—</span>{escape(t("set_blackout_none", lang))}</span>'
+            f'</div>',
+            unsafe_allow_html=True)
 
     rev = st.session_state.get("set_rev", 0)
     scope_opts = [t("set_scope_all", lang), t("set_scope_staff", lang)]
-    a1, a2, a3 = st.columns([2.4, 1, 1])
+    a1, a2, a3, a4 = st.columns([2.4, 1, 1, 0.9], vertical_alignment="bottom")
     nd = a1.multiselect(t("set_blackout_day_scope", lang), _work_days(s),
-                        format_func=lambda d: dl_full.get(d, d), key=f"bl_days_{rev}")
+                        format_func=lambda d: dl_full.get(d, d), key=f"bl_days_{rev}",
+                        placeholder=t("set_blackout_day_placeholder", lang))
     nf = _hour_select(a2, t("set_blackout_hour_from", lang), 6, 20, 13, f"bl_from_{rev}")
     nt = _hour_select(a3, t("set_blackout_hour_to", lang), 7, 21, 17, f"bl_to_{rev}")
-    b1, b2, b3 = st.columns([2, 1.4, 1], vertical_alignment="bottom")
-    nscope = b1.segmented_control(t("set_blackout_scope", lang), scope_opts,
+    add_clicked = a4.button(t("set_blackout_add", lang), icon=":material/add:",
+                            key=f"bl_add_{rev}", type="primary")
+    nscope = st.segmented_control(t("set_blackout_scope", lang), scope_opts,
                                   default=scope_opts[0], key=f"bl_scope_{rev}")
-    if b2.button(t("set_blackout_lunch_preset", lang), icon=":material/lunch_dining:",
-                 key=f"bl_lunch_{rev}"):
-        bl.extend(r for r in _expand_blackout(["Mo", "Tu", "We", "Th", "Fr"], 12, 13, False)
-                  if r not in bl)
-        _bump()
-        st.rerun()
-    if b3.button(t("set_blackout_add", lang), icon=":material/add:",
-                 key=f"bl_add_{rev}", type="primary"):
+    if add_clicked:
         staff = nscope == scope_opts[1]
         if nd and nt > nf:
             bl.extend(r for r in _expand_blackout(nd, nf, nt, staff) if r not in bl)
@@ -307,6 +322,7 @@ def _availability(lang: str) -> None:
         s = st.session_state["settings"]
         dl = DAY_LABELS.get(lang, DAY_LABELS["en"])
         rev = st.session_state.get("set_rev", 0)
+        st.caption(t("set_avail_hint", lang))
         selected_label = st.selectbox(t("set_avail_pick", lang), labels, key=f"av_who_{rev}")
         who = label_to_email[selected_label]
 
@@ -316,8 +332,6 @@ def _availability(lang: str) -> None:
         hours = list(range(day_start, day_end))
         by_day = _slots_to_hours(avail.get(who, []), day_start, day_end, midday)
         cur = {(d, h) for d, hs in by_day.items() for h in hs}
-
-        st.caption(t("set_avail_hint", lang))
         st.markdown(
             "<div class='hm-leg'>"
             f"<span><i class='av'></i>{escape(t('set_avail_free', lang))}</span>"

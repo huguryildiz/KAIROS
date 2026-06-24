@@ -7,6 +7,7 @@ import streamlit as st
 from timetabling.ui_grid import filter_assignments, distinct_values
 from timetabling.ui_style import metric_cards_html, week_grid_html, eyebrow_html, unschedulable_html
 from timetabling.pdf_export import build_pdf_bundle
+from timetabling.export import CSV_FIELDS
 from timetabling.i18n import t
 
 # View dimension -> i18n label key for the "view by" selector.
@@ -81,7 +82,7 @@ def render(lang: str) -> None:
                            file_name="schedule.json",
                            key="dl_json")
         st.download_button(t("res_dl_csv", lang),
-                           pd.DataFrame(sched["assignments"]).to_csv(index=False),
+                           pd.DataFrame(sched["assignments"], columns=CSV_FIELDS).to_csv(index=False).encode("utf-8-sig"),
                            file_name="schedule.csv",
                            key="dl_csv")
         st.download_button(t("res_dl_pdf", lang), pdf_data,

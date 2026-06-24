@@ -368,6 +368,6 @@ def read_raw(file_or_path) -> List[List[str]]:
     line numbers in the report match the original file.
     """
     import pandas as pd
-    df = pd.read_csv(file_or_path, header=None, dtype=str,
+    df = pd.read_csv(file_or_path, header=None, dtype=str, encoding="utf-8-sig",
                      skip_blank_lines=False, keep_default_na=False)
     return df.fillna("").astype(str).values.tolist()

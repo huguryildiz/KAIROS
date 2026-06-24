@@ -1821,7 +1821,7 @@ def unschedulable_html(items: list, lang: str = DEFAULT_LANG) -> str:
     cards = []
     for s in items:
         sid = escape(str(s.get("section_id", "")))
-        students = s.get("students", 0)
+        students = s.get("section_cap", 0)
         issues = s.get("issues", [])
         seen_reasons: set = set()
         unique_issues = [(blk, r) for blk, r in issues if not (r in seen_reasons or seen_reasons.add(r))]

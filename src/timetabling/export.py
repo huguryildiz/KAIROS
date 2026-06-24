@@ -5,6 +5,13 @@ import csv
 
 from .model import Assignment, Section, Room, Instructor
 
+# Canonical per-assignment column order, shared by the CLI CSV and the UI
+# download so both outputs are byte-for-byte identical in shape.
+CSV_FIELDS = ["section_id", "course_code", "course_name", "block_kind",
+              "instructor_id", "instructor_name", "cohort", "dept",
+              "section_cap", "section_p", "day", "start", "end",
+              "room", "room_cap", "is_lab_room"]
+
 
 def build_schedule_dict(period, assignments: List[Assignment], sections: List[Section],
                         rooms: Dict[str, Room], instructors: Dict[str, Instructor],
@@ -25,13 +32,12 @@ def build_schedule_dict(period, assignments: List[Assignment], sections: List[Se
             "instructor_name": " & ".join(names),
             "cohort": s.cohort_key if s else "",
             "dept": s.dept_code if s else "",
-            "students": s.students if s else 0,
+            "section_cap": s.students if s else 0,
             "section_p": s.P if s else 0,
             "day": a.day, "start": a.start, "end": a.end,
             "room": a.room,
             "room_cap": room.cap if room else None,
             "is_lab_room": room.is_lab if room else None,
-            "flags": [],
         })
     return {
         "period": period,
@@ -48,11 +54,10 @@ def write_schedule_json(path: str, payload: dict) -> None:
 
 
 def write_csv(path: str, payload: dict) -> None:
-    fields = ["section_id", "course_code", "course_name", "block_kind", "instructor_id",
-              "instructor_name", "cohort", "dept", "students", "day", "start", "end",
-              "room", "room_cap", "is_lab_room"]
-    with open(path, "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
+    # utf-8-sig: BOM lets Excel (notably on macOS) detect UTF-8 so Turkish
+    # characters (ş, ğ, ü, …) render correctly instead of mojibake.
+    with open(path, "w", newline="", encoding="utf-8-sig") as f:
+        w = csv.DictWriter(f, fieldnames=CSV_FIELDS, extrasaction="ignore")
         w.writeheader()
         for item in payload["assignments"]:
             w.writerow(item)

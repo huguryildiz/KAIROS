@@ -53,3 +53,6 @@ bench/_ctx/
 
 # graphify knowledge graph outputs — local only
 graphify-out/
+
+# ITC-2007 benchmark instance files (downloaded, not tracked)
+benchmarks/itc2007/

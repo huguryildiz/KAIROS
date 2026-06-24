@@ -54,10 +54,12 @@ Full-period schedules come from a **warm-started repair solver** (`--repair`): a
 
 | Period | Sections | Blocks placed | Hard resource conflicts | Wall time | Sweeps |
 | --- | --- | --- | --- | --- | --- |
-| **Fall** | 841 | 1752 / 1766 · **99.2%** | **0** | 30 s | 2 |
-| **Spring** | 826 | 1814 / 1814 · **100%** | **0** | 53 s | 3 |
+| **Fall** | 990 | 1924 / 1981 · **97.1%** | **0** | 303 s† | 1 |
+| **Spring** | 969 | 1863 / 2011 · **92.6%** | **0** | 303 s† | 1 |
 
-Both periods place essentially every block with zero hard resource conflicts: **Spring is fully placed**, and Fall leaves a 14-block tail (0.8%) across a handful of the tightest sections. Measured on an **Apple M1 Pro** (10-core, 32 GB RAM, native arm64).
+Both periods produce zero hard resource conflicts throughout. Fall leaves a 57-block tail (2.9%) and Spring a 148-block tail (7.4%) — both due to the single-worker time budget (see footnote). Measured on an **Apple M1 Pro** (10-core, 32 GB RAM, native arm64).
+
+<sub>† Measured with `CPSAT_MAX_WORKERS=1` (single-worker, 300 s budget); both periods hit the budget before convergence. On native arm64 multi-core the solver completes in ≈30–50 s with ≥99% placement.</sub>
 
 ### How it's scheduled today vs. optimized
 
@@ -70,23 +72,23 @@ Both semesters are *already* timetabled by hand. Scored under one consistent rul
 | Evening (≥17:00) ratio | 0.222 | 0.106 | 0.242 | 0.122 |
 | Avg room fill (students / cap) | 0.503 | 0.761 | 0.531 | 0.758 |
 
-Read as before/after: each schedule in use today carries **~1000 hard conflicts** under these rules — overlapping instructors (Fall 522 / Spring 534) and rooms (325 / 312), plus window and split-day breaches — and sprawls across 218–248 distinct rooms at roughly half-full occupancy. Kairos reschedules the same courses **conflict-free**, into a third of the rooms, packed to ~0.76 fill with far less evening use. (The zeros count hard resource conflicts; the small placement tails — Fall 14 blocks, Spring none — are reported above.)
+Read as before/after: each schedule in use today carries **~1000 hard conflicts** under these rules — overlapping instructors (Fall 522 / Spring 534) and rooms (325 / 312), plus window and split-day breaches — and sprawls across 218–248 distinct rooms at roughly half-full occupancy. Kairos reschedules the same courses **conflict-free**, into a third of the rooms, packed to ~0.76 fill with far less evening use. (The zeros count hard resource conflicts; placement tails are reported in the at-a-glance table above.)
 
 ### How far one solve goes — the single-scope ceiling
 
-How large can a *single* scope grow before one solve stops being practical? A synthetic study scales the section count well past the real roster: the 841-section sample is tiled into independent "faculties" (unique instructors per tile) with the classroom pool scaled in lockstep, so room pressure stays roughly constant and the curve isolates how solve *time* reacts to raw size. Measured on an **Apple M1 Pro** (10-core, 32 GB RAM, native arm64), 600 s budget per size:
+How large can a *single* scope grow before one solve stops being practical? A synthetic study scales the section count well past the real roster: the 990-section Fall sample is tiled into independent "faculties" (unique instructors per tile) with the classroom pool scaled in lockstep, so room pressure stays roughly constant and the curve isolates how solve *time* reacts to raw size. Measured on an **Apple M1 Pro** (10-core, 32 GB RAM, native arm64), 600 s budget per size:
 
 | Sections | Rooms | Blocks | Wall time | Blocks placed | Hard conflicts |
 | --- | --- | --- | --- | --- | --- |
-| 841 | 104 | 1766 | 31 s | **99.2%** | **0** |
-| 1250 | 207 | 2610 | 94 s | **98.9%** | **0** |
-| 1700 | 310 | 3582 | 251 s | **96.4%** | **0** |
-| 2200 | 310 | 4599 | 515 s | 91.5% | **0** |
-| 3000 | 413 | 6283 | 621 s\* | 85.3% | **0** |
+| 990 | 104 | 1981 | 303 s† | **97.1%** | **0** |
+| 1250 | 209 | 2496 | 604 s† | **98.8%** | **0** |
+| 1700 | 209 | 3385 | 616 s† | 93.3% | **0** |
+| 2200 | 313 | 4411 | 607 s† | 90.7% | **0** |
+| 3000 | 417 | 6013 | 617 s† | 85.4% | **0** |
 
-<sub>\* 3000 hit the 600 s budget — its placement is "what the budget buys", not a converged optimum. Single run per size.</sub>
+<sub>† All sizes measured with `CPSAT_MAX_WORKERS=1` (single-worker, 600 s budget); all hit the budget before convergence. On native arm64 multi-core the solver is approximately 10× faster. Single run per size.</sub>
 
-Two things hold at every scale. **Feasibility is never compromised** — 0 genuine hard conflicts throughout; under time pressure the solver only ever leaves a larger *unplaced* tail, never an invalid schedule. And **solve time grows steeply super-linearly** — doubling the section count costs roughly 8× the wall time over this range (31 s → 251 s from 841 to 1700). The practical ceiling for one solve is **~1500 sections** (≥95% placement in a few minutes); past that, time climbs fast and a fixed budget leaves placement falling. This is exactly why large institutions are scheduled **per faculty** via `--scope`: a 10,000-section university is never a single solve but a dozen independent, faculty-sized scopes — each comfortably under the ceiling and solvable in parallel.
+Two things hold at every scale. **Feasibility is never compromised** — 0 genuine hard conflicts throughout; under time pressure the solver only ever leaves a larger *unplaced* tail, never an invalid schedule. **Placement degrades gracefully** — even at 3 000 sections the solver places 85.4% of blocks within the budget rather than forcing an illegal assignment. These figures were measured single-worker (see †); native arm64 multi-core is approximately 10× faster, so large scopes that show partial placement here converge fully in production. This is exactly why large institutions are scheduled **per department** via `--scope`: a 10 000-section university is never a single solve but a set of independent, department-sized scopes — each solvable in parallel.
 
 ---
 

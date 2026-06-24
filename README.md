@@ -50,7 +50,7 @@ Hand-building a university timetable means juggling hundreds of sections against
 
 ## At a glance
 
-Full-period schedules come from a **warm-started repair solver** (`--repair`): a fast greedy construction seeds an initial solution, then CP-SAT repeatedly re-optimizes small *relatedness* neighbourhoods until no further block can be placed. Measured across **TED University**'s real Fall and Spring rosters, against its production classroom inventory, every rule enforced:
+Full-period schedules come from a **warm-started repair solver** (`--repair`): a fast greedy construction seeds an initial solution, then CP-SAT repeatedly re-optimizes small *relatedness* neighbourhoods until convergence or 25 sweeps. Measured across **TED University**'s real Fall and Spring rosters, against its production classroom inventory, every rule enforced:
 
 | Period | Sections | Blocks placed | Hard resource conflicts | Wall time | Sweeps |
 | --- | --- | --- | --- | --- | --- |
@@ -107,8 +107,11 @@ Hard rules and soft preferences are kept strictly apart. **Hard constraints can 
 | **Self no-overlap** — a section's own blocks never collide | CP-SAT model |
 | **Theory different-day** — a section's theory sessions fall on distinct days | model + repair + validator |
 | **Room type** — a section's `Room Type` demand (`normal/lab/pc/studio`) is honored; a generic lab block lands in a lab-family room | candidate pruning |
+| **Instructor unavailability** — per-instructor AM/PM half-day blocks configured in Settings are excluded from that instructor's candidates | candidate pruning |
+| **Fixed slot** — a section with a `Fixed` column value is pinned to exactly that `(day, start)` slot | candidate pruning + CP-SAT |
+| **Room ownership** — rooms with a `Dept` column value are restricted to that owning department | candidate pruning |
 
-Most hard rules are enforced **during candidate generation** — only legal `(room, day, start)` placements are ever produced — while cross-block relations become model/solver constraints. A virtual `Online` room absorbs online and oversize (>100) sections: unlimited capacity, exempt from room no-overlap, while instructor and self constraints still apply.
+Most hard rules are enforced **during candidate generation** — only legal `(room, day, start)` placements are ever produced — while cross-block relations become model/solver constraints. A virtual `Online` room absorbs online and oversize sections (those whose enrollment exceeds the capacity of every physical room in the loaded inventory): unlimited capacity, exempt from room no-overlap, while instructor and self constraints still apply.
 
 ### Soft objective (minimized)
 
@@ -214,7 +217,7 @@ A single-page progressive flow that walks a user from raw CSV to a placed timeta
 
 | Step | What happens |
 | --- | --- |
-| **1 · Data** | One numbered step bundling three sub-sections: **upload** a course-list CSV — or press **Try with sample dataset** (100 sections across 18 departments, bundled, PII-free); a **review** with a KPI summary (sections, courses, departments, instructors) and non-blocking data-quality warnings; and an editable **classroom** inventory — add / edit / delete rooms with capacity and a categorical **Type** (`normal/lab/pc/studio`), 103 PII-free defaults preloaded, the `Online` virtual room added automatically |
+| **1 · Data** | One numbered step bundling three sub-sections: **upload** a course-list CSV — or press **Try with sample dataset** (100 sections across 18 departments, bundled, PII-free); a **review** with a KPI summary (sections, courses, departments, instructors) and non-blocking data-quality warnings; and a **classroom** step — upload a room-inventory CSV or load the bundled 107-room sample (PII-free, `normal/lab/pc/studio` types, optional `Dept` ownership column); the `Online` virtual room is added automatically |
 | **2 · School Settings** | Optional per-school config: day window, lunch-break protection, blackout slots, Saturday / graduate toggles (incl. a configurable graduate earliest-start hour for daytime grad classes), block-split policy, instructor daily-hours and weekly-days caps, preference-weight presets, and per-hour instructor availability — backward-compatible (untouched = today's defaults) |
 | **3 · Solve** | **Solve** button — disabled with a targeted warning and a scroll-to link if course data has blocking errors (missing required columns / no rows) or the classroom inventory is empty; otherwise one click starts the 5-phase progress display (candidates → construct → repair sweeps → soft polish → validate) with a Python-driven step indicator and animated progress bar, under a fixed 3000 s budget |
 | **4 · Results** | Weekly Mon–Fri grid, view by cohort / room / instructor / department / course, conflict + unschedulable lists, and `schedule.json` / `schedule.csv` / multi-page PDF download |
@@ -303,19 +306,20 @@ PYTHONPATH=src python3 -m timetabling --period 001 --scope all --mode A --repair
 
 # A single faculty — small scopes solve directly in one CP-SAT pass
 PYTHONPATH=src python3 -m timetabling --period 001 \
-    --scope faculty="Basic Sciences" --mode A,B --time-limit 60
+    --scope department="Basic Sciences" --mode A,B --time-limit 60
 ```
 
 | Flag | Values | Description |
 | --- | --- | --- |
 | `--period` | `001` (Fall) · `002` (Spring) | Term to schedule — each solved independently |
-| `--scope` | `all` · `faculty=<text>` · `dept=<CODE>` | The slice to solve |
+| `--scope` | `all` · `department=<text>` · `dept=<CODE>` | The slice to solve |
 | `--mode` | `A,B` (default) · `A` · `B` | **A** solves from scratch; **B** benchmarks against the existing program |
 | `--repair` | flag | Warm-started neighbourhood repair — the path for full `--scope all` |
 | `--decompose` | flag | Legacy faculty-by-faculty greedy (~49%), kept for comparison |
 | `--time-limit` | seconds (default 60) | CP-SAT budget for the single-shot solver |
 | `--max-rooms-per-block N` | int | Truncate each block's candidate room list (model-size lever) |
 | `--out` | dir (default `out/`) | Output folder |
+| `--no-soft-shaping` | flag | Disable cohort-conflict soft shaping during greedy construction |
 
 ---
 
@@ -353,7 +357,7 @@ ECON 101,Principles of Economics,Faculty of Econ.,ECON 101_01,John Smith,john.sm
 
 | File | Contents |
 | --- | --- |
-| `schedule_<period>.json` | The UI contract — per-assignment `section_id, course_code, block_kind, instructor, cohort, day, start, end, room, …` plus `meta`, `unmet_soft`, `conflicts` |
+| `schedule_<period>.json` | The UI contract — per-assignment `section_id, course_code, block_kind, instructor_id, instructor_name, cohort, day, start, end, room, …` plus `meta`, `unmet_soft`, `conflicts` |
 | `schedule_<period>.csv` | The same assignments as a flat table |
 | `data_quality_<period>.json` | Parse / room / cohort / join checks + the unschedulable list |
 | `mode_b_<period>.json` | Generated vs. existing program — conflict counts, room usage, evening ratio |

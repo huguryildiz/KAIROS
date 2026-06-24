@@ -85,8 +85,9 @@ repair soft polish (§7b) use separate objectives — see §5 for which terms be
 - **Maxrun — anti-fatigue** (`w_maxrun=10.0`) — penalize consecutive teaching runs longer than
   `max_consecutive_hours`=3 h, over cohorts and instructors (repair polish).
 - **Compress instructor weeks** (`w_instr_days=10.0` full-time, `w_parttime_days=14.0`
-  part-time) — penalize teaching-days beyond target `max_instr_days`; gated on the
-  `instr_days_target` UI dial (No target = off; ≤4/≤3/≤2 = active).
+  part-time in the CP-SAT monolith; repair polish uses `w_instr_days` only) — monolith:
+  penalizes every teaching day; repair polish: penalizes days beyond target `max_instr_days`.
+  Gated on the `instr_days_target` UI dial (No target = off; ≤4/≤3/≤2 = active).
 - **Room stability** (`w_room_stable=10.0`) — penalize each section that uses more than one
   room across its blocks (repair polish).
 - **Free day** (`w_free_day=10.0`, year-scoped) — penalize each configured year-level cohort
@@ -132,16 +133,16 @@ behavior. A downloadable "school profile" JSON persists a school's settings + av
 | $I$ | instructors (a section may have several — team teaching) | `lecturers.csv` |
 | $I_b \subseteq I$ | instructors of the section owning block $b$ | |
 | $D$ | days $\{\mathrm{Mo,Tu,We,Th,Fr}\}$ (Sa optional) | `Config.days()` |
-| $H$ | hour-slots, $9 \le h < 21$ | `horizon_start`, `horizon_end` |
+| $H$ | hour-slots, `horizon_start` $\le h <$ `horizon_end` (defaults: $9 \le h < 21$) | `horizon_start`, `horizon_end` |
 | $K$ | cohorts $k=(\text{dept code},\ \text{year level})$ | `Section.cohort_key` |
 | $\mathcal{C}(b)$ | legal candidate placements $(r,d,h)$ of block $b$ | `gen_candidates` |
 
 **Blocks** are derived from a section's T/P/L hours:
 
-- Theory hours $T+P$ split into sessions of at most `max_theory_session` $=2$ h (e.g.
+- Theory hours $T+P$ split into sessions of at most `max_theory_session` h (default 2 h; e.g.
   $T{=}3 \to 2+1$), each forced onto a different day.
-- One lab block of $L$ hours, split at `max_block_len` $=4$ h, pinned to the section's
-  real lab room.
+- One lab block of $L$ hours, split at `max_block_len` h (default 4 h), pinned to the
+  section's real lab room.
 - Block ids: single `#T` / `#L`; split `#T1..#Tk` / `#L1..#Lk`. Kind detected by
   `"#L" in block_id`; `section_id = block_id.split("#")[0]`.
 
@@ -155,10 +156,10 @@ behavior. A downloadable "school profile" JSON persists a school's settings + av
 | $n_s$ | students in section $s$ | — | enrollment |
 | $\ell_b$ | length of block $b$ (hours) | — | T/P/L |
 | $\mathrm{lvl}_s$ | course level of section $s$ ($1\dots4$) | — | course code |
-| $T$ | instructor-days target (soft; excess days penalized) | $5=\text{off}$ | `max_instr_days` |
+| $T$ | instructor-days target (soft; repair: days beyond target penalized; monolith: all teaching days penalized) | `week_len`=off (5 M–F; 6 with Sa) | `max_instr_days` |
 | $T_{\text{run}}$ | maxrun threshold (soft; consecutive-hour excess) | $3$ | `max_consecutive_hours` |
 | — | undergrad end-of-day | 18:00 | `undergrad_end` |
-| — | graduate window | 18:00–21:00 | `grad_start`, `grad_end` |
+| — | graduate window | 18:00–21:00 | `grad_start` (tunable); `grad_end=21` fixed — not a settings field (`_HORIZON_END=21` in `settings.py`) |
 | — | blackout slots (universal / full-time-only) | none | `blackout` (School Settings) |
 | — | AM/PM boundary (legacy half-day availability) | 13:00 (hardcoded in `settings.py`) | — (`Config.midday_split_hour` exists but is not read by `build_config`; vestigial field) |
 | — | per-instructor unavailable slots | — | `instr_unavailable` (School Settings) |
@@ -183,7 +184,8 @@ $(r,d,h)$ only when it already satisfies:
 
 - room capacity $\mathrm{cap}_r \ge n_s$ (the virtual `Online` room is exempt — unlimited);
 - lab-room pinning — a lab block only in the section's designated lab room;
-- undergrad window $h + \ell_b \le \texttt{cfg.undergrad\_end}$ (default 18; tunable via School Settings "Day end");
+- undergrad window: $h \ge \texttt{cfg.horizon\_start}$ and $h + \ell_b \le \texttt{cfg.undergrad\_end}$ (default 9–18; tunable);
+- graduate window (level > 4): $h \ge \texttt{cfg.grad\_start\_for(dept)}$ and $h + \ell_b \le \texttt{cfg.grad\_end}$ (default start 18, end fixed 21);
 - configured blackout slots (`Config.blackout`; none by default — each is universal or
   full-time-only, resolved per section via `cfg.closed_hours`);
 - per-instructor availability (`Config.instr_unavailable`) — a candidate is dropped if any of
@@ -364,7 +366,7 @@ $$
 ### 5.6 S-Order — $w_{\text{order}}=1$ (monolith)
 
 $$
-\mathrm{pen}_{\text{order}} \;=\; \sum_{b,r,d,h} w_{\text{order}}\,(4-\mathrm{lvl}_s)\,(h-9)\; x_{b,r,d,h}
+\mathrm{pen}_{\text{order}} \;=\; \sum_{b,r,d,h} w_{\text{order}}\,(4-\mathrm{lvl}_s)\,(h-\texttt{cfg.horizon\_start})\; x_{b,r,d,h}
 \qquad (\,2 \le \mathrm{lvl}_s \le 4\,)
 $$
 
@@ -379,7 +381,7 @@ $$
 $$
 
 - One unit per Engineering **lab** block placed off Thursday/Friday (`eng_lab_days`).
-- Matches sections whose faculty contains `eng_faculty_match` $=$ "Engineering".
+- Matches sections whose faculty contains `eng_department_match` $=$ "Engineering".
 
 ### 5.8 Cohort-conflict — $w_{\text{coh}}=50$
 
@@ -521,13 +523,13 @@ solve_repair(sections, rooms, cfg, progress_cb=None):
           IF now() − t0 ≥ deadline: BREAK
           batch = [bid for bid in batch if bid ∉ state.placed]   # recheck after prior rounds
           IF batch ≠ []:
-              gained += repair_round(state, batch, cand_by_block, cfg)
+              gained += repair_round(state, batch, cand_by_block)
 
       IF gained = 0: BREAK   # converged — no improvement possible
 
   # ── Phase 4: move-based soft polish ───────────────────────────────────────
   IF cfg.soft_polish_in_repair:
-      budget = min(SOFT_POLISH_BUDGET_S, 0.75 × |placed|, remaining_deadline)
+      budget = min(SOFT_POLISH_BUDGET_S, max(30.0, 0.75 × |placed|), remaining_deadline)
       # anneal_soft: deluge acceptor; moves = relocate / chain / swap /
       #              consolidate_instr / free_cohort_day
       # objective: normalized(idle + maxrun + instr_days + room_stable + free_day)
@@ -542,7 +544,7 @@ solve_repair(sections, rooms, cfg, progress_cb=None):
 **Pseudocode — `repair_round`**
 
 ```text
-repair_round(state, batch, cand_by_block, cfg, tl=12s):
+repair_round(state, batch, cand_by_block, tl=12s):
 
   # ── 1. Identify free neighbourhood ────────────────────────────────────────
   comp = competitors(state, batch, cand_by_block)
@@ -578,9 +580,10 @@ repair_round(state, batch, cand_by_block, cfg, tl=12s):
   FOR (sect, day, h): m.Add( Σ x[bid,c] ≤ 1 )   where bid.section = sect
   FOR (sect, day):   m.Add( Σ x[bid,c] ≤ 1 )   theory only — one theory session per (sect, day)
 
-  # lexicographic objective: placement first, then soft (add_soft_objective)
-  BIG = max(10 000, soft_penalty_ub + 1)
-  m.Minimize( BIG × Σ u[bid] + soft_penalty )
+  # objective: minimize unplaced count only (pure placement; no soft terms)
+  # soft shaping is done in greedy construction, not here
+  BIG = 10 000
+  m.Minimize( BIG × Σ u[bid] )
 
   # ── 4. Warm-start hints ───────────────────────────────────────────────────
   FOR bid in free:
@@ -600,22 +603,13 @@ repair_round(state, batch, cand_by_block, cfg, tl=12s):
   old_count  = |{bid ∈ free : bid ∈ state.placed}|
 
   # ── 6. Accept guard ───────────────────────────────────────────────────────
-  IF |new_assign| < old_count:          # would drop placements
-      RETURN 0                          # → reject, state unchanged
+  IF |new_assign| < old_count:   # would drop placements → reject, state unchanged
+      RETURN 0
 
-  IF soft_shaping AND |new_assign| = old_count:
-      # FEASIBLE (timed-out) solution may be soft-worse; guard against drift
-      old_soft = _soft_total(state, cfg)
-      release free_set from state
-      occupy new_assign into state
-      IF _soft_total(state, cfg) > old_soft:
-          revert to old_placed           # → soft-reject
-          RETURN 0
-  ELSE:
-      release free_set from state
-      occupy new_assign into state
+  release free_set from state
+  occupy new_assign into state
 
-  RETURN |new_assign| − old_count       # ≥ 0; positive means new placements gained
+  RETURN |new_assign| − old_count   # ≥ 0; positive means new placements gained
 ```
 
 Full-period result on TED University's Fall/Spring sample course lists
@@ -729,7 +723,7 @@ year scope, §5.1 / §5.5); `conf` is the **soft** cohort-conflict proxy (§5.8)
 **Why this run uses CP-SAT — and what that implies.** `repair` is *not* solver-free. The
 production solver is `greedy_construct` (pure Python: candidate pruning + `State` no-overlap)
 followed by iterated `repair_round`, and **each `repair_round` builds a mini CP-SAT model and
-calls `CpSolver.Solve()` with 8 search workers** ([`repair.py:339–401`](src/timetabling/repair.py#L339-L401))
+calls `CpSolver.Solve()` with 8 search workers** ([`repair.py:320–437`](src/timetabling/repair.py#L320-L437))
 over a freed neighbourhood — soft-H1 placement (a block may stay unplaced), `≤1` room/instructor/
 section no-overlap, `≤1` theory-per-day, warm-started from the current placement (§7b). So the
 full `solve_repair` needs a real solver environment: in a sandboxed/headless runtime where
@@ -765,9 +759,9 @@ every bad field falls back to its default and the solve proceeds.
 | Max block length | 1–8 | `max_block_len` | longest lab block before splitting (default 4 h) |
 | Instructor-days target | No target / ≤4 / ≤3 / ≤2 | `max_instr_days` + `w_instr_days` | No target → term off (weight forced 0); ≤4/≤3/≤2 sets target and activates the instr_days soft term. See §5.1. |
 | Saturday | checkbox | `saturday_enabled` | add Sa to the teaching week |
-| Graduate | checkbox | `include_grad` | enable the graduate window (blocks end by 21:00) |
-| Graduate earliest start | 6–20 | `grad_start` | earliest hour a graduate block may start (default 18:00; only shown/used when Graduate is on). Lower it to allow daytime graduate classes; guarded to `day_start ≤ grad_start < 21`, else reverts to 18. |
-| Lunch break | checkbox + 9–16 / 10–17 | `lunch_enabled`, `lunch_start`, `lunch_end` | when on, `[lunch_start, lunch_end)` is closed every active day as a **universal** blackout (default off; expanded into `Config.blackout` slots in `build_config`). |
+| Graduate | (always True — not a UI control; hardcoded `s["include_grad"] = True` in `views/settings.py`) | `include_grad` | graduate courses are always scheduled; the field exists in `Config` and `DEFAULT_SETTINGS` but no checkbox is rendered. |
+| Graduate earliest start | 6–20 | `grad_start` | earliest hour a graduate block may start (default 18:00). Lower it to allow daytime graduate classes; guarded to `day_start ≤ grad_start < 21`, else reverts to 18. |
+| Lunch break | (not currently rendered in UI) | `lunch_enabled`, `lunch_start`, `lunch_end` | `build_config` supports it: when on, `[lunch_start, lunch_end)` is closed every active day as a universal blackout. Present in `DEFAULT_SETTINGS` but no UI control is shown; effectively always off. |
 
 The day window is guarded (`0 ≤ day_start < day_end ≤ 21`); out-of-order values silently
 revert to `9 / 18`. The AM/PM boundary for legacy half-day availability is no longer a
@@ -888,8 +882,8 @@ the product datasets; gitignored, so the concrete numbers are recorded here):
 | Room capacity (min / median / max) | 20 / 45 / 100 | 20 / 45 / 100 |
 | Team-taught sections | 1 | 0 |
 
-Full-period solve (`--repair`): Fall ~**91.7 %** placed / 297 s, Spring ~**88.6 %** / 628 s,
-**0 hard conflicts**. Notes on the sample: every instructor is flagged full-time
+Full-period solve (`--repair`): Fall **99.3 %** placed / 43 s, Spring **100 %** / 58 s,
+**0 hard conflicts** (measured with deluge acceptor, `bench/acceptor_ab.py`, 3 seeds — see §7c). Notes on the sample: every instructor is flagged full-time
 (`is_staff = True`), so `w_parttime_days` never engages on this data; the online/oversize
 sections carry a sentinel capacity (999 Fall / 500 Spring) and route to the single unlimited
 `Online` virtual room (exempt from room no-overlap), so they are not real seat counts.
@@ -898,7 +892,7 @@ sections carry a sentinel capacity (999 Fall / 500 Spring) and route to the sing
 
 Candidate pruning makes the variable set **sparse**: a variable exists only for a legal
 $(r,d,h)$, never the full $B\times\lvert R\rvert\times\lvert D\rvert\times\lvert H\rvert$
-product (`gen_candidates`, model_cpsat.py:63; var creation, model_cpsat.py:138).
+product (`gen_candidates`, model_cpsat.py:70; var creation, model_cpsat.py:142).
 
 $$\lvert x\rvert \;=\; \sum_{b}\lvert\mathcal C(b)\rvert \;\le\; B\cdot P \;=\; O(B).$$
 
@@ -911,12 +905,12 @@ linear:
 
 | Constraint (§4–§6) | # rows | # literals | Code |
 |---|---|---|---|
-| H1 placement | $B$ | $O(BP)$ | `AddExactlyOne`, model_cpsat.py:166 |
-| H2 room no-overlap | $\le\lvert R\rvert\lvert D\rvert\lvert H\rvert$ | $O(BP\ell)$ | model_cpsat.py:169 |
-| H3 instructor no-overlap | $\le\lvert I\rvert\lvert D\rvert\lvert H\rvert$ | $O(BP\ell\iota)$ | model_cpsat.py:169 |
-| H_self section no-overlap | $\le\lvert S\rvert\lvert D\rvert\lvert H\rvert$ | $O(BP\ell)$ | model_cpsat.py:169 |
-| H_day theory diff-day | $O(\lvert S\rvert\lvert D\rvert)$ | $O(B\lvert D\rvert)$ | model_cpsat.py:224 |
-| soft terms (all) | $O(K\lvert D\rvert\lvert H\rvert+\lvert I\rvert\lvert D\rvert+\lvert R\rvert)$ | $O(BP\ell)$ | model_cpsat.py:174-293 |
+| H1 placement | $B$ | $O(BP)$ | `AddExactlyOne`, model_cpsat.py:165 |
+| H2 room no-overlap | $\le\lvert R\rvert\lvert D\rvert\lvert H\rvert$ | $O(BP\ell)$ | model_cpsat.py:168-171 |
+| H3 instructor no-overlap | $\le\lvert I\rvert\lvert D\rvert\lvert H\rvert$ | $O(BP\ell\iota)$ | model_cpsat.py:168-171 |
+| H_self section no-overlap | $\le\lvert S\rvert\lvert D\rvert\lvert H\rvert$ | $O(BP\ell)$ | model_cpsat.py:168-171 |
+| H_day theory diff-day | $O(\lvert S\rvert\lvert D\rvert)$ | $O(B\lvert D\rvert)$ | model_cpsat.py:223-230 |
+| soft terms (all) | $O(K\lvert D\rvert\lvert H\rvert+\lvert I\rvert\lvert D\rvert+\lvert R\rvert)$ | $O(BP\ell)$ | model_cpsat.py:174-251 |
 
 **Total model size $=O(BP\ell\iota)=O(B)$** for fixed config. The $\ell\iota$ factors are the
 span expansion (a block occupies $\ell$ hours) and team teaching (each co-instructor enters
@@ -931,10 +925,10 @@ per-block rules (capacity, lab-room, window, blackout) add **no** rows at all.
 | Solve (CP-SAT) | **NP-hard**, capped by `solve_time_limit_s` | $\propto$ model size |
 
 - **Build** is dominated by `gen_candidates` ($O(P\ell\iota)$ per block — the blackout /
-  availability membership checks scan the $\ell$-hour span, model_cpsat.py:83-88) plus
-  populating the occupancy dictionaries ($O(\ell\iota)$ per variable, model_cpsat.py:150-165).
+  availability membership checks scan the $\ell$-hour span, model_cpsat.py:87-95) plus
+  populating the occupancy dictionaries ($O(\ell\iota)$ per variable, model_cpsat.py:154-164).
 - **Solve** is the NP-hard part. Without a limit the worst case is $2^{O(BP)}$; here it is
-  bounded by `CpSolver.max_time_in_seconds` over 8 workers (model_cpsat.py:296-297). The
+  bounded by `CpSolver.max_time_in_seconds` over 8 workers (model_cpsat.py:254-255). The
   **time is capped; the guarantee is not** — at ≈367 k variables CP-SAT cannot even certify
   feasibility within budget and returns **UNKNOWN** (§7a). That single fact is why the repair
   solver exists.
@@ -949,22 +943,22 @@ neighbourhoods.
 
 | Phase | Time | Space | Code |
 |---|---|---|---|
-| Generate all candidates | $O(BP\ell\iota)$ | $O(BP)$ stored | repair.py:305-308 |
-| Sort blocks (fewest cands first) | $O(B\log B)$ | — | repair.py:310-311 |
-| Greedy construction | $O(BP\ell\iota)$ | $O(B\ell\iota)$ state | repair.py:120 |
-| Repair sweep loop | $\le 25\lceil B/30\rceil=O(B)$ rounds | $O(1)$ live model | repair.py:324-341 |
-| — each `repair_round` | build $O(FP\ell\iota)$; solve $\le$ 12 s | $O(1)$, $F\le 240$ | repair.py:177 |
+| Generate all candidates | $O(BP\ell\iota)$ | $O(BP)$ stored | repair.py:463-467 |
+| Sort blocks (fewest cands first) | $O(B\log B)$ | — | repair.py:469-470 |
+| Greedy construction | $O(BP\ell\iota)$ | $O(B\ell\iota)$ state | repair.py:133 |
+| Repair sweep loop | $\le 25\lceil B/30\rceil=O(B)$ rounds | $O(1)$ live model | repair.py:481-498 |
+| — each `repair_round` | build $O(FP\ell\iota)$; solve $\le$ 12 s | $O(1)$, $F\le 240$ | repair.py:320 |
 | Polish (move-based soft, opt-in) | remaining `repair_time_limit_s` budget | $O(1)$ | soft_search.py:anneal_soft |
 
 - **Greedy construction** checks each candidate with `free_to_place` ($O(\ell\iota)$) and, with
-  soft-shaping on, `_soft_score` ($O(\ell)$) — repair.py:35-117. Linear overall.
-- **The decisive property:** `BATCH = 30` and `MAX_FREE = 240` (repair.py:148-150) cap every
+  soft-shaping on, `_soft_score` ($O(\ell)$) — repair.py:99-154. Linear overall.
+- **The decisive property:** `BATCH = 30` and `MAX_FREE = 240` (repair.py:157-159) cap every
   CP-SAT call to a neighbourhood of **≤240 blocks regardless of $B$**. The live model each
   round is therefore $O(1)$ in the roster — its build time, memory, and per-solve cost do not
   grow with the school. Each round is bounded by `REPAIR_TL`=12 s over 8 workers
-  (repair.py:273-274). The sweep count is bounded (≤25, plus a `gained==0` early exit), so the
+  (repair.py:399-401). The sweep count is bounded (≤25, plus a `gained==0` early exit), so the
   total is $O(B)$ rounds, the whole loop hard-capped by the `repair_time_limit_s` deadline
-  (repair.py:320, 340).
+  (repair.py:482, 492, 497).
 
 **Monolith vs repair, stated as complexity:** the monolith solves **one $\Theta(B)$
 NP-hard model** (UNKNOWN at full size); repair solves **many $O(1)$-sized NP-hard models**
@@ -976,7 +970,7 @@ Apple M1 Pro / native arm64): **Fall ≈30 s / 99.2 %, Spring ≈53 s / 100 %, b
 
 - **Monolith:** $O(BP\ell\iota)$ model + CP-SAT internals — the ≥4 GiB RAM floor.
 - **Repair:** $O(BP)$ for `cand_by_block` + $O(B\ell\iota)$ for the `State` occupancy dicts
-  (`room_owner` / `instr_slot` / `sect_slot` / `cohort_slot_courses`, repair.py:16-90), and a
+  (`room_owner` / `instr_slot` / `sect_slot` / `cohort_slot_courses`, repair.py:17-97), and a
   **bounded $O(1)$ live mini-model**. So repair's *peak solver memory is independent of $B$* —
   the second reason it is the production path.
 - **Block derivation** (`build_sections` / `blocks_from_tpl`, derive.py): $O(S)$ time, $O(B)$

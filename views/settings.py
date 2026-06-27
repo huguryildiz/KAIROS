@@ -9,12 +9,20 @@ import streamlit as st
 
 from timetabling.ui_style import eyebrow_html
 from timetabling.i18n import t, DAY_LABELS, DAY_LABELS_FULL
-from timetabling.settings import profile_to_json, profile_from_json, _LEGACY_LEVEL
+from timetabling.settings import (profile_to_json, profile_from_json, _LEGACY_LEVEL,
+                                  QUALITY_MODES)
 from timetabling.ui_input import normalize_name, grad_dept_codes
 
 _LEVELS = ("low", "medium", "high")
+_QUALITY_LEVELS = ("fast", "balanced", "best")
 _MIDDAY = 13  # hardcoded AM/PM boundary; no longer a user-facing setting
 _WEIGHT_KNOBS = ("maxrun", "instr_days", "room_stable")
+
+
+def _sync_segmented_key(key: str, options, current):
+    """Keep Streamlit's widget key on stable option values, not translated labels."""
+    if st.session_state.get(key) not in options:
+        st.session_state[key] = current
 
 
 def _hour_select(col, label: str, lo: int, hi: int, cur, key: str, help: str = "") -> int:
@@ -152,35 +160,54 @@ def _policy(lang: str, s: dict) -> None:
         _blackouts(lang, s)
 
         st.divider()
+        st.markdown(f"**{t('set_quality_header', lang)}**")
+        st.caption(t("set_quality_desc", lang))
+        cur_q = str(s.get("quality_mode", "balanced"))
+        cur_q = cur_q if cur_q in _QUALITY_LEVELS else "balanced"
+        _sync_segmented_key("set_quality_mode", _QUALITY_LEVELS, cur_q)
+        chosen_q = st.segmented_control(
+            t("set_quality_mode", lang), _QUALITY_LEVELS, default=cur_q,
+            format_func=lambda lv: t(f"set_quality_{lv}", lang),
+            key="set_quality_mode", help=t("set_quality_mode_help", lang),
+        )
+        if chosen_q is not None:
+            s["quality_mode"] = chosen_q
+        st.caption(t("set_quality_budget", lang,
+                     n=int(QUALITY_MODES.get(s.get("quality_mode", "balanced"), 300))))
+
+        st.divider()
         st.markdown(f"**{t('set_weights_header', lang)}**")
         st.caption(t("set_weights_desc", lang))
-        disp = [t(f"set_w_{lv}", lang) for lv in _LEVELS]
         wc = st.columns(2)
         for i, knob in enumerate(_WEIGHT_KNOBS):
             cur = _LEGACY_LEVEL.get(s["weights"].get(knob, "medium"), s["weights"].get(knob, "medium"))
-            idx = _LEVELS.index(cur) if cur in _LEVELS else 1
-            chosen = wc[i % 2].segmented_control(t(f"set_w_{knob}", lang), disp,
-                                                 default=disp[idx], key=f"set_w_{knob}",
-                                                 help=t(f"set_w_{knob}_help", lang))
+            cur = cur if cur in _LEVELS else "medium"
+            key = f"set_w_{knob}"
+            _sync_segmented_key(key, _LEVELS, cur)
+            chosen = wc[i % 2].segmented_control(
+                t(f"set_w_{knob}", lang), _LEVELS, default=cur,
+                format_func=lambda lv: t(f"set_w_{lv}", lang), key=key,
+                help=t(f"set_w_{knob}_help", lang))
             if chosen is not None:
-                s["weights"][knob] = _LEVELS[disp.index(chosen)]
+                s["weights"][knob] = chosen
         # instr_days target: companion to the "compact instructor days" priority dial above.
         # "No target" keeps the term off (no headroom); ≤4/≤3/≤2 give the dial something to
         # optimize toward. The priority dial is inert until a target is picked (build_config
         # forces w_instr_days=0 at "No target").
         _t_opts = (0, 4, 3, 2)
-        t_disp = [t("set_instr_days_no_target", lang) if v == 0
-                  else t("set_instr_days_at_most", lang, n=v) for v in _t_opts]
         try:
             cur_t = int(s.get("instr_days_target", 0) or 0)
         except (TypeError, ValueError):
             cur_t = 0
-        t_idx = _t_opts.index(cur_t) if cur_t in _t_opts else 0
-        chosen_t = wc[1].segmented_control(t("set_instr_days_target", lang), t_disp,
-                                           default=t_disp[t_idx], key="set_instr_days_target",
-                                           help=t("set_instr_days_target_help", lang))
+        cur_t = cur_t if cur_t in _t_opts else 0
+        _sync_segmented_key("set_instr_days_target", _t_opts, cur_t)
+        chosen_t = wc[1].segmented_control(
+            t("set_instr_days_target", lang), _t_opts, default=cur_t,
+            format_func=lambda v: t("set_instr_days_no_target", lang) if v == 0
+            else t("set_instr_days_at_most", lang, n=v),
+            key="set_instr_days_target", help=t("set_instr_days_target_help", lang))
         if chosen_t is not None:
-            s["instr_days_target"] = _t_opts[t_disp.index(chosen_t)]
+            s["instr_days_target"] = chosen_t
         # free_day: controlled by which cohort year-levels want a free day (the gate showed a
         # strength slider can't steer it; the year selection IS its on/off control).
         cur_years = [int(y) for y in s.get("free_day_years", []) if str(y).strip().isdigit()]

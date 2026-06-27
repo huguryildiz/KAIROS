@@ -22,6 +22,7 @@ def test_build_config_three_levels_map_to_5_10_20():
 def test_default_settings_medium_maps_to_todays_default():
     cfg = build_config(DEFAULT_SETTINGS, {}, 60)
     assert cfg.w_maxrun == 10.0 and cfg.w_room_stable == 10.0  # medium == 10, unchanged from before
+    assert cfg.soft_polish_budget_s == 300.0
 
 
 def test_unknown_priority_falls_back_to_medium():

@@ -23,7 +23,7 @@ st.set_page_config(page_title="Kairos | Course Timetabling", page_icon=_ICON, la
 st.session_state.setdefault("courses", [])
 st.session_state.setdefault("classrooms", [])
 st.session_state.setdefault("result", None)
-st.session_state.setdefault("lang", "tr")
+st.session_state.setdefault("lang", "en")
 st.session_state.setdefault("theme", "light")
 st.session_state.setdefault("settings", default_settings())
 st.session_state.setdefault("availability", {})

@@ -1,4 +1,4 @@
-# Kairos — Input Data Schema
+# KAIROS — Input Data Schema
 
 The two tables a user provides to the Kairos timetabling UI, and how the solver
 derives everything else from them. This is the **input contract**: the importer
@@ -38,10 +38,10 @@ fallback order.
 | `Part-time` | optional | Boolean. Overrides the `(S)` name marker; empty/`false` ⇒ full-time. |
 | `T` | ✓ | Theory hours → theory blocks. |
 | `P` | ✓ | Practice/application hours (`U` = Uygulama) → blocks. |
-| `L` | ✓ | Lab hours → lab block (routed to a lab-family room). |
+| `L` | ✓ | Lab hours → lab block. If the legacy Plan path pins a specific lab room, the lab block uses that room; in the UI upload path `L > 0` alone does **not** force a lab-family room. |
 | `Section Capacity` | ✓ | **Quota.** The **hard** room-sizing input (`room.Capacity ≥ Section Capacity`). |
-| `~Students` | optional | Actual/expected enrolment → KPIs + soft right-sizing. Absent ⇒ falls back to `Section Capacity`. |
-| `Room Type` | optional | **Required room category** (demand): `normal / lab / pc / studio`. Empty ⇒ `normal`; `L > 0` ⇒ lab-family. Shares Table 2's vocabulary. |
+| `~Students` | optional | Legacy/estimated enrolment field. Current solver stores one section size: `Section Capacity` wins; `~Students` is only a fallback in importer paths that permit it. There is no separate soft right-sizing signal yet. |
+| `Room Type` | optional | **Required room category** (demand): `lab / pc / studio`. Empty or `normal` ⇒ no categorical restriction; explicit `lab`, `pc`, or `studio` restricts the section to exactly that room type. Shares Table 2's vocabulary. |
 | `Fixed` | optional | Fixed slot for the section's first block (e.g. `"Mo 9"`). |
 | `Year` | optional | Overrides the cohort year level. |
 
@@ -55,7 +55,7 @@ are solver output): `ROOM`, `ROOM_CAP`, `SCHEDULE`.
 | `Room` | ✓ | Room name (unique). |
 | `Capacity` | ✓ | Seats. |
 | `Type` | ✓ | Room category: `normal / lab / pc / studio`. Derived from a name token (`-PC` → `pc`, `-L` → `lab`) when seeding; editable. |
-| `Dept` | optional | **Department ownership** for lab/pc rooms. Semicolon-separated list of department names (e.g. `"Department of Software Engineering;Dept.of Electric&Electronics Engineering"`). When set, only sections whose `DEPT` matches one of the listed values may be assigned to this room. Empty = open to all departments (general pool). Has no effect on `normal` / `studio` rooms. |
+| `Dept` | optional | **Department ownership** for a room. Semicolon-separated list of department names (e.g. `"Department of Software Engineering;Dept.of Electric&Electronics Engineering"`). When set, only sections whose `DEPT` matches one of the listed values may be assigned to this room. Empty = open to all departments (general pool). |
 
 The user must upload a classroom CSV or load the built-in sample in the Classrooms step before solving.
 
@@ -66,10 +66,11 @@ The user must upload a classroom CSV or load the built-in sample in the Classroo
 Both tables speak one controlled vocabulary: **`normal / lab / pc / studio`**.
 
 - **Supply** = a room's `Type`. **Demand** = a section's `Room Type`.
-- **Matching:** a lab block (`L > 0`) must land in a **lab-family** room
-  (`lab / pc / studio`); when a section names an explicit `Room Type`, the
-  relevant block is restricted to that exact category; theory blocks go to
-  `normal` rooms unless overridden.
+- **Matching:** when a section names an explicit `Room Type`, its blocks are
+  restricted to that exact category (`lab`, `pc`, or `studio`). With no demand
+  (`Room Type` empty or `normal`), any fitting physical room is eligible after
+  capacity and ownership checks. A lab block is pinned only when the legacy Plan
+  route found a specific lab room.
 - A single boolean `is_lab` is insufficient: `lab ≠ pc ≠ studio` (a programming
   course must not land in a wet lab; **Architecture studios** are their own
   category).
@@ -79,7 +80,7 @@ Both tables speak one controlled vocabulary: **`normal / lab / pc / studio`**.
 ## Derivations & semantics
 
 **Cohort** = `(program code, year level)` — a **soft proxy**, never a hard rule
-(see MODEL.md §5.7).
+(see MODEL.md §5.8).
 - Program code = the **letter prefix of `COURSE_CODE`** (`ADA 403` → `ADA`) — *not*
   `DEPT`. `DEPT` is faculty-level (it groups many programs), too coarse for a
   cohort; using it would manufacture false conflicts.
@@ -97,11 +98,11 @@ Both tables speak one controlled vocabulary: **`normal / lab / pc / studio`**.
   marker in the name. The full-time-only blackout applies if **any** co-instructor
   is full-time.
 
-**Capacity — three distinct roles, never conflated.**
-- `Section Capacity` (quota) → the only hard capacity input; room matching always
-  uses it.
-- `~Students` (actual) → KPIs + a soft "don't put 10 students in a 100-seat room"
-  signal; absent ⇒ uses `Section Capacity`.
+**Capacity — current implementation.**
+- `Section Capacity` (quota) → the hard capacity input; room matching uses it.
+- `~Students` → optional fallback/preview field. When `Section Capacity` is
+  present, the solver and exported `section_cap` use `Section Capacity`, not a
+  separate actual-enrolment value.
 - A room's `Capacity` → the room's own size (Table 2).
 
 **What is *not* in either file** (it lives in the **School Settings** step, not the

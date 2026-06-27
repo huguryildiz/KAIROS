@@ -3,6 +3,7 @@ from html import escape
 import queue as _queue
 import threading
 import time as _time
+from pathlib import Path
 
 import streamlit as st
 import streamlit.components.v1 as _cmp
@@ -13,6 +14,7 @@ from timetabling.ui_input import (build_sections_from_courselist,
                                   classrooms_is_valid, courselist_is_valid)
 from timetabling.route import mark_virtual
 from timetabling.pipeline import run_pipeline, AUTO_REPAIR_THRESHOLD
+from timetabling.export import write_schedule_outputs
 from timetabling.i18n import t
 from timetabling.ui_style import eyebrow_html
 
@@ -234,6 +236,7 @@ def render(lang: str) -> None:
             raise _error[0]
 
         res = _result[0]
+        write_schedule_outputs(Path("out"), res.schedule, period=_PERIOD)
         st.session_state["result"] = res
         st.success(t("solve_done", lang, a=len(res.assignments),
                      v=len(res.violations), u=len(res.unschedulable)))

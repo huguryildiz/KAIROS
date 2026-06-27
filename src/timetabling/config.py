@@ -87,6 +87,7 @@ class Config:
     soft_polish_acceptor: str = "deluge"      # schc | lahc | deluge | sa (deluge wins full Fall+Spring A/B, measured 2026-06-23)
     soft_polish_counter_limit: int = 5000     # SCHC counter / LAHC history length
     soft_polish_seed: int = 0
+    soft_polish_budget_s: float = 300.0       # UI quality mode cap: fast/balanced/best
     evening_from_hour: int = 17   # an hour-slot >= this counts as "evening" for the soft penalty
 
     def days(self) -> list:

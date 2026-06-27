@@ -1,4 +1,4 @@
-# Kairos — UCTP Optimization Model
+# KAIROS — UCTP Optimization Model
 
 A formal description of the University Course Timetabling (UCTP) model implemented in
 `src/timetabling/`. This is the ground-truth specification: it mirrors `model_cpsat.py`
@@ -74,8 +74,10 @@ A placement that breaks one of these is never even generated, so it cannot occur
 
 ### Soft preferences — penalized in the objective (never block a schedule)
 
-Listed heaviest weight first; weights live in `config.py`. The CP-SAT monolith (§7a) and the
-repair soft polish (§7b) use separate objectives — see §5 for which terms belong to which path.
+Listed by default weight magnitude where that comparison is meaningful; weights live in
+`config.py`, but `settings.build_config()` may zero or remap some UI-controlled terms at solve
+time. The CP-SAT monolith (§7a) and the repair soft polish (§7b) use separate objectives — see
+§5 for which terms belong to which path.
 
 - **Cohort course-conflict** (`w_cohort_conflict=50`) — penalize each extra distinct course a
   `(dept, year)` cohort runs in the same slot (CP-SAT monolith objective; no-regress guard in
@@ -85,13 +87,16 @@ repair soft polish (§7b) use separate objectives — see §5 for which terms be
 - **Maxrun — anti-fatigue** (`w_maxrun=10.0`) — penalize consecutive teaching runs longer than
   `max_consecutive_hours`=3 h, over cohorts and instructors (repair polish).
 - **Compress instructor weeks** (`w_instr_days=10.0` full-time, `w_parttime_days=14.0`
-  part-time in the CP-SAT monolith; repair polish uses `w_instr_days` only) — monolith:
-  penalizes every teaching day; repair polish: penalizes days beyond target `max_instr_days`.
-  Gated on the `instr_days_target` UI dial (No target = off; ≤4/≤3/≤2 = active).
+  part-time when an instructor-days target is active; repair polish uses `w_instr_days` only) —
+  CP-SAT monolith penalizes every teaching day; repair polish penalizes days beyond
+  `max_instr_days`. In the UI default (`instr_days_target = No target`) `build_config()` forces
+  both weights to 0.0; choosing ≤4/≤3/≤2 activates the term and maps the priority preset to
+  5.0/10.0/20.0, with part-time set to `w_instr_days + 4.0`.
 - **Room stability** (`w_room_stable=10.0`) — penalize each section that uses more than one
   room across its blocks (repair polish).
 - **Free day** (`w_free_day=10.0`, year-scoped) — penalize each configured year-level cohort
-  that occupies all working days (repair polish; scope = year multiselect, not a weight dial).
+  that occupies all working days (repair polish). The UI does not expose a free-day weight dial;
+  the year multiselect is the on/off scope control. With no selected years, the term is inert.
 - **Level ordering** (`w_order=1`) — prefer low-level courses early, high-level courses late;
   level-1 and graduate excluded (CP-SAT monolith).
 - **Engineering labs late-week** (`w_englab=1`) — prefer Engineering lab blocks on Thu/Fri
@@ -99,25 +104,28 @@ repair soft polish (§7b) use separate objectives — see §5 for which terms be
 - **Non-adjacent split** (`w_nonadjacent=0`, disabled) — superseded by the hard theory
   different-day rule.
 
-### What "0 hard violations" means
+### What "0 resource conflicts" means
 
 `validate.py` independently re-checks: placement, capacity, lab-room, daytime window,
 blackouts, room/instructor/self no-overlap, theory different-day, and the School-Settings
 hard rules — **room-type** (lab requirement), **fixed** (pinned first block), and
-**instructor-unavailable**. Cohort conflict is a **soft metric**,
-never a hard violation.
+**instructor-unavailable**. In benchmark summaries, "0 resource conflicts" excludes
+`placement` violations caused by an unplaced tail; those are reported separately. Cohort
+conflict is a **soft metric**, never a hard violation.
 
 ### Per-school configuration (School Settings)
 
 Every value above is a default tuned to our own institution; the **School Settings** UI step
 lets another school override them without touching code. A session **Settings** dict plus an
 instructor-availability map are turned into a `Config` by `settings.build_config` at solve
-time: the day window, blackout slots, Saturday / graduate toggles, block-split policy, the
-instructor-days target, and the soft-preference weights (as low / medium / high presets)
-are all configurable; optional course-list columns (`Year`, `Part-time`, `Room Type`, `Fixed`)
-override the string-derived cohort / part-time / lab / pin. Unconfigured settings reproduce the
-defaults documented here exactly, so this section stays the ground truth for the out-of-the-box
-behavior. A downloadable "school profile" JSON persists a school's settings + availability.
+time: the day window, blackout slots, Saturday toggle, graduate earliest-start controls,
+block-split policy, the instructor-days target, free-day year scope, and the soft-preference
+weights (as low / medium / high presets) are configurable. Graduate courses are always
+included in the UI; there is no graduate on/off checkbox. Optional course-list columns
+(`Year`, `Part-time`, `Room Type`, `Fixed`) override the string-derived cohort / part-time /
+room demand / pin. Unconfigured settings reproduce the UI defaults documented here exactly.
+The pure profile JSON functions remain in `settings.py`, but the profile expander is currently
+disabled in the UI (§9.5).
 **§9 is the exhaustive control-by-control list of what the UI exposes.**
 
 ---
@@ -261,9 +269,10 @@ $$
 - Lab blocks are excluded (the rule keys on $b\in B_s^{\text{theory}}$).
 
 > **Cohort overlap is deliberately not a hard constraint.** A hard course-level cohort
-> rule was proven infeasible at scale, so it is a *soft* term (§5.7). "0 hard violations"
+> rule was proven infeasible at scale, so it is a *soft* term (§5.8). "0 resource conflicts"
 > therefore means H2, H3, H_self, H_day plus the pruned rules (capacity, lab-room, window,
-> blackout) all hold.
+> blackout) all hold for placed blocks; unplaced tails are tracked separately as placement
+> violations.
 
 ---
 
@@ -293,8 +302,10 @@ $$
 
 **Semantics differ by path.** In the CP-SAT monolith the weight applies to *every* teaching
 day; in the repair soft polish it applies to days **beyond the target** $T = $ `max_instr_days`
-($\max(0,\ \text{days}_i - T)$). Both paths force $w = 0$ when `instr_days_target` is "No
-target" (the default), making the term inert until the target dial is activated.
+($\max(0,\ \text{days}_i - T)$). In the School-Settings/UI path, `build_config` forces
+`w_instr_days = w_parttime_days = 0` when `instr_days_target` is "No target" (the default),
+making the term inert until the target dial is activated. Raw `Config()` still carries the
+legacy nonzero weights used by CLI/model tests unless a Settings dict is built.
 
 **Target lever (`instr_days_target` → `max_instr_days`).** The School-Settings control maps
 **No target → $T = $ week length** (5, or 6 with Saturday) which is the term's **off state**
@@ -304,13 +315,14 @@ target** (opt-in; an untouched settings step reproduces today's schedule). The c
 move in the soft polish (`soft_search`) is gated on $T < $ week length, so a weight alone
 cannot steer this term — *the target must create headroom first*.
 
-**Measured steerability (2026-06-23, deluge polish, both datasets).** Same-snapshot sweep
+**Measured steerability (2026-06-23, deluge polish).** Measured across **TED University's**
+real Fall and Spring rosters. Same-snapshot sweep
 (`bench/instr_days_target_sweep.py`; converge once, polish each target from the identical
 snapshot, $w_{\text{instr}}$ maxed). Metric = real per-instructor teaching-day distribution
 (target-independent, so comparable across targets). As the target tightens **No target → ≤4 →
 ≤3**, mean teaching-days falls **monotonically** and the matching $\le k$ share climbs, with
 `conf` held at baseline (no placement/conflict regression) on **both** Fall (001) and Spring
-(002):
+(002) rosters:
 
 | target | 001 mean days | 001 %≤3 | 002 mean days | 002 %≤3 |
 | --- | --- | --- | --- | --- |
@@ -339,7 +351,9 @@ $$
 $$
 
 - Penalizes idle gaps inside a cohort's day: span (last $-$ first) minus busy hours.
-- Applies to cohorts of year level $\in\{2,3,4\}$ (`compact_cohort_years`).
+- In the CP-SAT monolith, `w_cohort_gap` applies to cohorts of year level
+  $\in\{2,3,4\}$ (`compact_cohort_years`). In the repair soft polish, `idle`
+  is computed over all cohorts.
 - $\mathrm{first}/\mathrm{last}$ are min/max active hour of the cohort that day.
 - In the CP-SAT monolith the weight is `w_cohort_gap=10.0`; in the repair soft polish the
   same metric is `idle`, weighted `w_idle=15.0` (always-on, fixed — not a UI dial).
@@ -360,8 +374,9 @@ $$
 
 - Penalizes each configured year-level cohort ($\in$ `free_day_year_levels`) that occupies
   all working days (i.e. has no completely empty day in the week).
-- Controlled by year scope (multiselect in the UI), not by a weight dial — the dial cannot
-  steer this term (move-on/off verified; see §7b). Fixed weight 10.0.
+- Controlled by year scope (multiselect in the UI), not by a weight dial. `w_free_day` remains
+  a fixed `Config` coefficient (10.0) used by repair polish, but with no selected years there
+  are no cohorts in scope, so the term is inert.
 
 ### 5.6 S-Order — $w_{\text{order}}=1$ (monolith)
 
@@ -612,10 +627,12 @@ repair_round(state, batch, cand_by_block, tl=12s):
   RETURN |new_assign| − old_count   # ≥ 0; positive means new placements gained
 ```
 
-Full-period result on TED University's Fall/Spring sample course lists
-(`sample_courses_2025_0XX.csv`, production classroom inventory, Apple M1 Pro / native
-arm64): 001 ≈ 99.2 % placed, 002 = 100 %, both at **0 hard conflicts** — only a 14-block
-Fall tail (0.8 %) remains, Spring fully placed.
+Current preserved full-roster benchmark (`out/benchmark_real.json`, 300 s single-worker
+budget, Apple M1 Pro arm64) on TED University's Fall/Spring sample course lists
+(`sample_courses_2025_0XX.csv`) places **1924 / 1981** Fall blocks (97.1 %) and
+**1863 / 2011** Spring blocks (92.6 %). Both runs have **0 genuine resource conflicts**; the
+unplaced tail appears as validator `placement` violations (57 / 148), not as room,
+instructor, capacity, window, blackout, or split-day clashes.
 
 **Measured effect of soft-shaping** (period 001, cohort-conflict, **on by default**,
 two `--no-soft-shaping` baselines for the noise band):
@@ -627,17 +644,18 @@ two `--no-soft-shaping` baselines for the noise band):
 
 Soft-shaping costs **no placement** (spreading cohorts also distributes load and improves
 packing). The cohort-conflict proxy drops by roughly a third versus the manual program's
-far worse 139 cohort-conflicts (and 0 hard violations vs the program's 83).
+far worse 139 cohort-conflicts, while preserving 0 resource conflicts.
 
-**Soft-polish acceptor — full Fall + Spring A/B** (the move-based polish
+**Soft-polish acceptor — tuning A/B** (the move-based polish
 `soft_search.anneal_soft` uses an *acceptance rule* to decide which neighbourhood moves to
-keep. `bench/acceptor_ab.py`, all ~990 courses per period, one converged snapshot, 3 seeds,
-30 s polish/run. Objective `E` is the normalized weighted sum, starts at 55, lower is better):
+keep. `bench/acceptor_ab.py`, converged snapshots, 3 seeds, 30 s polish/run. Objective `E`
+is the normalized weighted sum, starts at 55, lower is better. These figures are tuning
+evidence for the acceptor choice, not the headline full-roster placement table above):
 
 | period | deluge | lahc / schc |
 |---|---|---|
-| **Fall (001)** — 1981 blocks, placement 43 s (99.3 %) | E **40.6** | E 54.4 |
-| **Spring (002)** — 2011 blocks, placement 58 s (100 %) | E **42.5** | E 54.3 |
+| **Fall (001)** tuning snapshot | E **40.6** | E 54.4 |
+| **Spring (002)** tuning snapshot | E **42.5** | E 54.3 |
 
 Per-dial steerability (`selected_gain` = how much maxing a dial improves its own term vs the
 same-run uniform profile; **bold** = sign-stable across seeds, `~` = not sign-stable):
@@ -692,8 +710,9 @@ converge; use a smaller $N$ for Spring polish benches.)
 
 ## 8. Validation (independent)
 
-`validate.py` re-derives every hard violation directly from the assignment list, importing
-no solver internals, so a model/encoding bug cannot pass silently. It checks: room,
+`validate.py` re-derives the core hard-resource violations directly from the assignment list,
+importing no solver internals, so model/encoding bugs in those checked rules cannot pass
+silently. It checks: room,
 instructor, capacity, **lab_room**, **room_type** (categorical room demand), **fixed** (pinned
 first block), window ($h + \ell_b \le \texttt{cfg.undergrad\_end}$, default 18:00), blackout, **instructor_unavailable** (per-instructor
 availability), H_self, and **split_day** (theory different-day). Cohort conflict is a **soft
@@ -702,39 +721,28 @@ validation.
 
 ### 8.1 Independent verification run (2026-06-23)
 
-Running `validate.py` over a full-data placement on **both** sample datasets returns **0 hard
-violations across all 11 checked kinds**:
+Running `validate.py` over the preserved full-roster benchmark (`out/benchmark_real.json`)
+returns **0 genuine resource conflicts** on both sample datasets. The remaining validator
+violations are `placement` violations for the reported unplaced tail:
 
 | | Fall (`001`) | Spring (`002`) |
 | --- | --- | --- |
 | placed blocks | 1924 / 1981 (97.1 %) | 1863 / 2011 (92.6 %) |
+| placement violations (unplaced tail) | 57 | 148 |
 | capacity · lab_room · room_type | 0 · 0 · 0 | 0 · 0 · 0 |
 | fixed · window · blackout | 0 · 0 · 0 | 0 · 0 · 0 |
 | instructor_unavailable | 0 | 0 |
 | room · instructor · self (no-overlap) | 0 · 0 · 0 | 0 · 0 · 0 |
 | split_day | 0 | 0 |
-| **hard total** | **0** | **0** |
+| **genuine resource conflicts** | **0** | **0** |
 | soft (minimized): idle / maxrun / room_stable | 128 / 1079 / 517 | 107 / 1105 / 484 |
 | soft: instr_days / free_day / conf | 0 / 0 / 229 | 0 / 0 / 230 |
 
-`instr_days = 0` and `free_day = 0` because their controls are off by default (No target / no
-year scope, §5.1 / §5.5); `conf` is the **soft** cohort-conflict proxy (§5.8), not a hard violation.
-
-**Why this run uses CP-SAT — and what that implies.** `repair` is *not* solver-free. The
-production solver is `greedy_construct` (pure Python: candidate pruning + `State` no-overlap)
-followed by iterated `repair_round`, and **each `repair_round` builds a mini CP-SAT model and
-calls `CpSolver.Solve()` with 8 search workers** ([`repair.py:320–437`](src/timetabling/repair.py#L320-L437))
-over a freed neighbourhood — soft-H1 placement (a block may stay unplaced), `≤1` room/instructor/
-section no-overlap, `≤1` theory-per-day, warm-started from the current placement (§7b). So the
-full `solve_repair` needs a real solver environment: in a sandboxed/headless runtime where
-CP-SAT's worker spawn blocks, `solve_repair` stalls at 0 % CPU inside `repair_round`. The
-placement above was therefore built with the **pure-Python pieces only** (`greedy_construct` +
-`soft_search.anneal_soft`), which exercise the **same** hard-constraint machinery
-(`gen_candidates` pruning + `State` no-overlap); the per-round CP-SAT model re-imposes the same
-`≤1` no-overlap and split-day relations, so it cannot introduce a hard violation either. The
-0-violation guarantee therefore transfers to the production path. (Placement % and `conf` here
-are *not* production-quality — the CP-SAT repair rounds improve both; the documented validated
-figures are 001 ≈ 91.7 % / 002 ≈ 88.6 %, 0 hard conflicts.)
+`instr_days = 0` and `free_day = 0` because their UI controls are off by default (No target /
+no year scope, §5.1 / §5.5); `conf` is the **soft** cohort-conflict proxy (§5.8), not a hard
+violation. `repair` is not solver-free: after greedy construction, each `repair_round` builds a
+mini CP-SAT model over a bounded neighbourhood (§7b). Those rounds may leave a block unplaced
+under a time budget, but they do not introduce illegal resource placements.
 
 ---
 
@@ -746,7 +754,7 @@ touching code*: the step writes a plain **Settings** dict (plus an availability 
 session state, and `settings.build_config(settings, availability, solve_seconds)` maps it into
 a `Config` at solve time. The mapping is **backward-compatible by construction** —
 `DEFAULT_SETTINGS` mirrors today's `Config` defaults, so an untouched step reproduces the exact
-behavior documented above (same placement, 0 hard violations). `build_config` **never raises**:
+UI-default behavior documented above. `build_config` **never raises**:
 every bad field falls back to its default and the solve proceeds.
 
 ### 9.1 Policy & block structure (the "Policy" expander)
@@ -778,10 +786,13 @@ Schools pick a **plain-language level**, never a raw number. Presets: `UI_REF=20
 | Instructor days¹ | `w_instr_days` / `w_parttime_days` (§5.1) | 5.0 / 10.0 / 20.0 |
 | Room stability | `w_room_stable` (§5.4) | 5.0 / 10.0 / 20.0 |
 
-`free_day` (§5.5) has a fixed weight of 10.0 and is not exposed as a dial — only its year scope
-(multiselect) is configurable. `w_cohort_gap=10.0` is fixed at medium and not exposed.
-¹ Only active when `instr_days_target` is set; `w_parttime_days = w_instr_days + 4.0` when
-active, else 0.
+`free_day` (§5.5) has a fixed `Config` weight of 10.0 and is not exposed as a dial — only its
+year scope (multiselect) is configurable. With no selected years it is inert. `w_cohort_gap=10.0`
+is fixed at medium and not exposed.
+
+¹ Only active when `instr_days_target` is set. With "No target", `build_config()` forces
+`w_instr_days = 0.0` and `w_parttime_days = 0.0`; when active,
+`w_parttime_days = w_instr_days + 4.0`.
 
 ### 9.3 Blackouts (add/remove list)
 
@@ -882,11 +893,15 @@ the product datasets; gitignored, so the concrete numbers are recorded here):
 | Room capacity (min / median / max) | 20 / 45 / 100 | 20 / 45 / 100 |
 | Team-taught sections | 1 | 0 |
 
-Full-period solve (`--repair`): Fall **99.3 %** placed / 43 s, Spring **100 %** / 58 s,
-**0 hard conflicts** (measured with deluge acceptor, `bench/acceptor_ab.py`, 3 seeds — see §7c). Notes on the sample: every instructor is flagged full-time
-(`is_staff = True`), so `w_parttime_days` never engages on this data; the online/oversize
-sections carry a sentinel capacity (999 Fall / 500 Spring) and route to the single unlimited
-`Online` virtual room (exempt from room no-overlap), so they are not real seat counts.
+Full-period 300 s benchmark (`out/benchmark_real.json`, single worker): Fall **97.1 %**
+placed / 303 s, Spring **92.6 %** / 303 s, **0 genuine resource conflicts**. The remaining
+57 / 148 blocks are `placement` violations (unplaced tails), not illegal resource clashes.
+Separate tuning/headline artifacts such as `out/ted_headline_arm64.json` use smaller
+schedulable subsets and should not be mixed with the full-roster table. Notes on the sample:
+every instructor is flagged full-time (`is_staff = True`), so `w_parttime_days` never engages
+on this data; the online/oversize sections carry a sentinel capacity (999 Fall / 500 Spring)
+and route to the single unlimited `Online` virtual room (exempt from room no-overlap), so they
+are not real seat counts.
 
 ### 10.2 Model size (shared by both solvers)
 
@@ -928,7 +943,8 @@ per-block rules (capacity, lab-room, window, blackout) add **no** rows at all.
   availability membership checks scan the $\ell$-hour span, model_cpsat.py:87-95) plus
   populating the occupancy dictionaries ($O(\ell\iota)$ per variable, model_cpsat.py:154-164).
 - **Solve** is the NP-hard part. Without a limit the worst case is $2^{O(BP)}$; here it is
-  bounded by `CpSolver.max_time_in_seconds` over 8 workers (model_cpsat.py:254-255). The
+  bounded by `CpSolver.max_time_in_seconds` over `CPSAT_MAX_WORKERS` (default 8)
+  (model_cpsat.py:254-255). The
   **time is capped; the guarantee is not** — at ≈367 k variables CP-SAT cannot even certify
   feasibility within budget and returns **UNKNOWN** (§7a). That single fact is why the repair
   solver exists.
@@ -955,16 +971,16 @@ neighbourhoods.
 - **The decisive property:** `BATCH = 30` and `MAX_FREE = 240` (repair.py:157-159) cap every
   CP-SAT call to a neighbourhood of **≤240 blocks regardless of $B$**. The live model each
   round is therefore $O(1)$ in the roster — its build time, memory, and per-solve cost do not
-  grow with the school. Each round is bounded by `REPAIR_TL`=12 s over 8 workers
-  (repair.py:399-401). The sweep count is bounded (≤25, plus a `gained==0` early exit), so the
+  grow with the school. Each round is bounded by `REPAIR_TL`=12 s over `CPSAT_MAX_WORKERS`
+  (default 8; repair.py:399-401). The sweep count is bounded (≤25, plus a `gained==0` early exit), so the
   total is $O(B)$ rounds, the whole loop hard-capped by the `repair_time_limit_s` deadline
   (repair.py:482, 492, 497).
 
 **Monolith vs repair, stated as complexity:** the monolith solves **one $\Theta(B)$
 NP-hard model** (UNKNOWN at full size); repair solves **many $O(1)$-sized NP-hard models**
 (each trivially small and time-boxed at 12 s). That is exactly why repair scales where the
-monolith does not. Measured to convergence well inside the deadline (sample course lists,
-Apple M1 Pro / native arm64): **Fall ≈30 s / 99.2 %, Spring ≈53 s / 100 %, both 0 hard** (§7).
+  monolith does not. The preserved full-roster benchmark uses a 300 s single-worker budget:
+**Fall 303 s / 97.1 %, Spring 303 s / 92.6 %, both 0 genuine resource conflicts** (§7).
 
 ### 10.5 Space summary
 
@@ -987,7 +1003,7 @@ Apple M1 Pro / native arm64): **Fall ≈30 s / 99.2 %, Spring ≈53 s / 100 %, b
 | Variables | $O(BP)$, one model | $O(BP)$ stored, **$O(1)$ live** |
 | Search | one NP-hard $\Theta(B)$ model, $\le$ `solve_time_limit_s` | $O(B)$ NP-hard **$O(1)$** models, each $\le$12 s, all $\le$ `repair_time_limit_s` |
 | Peak solver RAM | $\propto B$ (≥4 GiB floor) | $\propto B$ stored + **$O(1)$ live** |
-| Full-period outcome | UNKNOWN (~367 k vars) | 99.2 % / 100 %, 0 hard |
+| Full-period outcome | UNKNOWN (~367 k vars) | 97.1 % / 92.6 % in the 300 s single-worker benchmark, 0 genuine resource conflicts |
 
 **Bottom line:** deterministic work is **linear in the roster**; the **NP-hard search is
 confined** — to a *time* box in the monolith, and additionally to a *size* box ($O(1)$
@@ -998,34 +1014,37 @@ buy the scalable solve.
 
 **Existing** columns are parsed from the `Schedule` field in the Grades CSVs
 (`data/2025-01-Grades.csv` / `data/2025-02-Grades.csv`) and re-validated with the KAIROS
-validator (`out/existing_metrics.json`). **KAIROS** columns run the repair solver on the same
-roster (`out/mode_b_001.json` mode\_a for Fall; `out/ted_headline_arm64.json` for Spring).
+validator. The preserved comparison artifacts are not all the same scope: `out/mode_b_001.json`
+is the full Fall Mode-B comparison, while `out/mode_b_002.json` is a Spring departmental-scope
+run. Treat Spring KAIROS ratios there as representative, not full-period absolute counts.
 
 | Metric | Existing · Fall 001 | KAIROS · Fall 001 | Existing · Spring 002 | KAIROS · Spring 002 |
 | --- | --- | --- | --- | --- |
-| Blocks scheduled / total | 1 232 / 1 708 | 1 588 / 1 708 | 1 231 / — | 1 814 / 1 814¹ |
-| Coverage | 72 % | **93 %** | — | **100 %**¹ |
-| Hard violations (total) | 1 006 | **0** | 1 001 | **0** |
-| — Room conflicts | 325 | 0 | 312 | 0 |
+| Blocks scheduled / total | 1 232 / 1 708 | 1 588 / 1 708 | 1 231 / — | 446 / —² |
+| Coverage | 72 % | **93 %** | — | —² |
+| Hard/resource violations (total) | 1 006 | **0 resource** / 120 placement | 981 | **0 resource** / 575 placement² |
+| — Room conflicts | 325 | 0 | 318 | 0 |
 | — Instructor conflicts | 522 | 0 | 534 | 0 |
 | — Window violations (>18:00) | 91 | 0 | 92 | 0 |
+| — Blackout violations | 0 | 0 | 37 | 0 |
 | — Capacity overflows | 6 | 0 | 0 | 0 |
-| — Split-day violations | 62 | 0 | 63 | 0 |
-| Rooms used | 248 | **94** | 218 | —² |
+| — Split-day violations | 62 | 0 | — | 0 |
+| Rooms used | 248 | **94** | 218 | 53² |
 | Room fill rate | 50.3 % | **70.8 %** | 53.1 % | 71.4 %² |
 | Evening blocks ratio | 22.2 % | **12.6 %** | 24.2 % | 7.8 %² |
 | Cohort conflicts (soft) | 549 | **370** | 584 | 100² |
-| Solve time | manual | ≈ 30 s | manual | ≈ 53 s |
+| Solve time | manual | artifact-specific | manual | artifact-specific² |
 
-¹ `ted_headline_arm64.json`: sample course input (826 sections → 1 814 blocks), native arm64, Apple M1 Pro.  
-² `out/mode_b_002.json` mode\_a: departmental-scope run; ratios representative, absolute counts are not full-period.
+² `out/mode_b_002.json` mode\_a is a departmental-scope run; ratios are representative, absolute
+counts are not full-period.
 
 **Key takeaways:**
 
-- **Hard conflicts drop from ~1 000 → 0:** the existing timetable has 325 room overlaps, 522
-  instructor double-bookings, and 91 undergrad-window violations; KAIROS eliminates all of them
-  by construction (candidate pruning ensures only legal placements enter the model; hard
-  constraints H1–H3 / H_self prevent residual overlaps).
+- **Resource conflicts drop from ~1 000 → 0:** the existing timetable has hundreds of room
+  overlaps, instructor double-bookings, and window violations; KAIROS eliminates resource
+  clashes by construction (candidate pruning ensures only legal placements enter the model;
+  hard constraints H1–H3 / H_self prevent residual overlaps). Under time budgets, unplaced
+  tails are reported separately as `placement` violations.
 - **Coverage rises from ~72 % → ≥93 %:** the Grades CSV leaves many blocks without a `Schedule`
   entry; the repair solver fills them within the same wall-clock budget.
 - **Room utilisation improves by ~20 pp:** 248 → 94 rooms at 50 % → 71 % fill — fewer rooms

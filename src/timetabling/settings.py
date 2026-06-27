@@ -51,7 +51,12 @@ DEFAULT_SETTINGS: dict = {
         "free_day": "medium",
     },
     "free_day_years": [],     # -> Config.free_day_year_levels (cohort years that want a free day)
+    # Soft-polish wall-clock cap. Balanced is the interactive default: measured sample data
+    # showed real quality gain above 180s, while 600s is better kept for best-quality runs.
+    "quality_mode": "balanced",
 }
+
+QUALITY_MODES: dict = {"fast": 180.0, "balanced": 300.0, "best": 600.0}
 
 # Uniform 0-1 preference scale, identical for all dials (normalization removes the need for
 # per-term magnitudes — only the relative dial matters). UI_REF lifts the 0-1 preference to an
@@ -115,6 +120,10 @@ def _preset(weights: dict, knob: str) -> float:
     lvl = weights.get(knob, "medium")
     lvl = _LEGACY_LEVEL.get(lvl, lvl)
     return round(UI_REF * WEIGHT_LEVELS.get(lvl, WEIGHT_LEVELS["medium"]), 1)
+
+
+def quality_seconds(mode: str) -> float:
+    return QUALITY_MODES.get(str(mode or "").strip().lower(), QUALITY_MODES["balanced"])
 
 
 def build_config(settings: dict, availability: Dict[str, list],
@@ -208,6 +217,7 @@ def build_config(settings: dict, availability: Dict[str, list],
         instr_unavailable=closed,
         solve_time_limit_s=float(solve_seconds),
         repair_time_limit_s=float(solve_seconds),
+        soft_polish_budget_s=quality_seconds(s.get("quality_mode", "balanced")),
     )
 
 

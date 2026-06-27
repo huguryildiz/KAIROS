@@ -506,7 +506,8 @@ def solve_repair(sections, rooms, instructors, cfg, progress_cb=None):
         # Scale cap by problem size (~0.75 s/block); prevents tiny inputs from burning
         # the full 600 s budget (e.g. 100 blocks → ≈75 s, 841 blocks → 600 s).
         size_cap = max(30.0, len(state.placed) * 0.75)
-        budget = min(min(SOFT_POLISH_BUDGET_S, size_cap), max(0.0, deadline - (perf_counter() - t0)))
+        polish_cap = getattr(cfg, "soft_polish_budget_s", SOFT_POLISH_BUDGET_S)
+        budget = min(min(float(polish_cap), size_cap), max(0.0, deadline - (perf_counter() - t0)))
         if budget > 0:
             _pb(("soft_polish", None))
             # within-run before/after: the only correct soft comparison (placement is

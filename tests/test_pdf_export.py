@@ -1,5 +1,6 @@
 """Tests for the pure PDF export helpers (Streamlit-free)."""
 from pathlib import Path
+import subprocess
 
 import pytest
 
@@ -32,6 +33,16 @@ def test_build_grid_pdf_returns_pdf_bytes():
     assert isinstance(data, (bytes, bytearray))
     assert bytes(data[:4]) == b"%PDF"
     assert len(data) > 500
+
+
+def test_build_grid_pdf_includes_room_label(tmp_path):
+    from timetabling.pdf_export import build_grid_pdf
+    if subprocess.run(["which", "pdftotext"], capture_output=True).returncode != 0:
+        pytest.skip("pdftotext is not installed")
+    pdf_path = tmp_path / "schedule.pdf"
+    pdf_path.write_bytes(build_grid_pdf(_sample_schedule(), "Öğretim elemanı: Şükrü Çağ", "tr"))
+    text = subprocess.check_output(["pdftotext", str(pdf_path), "-"], text=True)
+    assert "A101" in text
 
 
 def test_build_grid_pdf_handles_turkish_and_empty():

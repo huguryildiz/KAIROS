@@ -3,10 +3,10 @@ from timetabling.ui_grid import build_week_grid, filter_assignments, distinct_va
 _SCHED = {"assignments": [
     {"section_id": "A_01", "course_code": "A 101", "room": "R1", "day": "Mo",
      "start": 9, "end": 11, "block_kind": "theory", "instructor_name": "X",
-     "cohort": "A-1", "dept": "A"},
+     "cohort": "A-1", "dept": "A", "department": "Department Alpha"},
     {"section_id": "B_01", "course_code": "B 201", "room": "R2", "day": "Tu",
      "start": 10, "end": 11, "block_kind": "lab", "instructor_name": "Y",
-     "cohort": "B-2", "dept": "B"},
+     "cohort": "B-2", "dept": "B", "department": "Department Beta"},
 ]}
 
 
@@ -22,3 +22,9 @@ def test_filter_and_distinct():
     only_a = filter_assignments(_SCHED, "dept", "A")
     assert len(only_a["assignments"]) == 1
     assert filter_assignments(_SCHED, "dept", "")["assignments"] == _SCHED["assignments"]
+
+
+def test_department_view_uses_department_names():
+    assert distinct_values(_SCHED, "department") == ["Department Alpha", "Department Beta"]
+    only_alpha = filter_assignments(_SCHED, "department", "Department Alpha")
+    assert [a["section_id"] for a in only_alpha["assignments"]] == ["A_01"]

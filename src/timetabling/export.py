@@ -1,4 +1,6 @@
 from __future__ import annotations
+from datetime import datetime
+from pathlib import Path
 from typing import List, Dict
 import json
 import csv
@@ -8,7 +10,7 @@ from .model import Assignment, Section, Room, Instructor
 # Canonical per-assignment column order, shared by the CLI CSV and the UI
 # download so both outputs are byte-for-byte identical in shape.
 CSV_FIELDS = ["section_id", "course_code", "course_name", "block_kind",
-              "instructor_id", "instructor_name", "cohort", "dept",
+              "instructor_id", "instructor_name", "cohort", "dept", "department",
               "section_cap", "section_p", "day", "start", "end",
               "room", "room_cap", "is_lab_room"]
 
@@ -32,6 +34,7 @@ def build_schedule_dict(period, assignments: List[Assignment], sections: List[Se
             "instructor_name": " & ".join(names),
             "cohort": s.cohort_key if s else "",
             "dept": s.dept_code if s else "",
+            "department": s.department if s else "",
             "section_cap": s.students if s else 0,
             "section_p": s.P if s else 0,
             "day": a.day, "start": a.start, "end": a.end,
@@ -61,3 +64,23 @@ def write_csv(path: str, payload: dict) -> None:
         w.writeheader()
         for item in payload["assignments"]:
             w.writerow(item)
+
+
+def write_schedule_outputs(
+    out_dir: str | Path,
+    payload: dict,
+    period: str | None = None,
+    generated_at: datetime | None = None,
+) -> dict[str, Path]:
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    suffix = period or payload.get("period") or "schedule"
+    stamp = (generated_at or datetime.now()).strftime("%Y%m%d_%H%M%S")
+    stem = f"schedule_{suffix}_{stamp}"
+    paths = {
+        "json": out / f"{stem}.json",
+        "csv": out / f"{stem}.csv",
+    }
+    write_schedule_json(str(paths["json"]), payload)
+    write_csv(str(paths["csv"]), payload)
+    return paths

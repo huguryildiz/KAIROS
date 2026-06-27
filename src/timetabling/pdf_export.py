@@ -142,6 +142,9 @@ def _draw_block(pdf: FPDF, a: dict, x: float, y: float, w: float, h: float,
     tag = _block_tag(a)
     section = str(a.get("section_id") or a.get("course_code", ""))
     lines = [(section, tag, 7.2, True, code_rgb)]
+    room = str(a.get("room", "") or "")
+    if room:
+        lines.append((room, "", 6.0, False, _blend(accent, (70, 74, 86), 0.6)))
     if show_instructor:
         name = str(a.get("instructor_name", "") or "")
         iid = str(a.get("instructor_id", "") or "")
@@ -153,9 +156,6 @@ def _draw_block(pdf: FPDF, a: dict, x: float, y: float, w: float, h: float,
             lines.append((iid, "", 5.6, False, (130, 134, 146)))
         elif iid and not name:
             lines.append((iid, "", 6.0, False, (96, 100, 112)))
-    room = str(a.get("room", "") or "")
-    if room:
-        lines.append((room, "", 6.0, False, _blend(accent, (70, 74, 86), 0.6)))
 
     pad_l, pad_t = 4.0, 1.6
     tw = w - pad_l - 1.8

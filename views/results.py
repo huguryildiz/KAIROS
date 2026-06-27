@@ -12,7 +12,7 @@ from timetabling.i18n import t
 
 # View dimension -> i18n label key for the "view by" selector.
 VIEW_KEY = {"cohort": "res_view_cohort", "room": "res_view_room",
-            "instructor_name": "res_view_instructor", "dept": "res_view_dept",
+            "instructor_name": "res_view_instructor", "department": "res_view_dept",
             "course_code": "res_view_course"}
 
 

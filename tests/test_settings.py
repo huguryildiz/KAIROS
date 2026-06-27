@@ -2,7 +2,7 @@
 mapping into Config, availability closed-slots, weight presets, and profile JSON."""
 from timetabling.settings import (build_config, DEFAULT_SETTINGS, WEIGHT_LEVELS,
                                   availability_closed_slots, profile_to_json,
-                                  profile_from_json)
+                                  profile_from_json, quality_seconds)
 
 
 def test_default_settings_build_config_matches_today():
@@ -23,6 +23,7 @@ def test_default_settings_build_config_matches_today():
     assert cfg.w_parttime_days == 0
     assert cfg.solve_time_limit_s == 3000.0
     assert cfg.repair_time_limit_s == 3000.0
+    assert cfg.soft_polish_budget_s == 300.0
     assert cfg.instr_unavailable == frozenset()
 
 
@@ -140,6 +141,15 @@ def test_profile_partial_merges_defaults():
     assert s["day_end"] == DEFAULT_SETTINGS["day_end"]
     assert s["weights"] == DEFAULT_SETTINGS["weights"]
     assert a == {}
+
+
+def test_quality_modes_map_to_soft_polish_budget():
+    assert quality_seconds("fast") == 180.0
+    assert quality_seconds("balanced") == 300.0
+    assert quality_seconds("best") == 600.0
+    assert quality_seconds("bogus") == 300.0
+    cfg = build_config(dict(DEFAULT_SETTINGS, quality_mode="best"), {}, 60.0)
+    assert cfg.soft_polish_budget_s == 600.0
 
 
 def test_availability_labels_keyed_by_email_or_name():

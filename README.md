@@ -36,11 +36,11 @@ It runs two ways: a **web app** for non-technical users and a **command-line sol
   - keeps each section in a stable room across its blocks
   - honors per-section minimum spread targets and coordinates parallel sections
   - penalizes user-defined avoid-conflict course pairs
-  - spreads multi-session courses across the week (`w_session_gap`, opt-in)
-  - balances prime-time access across departments (`w_dept_fairness`, opt-in)
-  - clusters department classes into fewer buildings (`w_dept_compact`, opt-in)
-  - reduces same-day building switches for instructors (`w_building_change`, opt-in)
-  - prefers right-sized rooms (penalizes waste fraction `(cap − students) / cap`)
+  - spreads multi-session courses across the week (opt-in)
+  - balances prime-time access across departments (opt-in)
+  - clusters department classes into fewer buildings (opt-in)
+  - reduces same-day building switches for instructors (opt-in)
+  - prefers right-sized rooms over large under-used ones
 - **Minimum perturbation.** Upload a previous `schedule_*.json` export as a reference. Assignments that differ in day, start time, or room from the reference receive a soft penalty, steering the new schedule to stay as close as possible to the existing one — useful for incremental updates and rescheduling scenarios.
 - **Graded instructor time preferences.** The availability editor supports four tiers per instructor: **unavailable** (hard — never placed in that slot), **avoid** (soft penalty per overlapping hour), **preferred** (soft miss-penalty when a block misses all preferred hours), and **neutral** (default, no cost). Active in both the CP-SAT monolith and the repair soft polish.
 - **Works with what you have.** A course list and a classroom inventory are the only required inputs. Cohorts, teaching blocks, and instructor identities are derived automatically.

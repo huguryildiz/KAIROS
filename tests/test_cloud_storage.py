@@ -77,6 +77,8 @@ def test_list_outputs_if_configured_returns_newest_first():
         "schedule_001_20260628_140509.json",
         "schedule_001_20260627_090000.json",
     ]
-    assert rows[0]["uri"] == "gs://kairos-results/runs/schedule_001_20260628_140509.csv"
     assert rows[0]["size_bytes"] == 256
+    assert "runs%2Fschedule_001_20260628_140509.csv" in rows[0]["download_url"]
+    assert "access_token=token" in rows[0]["download_url"]
+    assert rows[0]["download_url"].startswith("https://storage.googleapis.com/")
     assert calls == [{"bucket": "kairos-results", "prefix": "runs", "token": "token"}]

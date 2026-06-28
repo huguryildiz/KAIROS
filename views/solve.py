@@ -8,13 +8,15 @@ from pathlib import Path
 import streamlit as st
 import streamlit.components.v1 as _cmp
 
+import json as _json
+
 from timetabling.settings import build_config
 from timetabling.ui_input import (build_sections_from_courselist,
                                   build_instructors_from_courselist, build_rooms_from_ui,
                                   classrooms_is_valid, courselist_is_valid)
 from timetabling.route import mark_virtual
 from timetabling.pipeline import run_pipeline, AUTO_REPAIR_THRESHOLD
-from timetabling.export import write_schedule_outputs
+from timetabling.export import write_schedule_outputs, load_ref_schedule
 from timetabling.cloud_storage import upload_outputs_if_configured
 from timetabling.i18n import t
 from timetabling.ui_style import eyebrow_html
@@ -86,13 +88,41 @@ def render(lang: str) -> None:
             st.session_state["scroll_to"] = "classrooms"
             st.rerun()
 
+    with st.expander(t("ref_schedule_label", lang), expanded=False):
+        uploaded_ref = st.file_uploader(
+            t("ref_schedule_label", lang),
+            type=["json"],
+            key="ref_schedule_upload",
+            label_visibility="collapsed",
+            help=t("ref_schedule_help", lang),
+        )
+        if uploaded_ref is not None:
+            try:
+                data = _json.loads(uploaded_ref.read())
+                if "assignments" not in data:
+                    raise ValueError("missing assignments")
+                ref = load_ref_schedule(data)
+                if not ref:
+                    raise ValueError("no block_id entries")
+                st.session_state["ref_schedule"] = ref
+                st.success(t("ref_schedule_loaded", lang, n=len(ref)))
+            except Exception:
+                st.error(t("ref_schedule_error", lang))
+                st.session_state.pop("ref_schedule", None)
+        if st.session_state.get("ref_schedule"):
+            if st.button(t("ref_schedule_clear", lang), key="ref_schedule_clear_btn",
+                         type="secondary"):
+                st.session_state.pop("ref_schedule", None)
+                st.rerun()
+
     ph = st.empty()
     if ph.button(t("solve_button", lang), type="primary", key="solve_btn",
                  disabled=not valid):
         cfg = build_config(st.session_state["settings"],
                            st.session_state["availability"], _SOLVE_SECONDS,
                            availability_avoid=st.session_state.get("availability_avoid", {}),
-                           availability_prefer=st.session_state.get("availability_prefer", {}))
+                           availability_prefer=st.session_state.get("availability_prefer", {}),
+                           ref_schedule=st.session_state.get("ref_schedule") or {})
         secs, _ = build_sections_from_courselist(courses, _PERIOD, cfg)
         instr = build_instructors_from_courselist(courses)
         rooms = build_rooms_from_ui(st.session_state["classrooms"], cfg)

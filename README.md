@@ -31,7 +31,16 @@ It runs two ways: a **web app** for non-technical users and a **command-line sol
 ## What it does
 
 - **Conflict-free by construction.** Placement-legality rules are enforced during candidate generation, while cross-block resource conflicts are enforced in the solver; room capacity, lab pinning, time-window, blackout, room-overlap, and instructor-overlap violations cannot appear in the output.
-- **Optimized, not just valid.** After placement, a soft polish phase minimizes idle gaps, compacts instructor days, reduces late-hour load, keeps each section in a stable room, can honor per-section minimum-day targets, can coordinate parallel sections, and penalizes user-defined avoid-conflict course pairs. Optional department-level preferences can balance access to prime-time teaching hours (`w_dept_fairness`) or cluster each department's classes into fewer buildings (`w_dept_compact`); optional building-aware preferences can also reduce same-day instructor building changes (`w_building_change`). An optional session day-gap preference (`w_session_gap`) spreads a multi-session course's theory sessions across the week, ensuring at least N days between sessions to preserve student consolidation time. Building preferences infer buildings from room-code prefixes, require no extra CSV column, and are off by default. The solver also prefers right-sized rooms by penalizing the waste fraction `(cap - students) / cap`. Hard capacity and hard resource rules are never relaxed.
+- **Optimized, not just valid.** The soft polish phase steers the schedule toward comfort after placement — never at the cost of hard constraints:
+  - minimizes cohort idle gaps, compacts instructor weeks, reduces late-hour load
+  - keeps each section in a stable room across its blocks
+  - honors per-section minimum spread targets and coordinates parallel sections
+  - penalizes user-defined avoid-conflict course pairs
+  - spreads multi-session courses across the week (`w_session_gap`, opt-in)
+  - balances prime-time access across departments (`w_dept_fairness`, opt-in)
+  - clusters department classes into fewer buildings (`w_dept_compact`, opt-in)
+  - reduces same-day building switches for instructors (`w_building_change`, opt-in)
+  - prefers right-sized rooms (penalizes waste fraction `(cap − students) / cap`)
 - **Minimum perturbation.** Upload a previous `schedule_*.json` export as a reference. Assignments that differ in day, start time, or room from the reference receive a soft penalty, steering the new schedule to stay as close as possible to the existing one — useful for incremental updates and rescheduling scenarios.
 - **Graded instructor time preferences.** The availability editor supports four tiers per instructor: **unavailable** (hard — never placed in that slot), **avoid** (soft penalty per overlapping hour), **preferred** (soft miss-penalty when a block misses all preferred hours), and **neutral** (default, no cost). Active in both the CP-SAT monolith and the repair soft polish.
 - **Works with what you have.** A course list and a classroom inventory are the only required inputs. Cohorts, teaching blocks, and instructor identities are derived automatically.

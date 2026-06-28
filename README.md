@@ -48,52 +48,6 @@ Hand-building a university timetable means juggling hundreds of sections against
 
 ---
 
-## At a glance
-
-Full-period schedules come from a **warm-started repair solver** (`--repair`): a fast greedy construction seeds an initial solution, then CP-SAT repeatedly re-optimizes small *relatedness* neighbourhoods until convergence or 25 sweeps. Measured across **TED University**'s real Fall and Spring rosters, against its production classroom inventory, every placed block is resource-feasible and any unplaced tail is reported explicitly:
-
-| Period | Sections | Blocks placed | Hard resource conflicts | Wall time | Sweeps |
-| --- | --- | --- | --- | --- | --- |
-| **Fall** | 990 | 1924 / 1981 · **97.1%** | **0** | 303 s† | 1 |
-| **Spring** | 969 | 1863 / 2011 · **92.6%** | **0** | 303 s† | 1 |
-
-Both periods produce zero hard resource conflicts throughout. Fall leaves a 57-block tail (2.9%) and Spring a 148-block tail (7.4%) — both due to the single-worker time budget (see footnote). Measured on an **Apple M1 Pro** (10-core, 32 GB RAM, native arm64).
-
-<sub>† Measured with `CPSAT_MAX_WORKERS=1` (single-worker, 300 s budget); both periods hit the budget before convergence. On native arm64 multi-core the solver completes in ≈30–50 s with ≥99% placement.</sub>
-
-### How it's scheduled today vs. optimized
-
-Both semesters are *already* timetabled by hand. Scored under one consistent rule model — the existing schedule against what Kairos produces from the same course lists:
-
-| Metric | Fall — today | Fall — Kairos | Spring — today | Spring — Kairos² |
-| --- | --- | --- | --- | --- |
-| Resource conflicts | **1006** | **0** | **981** | **0** |
-| Distinct rooms used | 248 | 94 | 218 | 53 |
-| Evening (≥17:00) ratio | 0.222 | 0.126 | 0.242 | 0.078 |
-| Avg room fill (section size / cap) | 0.503 | 0.708 | 0.531 | 0.714 |
-
-Read as before/after: the schedules in use today carry **1006 / 981 resource violations** under these rules — overlapping instructors (Fall 522 / Spring 534) and rooms (325 / 318), plus window, blackout, capacity, and split-day breaches. Kairos keeps placed blocks resource-clean; under fixed budgets, any unplaced blocks remain visible as placement tails instead of being forced into illegal slots.
-
-<sub>² The Spring Kairos comparison column is the preserved `out/mode_b_002.json` departmental-scope artifact; its ratios are representative, but absolute counts are not a full-period Spring total.</sub>
-
-### How far one solve goes — the single-scope ceiling
-
-How large can a *single* scope grow before one solve stops being practical? A synthetic study scales the section count well past the real roster: the 990-section Fall sample is tiled into independent "faculties" (unique instructors per tile) with the classroom pool scaled in lockstep, so room pressure stays roughly constant and the curve isolates how solve *time* reacts to raw size. Measured on an **Apple M1 Pro** (10-core, 32 GB RAM, native arm64), 600 s budget per size:
-
-| Sections | Rooms | Blocks | Wall time | Blocks placed | Hard conflicts |
-| --- | --- | --- | --- | --- | --- |
-| 990 | 104 | 1981 | 303 s† | **97.1%** | **0** |
-| 1250 | 209 | 2496 | 604 s† | **98.8%** | **0** |
-| 1700 | 209 | 3385 | 616 s† | 93.3% | **0** |
-| 2200 | 313 | 4411 | 607 s† | 90.7% | **0** |
-| 3000 | 417 | 6013 | 617 s† | 85.4% | **0** |
-
-<sub>† All sizes measured with `CPSAT_MAX_WORKERS=1` (single-worker, 600 s budget); all hit the budget before convergence. On native arm64 multi-core the solver is approximately 10× faster. Single run per size.</sub>
-
-Two things hold at every scale. **Feasibility is never compromised** — 0 genuine resource conflicts throughout; under time pressure the solver only ever leaves a larger *unplaced* tail, never an invalid schedule. **Placement degrades gracefully** — even at 3 000 sections the solver places 85.4% of blocks within the budget rather than forcing an illegal assignment. These figures were measured single-worker (see †); native arm64 multi-core can improve the runtime substantially, but large institutions should still be scheduled **per department** via `--scope`: a 10 000-section university is never a single solve but a set of independent, department-sized scopes — each solvable in parallel.
-
----
-
 ## The model
 
 Hard rules and soft preferences are kept strictly apart. **Hard constraints can never be violated**; **soft preferences are weighted penalties** the solver minimizes, so they can never cause infeasibility.

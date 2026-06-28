@@ -209,7 +209,7 @@ def build_config(settings: dict, availability: Dict[str, list],
         w_instr = 0.0
     w_parttime = round(w_instr + 4, 1) if w_instr else 0.0
     w_nonadjacent = _optional_preset(weights, "nonadjacent")
-    w_perturb = _optional_preset(weights, "perturbation")
+    w_perturb = _optional_preset(weights, "perturbation") or (10.0 if ref_schedule else 0.0)
     free_day_years = tuple(int(y) for y in s.get("free_day_years", []) or []
                            if str(y).strip().isdigit())
 

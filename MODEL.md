@@ -104,6 +104,20 @@ time. The CP-SAT monolith (§6a) and the repair soft polish (§6b) use separate 
   5.0/10.0/20.0, with part-time set to `w_instr_days + 4.0`.
 - **Room stability** (`w_room_stable=10.0`) — penalize each section that uses more than one
   room across its blocks (repair polish).
+- **Section minimum working days** (`w_min_working_days=10.0`) — penalize each missing
+  distinct day below a section's optional `Min Working Days` CSV target. The target is soft:
+  unmet days are reported in `unmet_soft`, not as validation failures.
+- **Parallel section coordination** (`w_parallel_coord=10.0`) — optional course-code scoped
+  repair-polish term. `same-time` nudges parallel theory sections toward the same
+  `(day,start)`, `spread` penalizes parallel theory sections sharing a `(day,start)`, and
+  `lab-after-theory` penalizes labs placed before their own section's theory. Blank or absent
+  policy is inert; hard feasibility and the cohort-conflict no-regress guard stay dominant.
+- **Avoid-conflict pairs** (`w_avoid_pairs=1.0`) — penalize each overlapping `(day, hour)`
+  slot between blocks of a user-defined pair of course codes. For each `{code_a, code_b}` pair,
+  counts the size of the intersection of occupied slots across all blocks of `code_a` and all
+  blocks of `code_b`. Configured via the "Avoid Conflict" panel in School Settings
+  (list of `[code_a, code_b]` pairs). Applies to both the CP-SAT monolith objective and the
+  repair soft polish.
 - **Free day** (`w_free_day=10.0`, year-scoped) — penalize each configured year-level cohort
   that occupies all working days (repair polish). The UI does not expose a free-day weight dial;
   the year multiselect is the on/off scope control. With no selected years, the term is inert.
@@ -152,8 +166,9 @@ block-split policy, the instructor-days target, free-day year scope, and the sof
 weights (as low / medium / high presets, with explicit off for the newer advanced dials) are
 configurable. Graduate courses are always
 included in the UI; there is no graduate on/off checkbox. Optional course-list columns
-(`Year`, `Part-time`, `Room Type`, `Fixed`) override the string-derived cohort / part-time /
-room demand / pin. Unconfigured settings reproduce the UI defaults documented here exactly.
+(`Year`, `Part-time`, `Room Type`, `Fixed`, `Min Working Days`) override the string-derived
+cohort / part-time / room demand / pin, or add a per-section soft day-spread target.
+Unconfigured settings reproduce the UI defaults documented here exactly.
 The pure profile JSON functions remain in `settings.py`, but the profile expander is currently
 disabled in the UI (§8.5).
 **§8 is the exhaustive control-by-control list of what the UI exposes.**
@@ -319,8 +334,9 @@ The CP-SAT monolith (§6a) and the repair soft polish (§6b) minimize different 
 objectives. Weights live in `config.py`. The two paths share the weight fields
 `w_instr_days` / `w_parttime_days` (but with different semantics — see §5.1). The repair
 polish has terms absent from the monolith (`w_idle`, `w_maxrun`, `w_room_stable`,
-`w_free_day`, `w_nonadjacent`, `w_evening`, `w_instr_idle`, `w_fairness`); the monolith has
-terms not in the polish objective (`w_cohort_gap`, `w_order`, `w_englab`). `w_cohort_conflict`
+`w_free_day`, `w_nonadjacent`, `w_evening`, `w_instr_idle`, `w_fairness`). Both paths share
+the per-section `w_min_working_days` target when a row supplies it. The monolith has terms
+not in the polish objective (`w_cohort_gap`, `w_order`, `w_englab`). `w_cohort_conflict`
 appears in both but as an objective term in the monolith and as a no-regress guard in the
 polish.
 
@@ -435,6 +451,26 @@ $$
   a fixed `Config` coefficient (10.0) used by repair polish, but with no selected years there
   are no cohorts in scope, so the term is inert.
 
+### 5.9a Section minimum working days — $w_{\text{min\_working\_days}}=10.0$ (both paths)
+
+- Reads the optional `Min Working Days` course-list column into `Section.min_working_days`.
+- Penalizes `max(0, target_days - actual_distinct_days)` per section, where actual days are
+  the distinct days occupied by that section's placed blocks.
+- Empty, invalid, or zero values are inert. The target is soft only: unmet targets are
+  exported through `schedule["unmet_soft"]`, not reported as hard validation failures.
+
+### 5.9b Parallel section coordination — $w_{\text{parallel\_coord}}=10.0$ (repair polish)
+
+- Reads optional `Parallel Policy` course-list values and Settings overrides into
+  `Config.parallel_policies`. Settings rows for a course code override CSV rows.
+- Policies are scoped by `Section.code`, not `section_id`, so different sections of the same
+  course can be coordinated without changing assignment/export fields.
+- `same-time` counts distinct theory `(day,start)` slots beyond the first for each theory block
+  tag; `spread` counts extra parallel theory sections sharing a `(day,start)`; `lab-after-theory`
+  counts section labs placed before that section's latest theory block.
+- This is a soft repair-polish term only in the first version. It never relaxes hard resource
+  constraints and cannot pass the `conf` no-regress guard.
+
 ### 5.10 S-Order — $w_{\text{order}}=1$ (monolith)
 
 $$
@@ -520,6 +556,30 @@ $$
   blocks sharing the same day — a narrower, block-level meaning distinct from §5.4.
   Superseded for theory by the hard different-day rule (H_day); effectively 0 there.
 
+### 5.17 S-AvoidPairs — $w_{\text{avoid\_pairs}}=1.0$ (both paths)
+
+$$
+\mathrm{slots}(c) \;=\; \bigcup_{b:\,\mathrm{code}(b)=c}\; \{(d,h) : h \in [\mathrm{start}_b, \mathrm{start}_b+\ell_b)\}
+$$
+
+$$
+\mathrm{pen}_{\text{avoid\_pairs}} \;=\; \sum_{\{c_a,c_b\} \in \mathrm{avoid\_pairs}} \;\bigl|\,\mathrm{slots}(c_a) \cap \mathrm{slots}(c_b)\,\bigr|
+$$
+
+- For each user-defined code pair `{code_a, code_b}`, counts the number of `(day, hour)` slots
+  simultaneously occupied by at least one block of `code_a` and at least one block of `code_b`.
+  Each overlapping hour contributes one unit of penalty.
+- Configured via the **Avoid Conflict** panel in School Settings as a list of
+  `[code_a, code_b]` rows. Parsed by `settings.build_config` into
+  `Config.avoid_pairs: tuple[frozenset, ...]`.
+- In the **CP-SAT monolith**, implemented via `code_day_hour_vars` auxiliary bool variables
+  (`code_active[code][d][h]` = OR over all blocks of that code at that hour); the intersection
+  term is a linearised AND added to the objective.
+- In the **repair soft polish**, computed by `_avoid_pairs_viol` in `repair.py` and exposed
+  as the `"avoid_pairs_viol"` key in `_global_terms` / `_local_terms` / `_norm_obj`.
+- Default weight 1.0 (always-on when pairs are configured). With no configured pairs the term
+  is inert (empty tuple → zero penalty).
+
 ---
 
 ## 6. Solution methods
@@ -549,7 +609,8 @@ Both solvers share the same candidate generation and constraints.
 3. **Move-based soft polish** (`soft_search.anneal_soft`) — once placement converges,
    re-seat already-placed blocks to lower the normalized non-guard objective
    (idle / maxrun / instr_days / nonadjacent / evening / instr_idle / fairness /
-   room_stable / free_day / instr_avoid_viol / instr_prefer_miss) under a `conf`
+   room_stable / free_day / min_working_days / instr_avoid_viol / instr_prefer_miss /
+   avoid_pairs_viol) under a `conf`
    no-regress guard.
    Moves: relocate, chain, swap, consolidate_instr, free_cohort_day. Acceptor: Great Deluge
    (default). Bounded by the `repair_time_limit_s` deadline; the placement count never
@@ -617,7 +678,8 @@ solve_repair(sections, rooms, cfg, progress_cb=None):
       # anneal_soft: deluge acceptor; moves = relocate / chain / swap /
       #              consolidate_instr / free_cohort_day
       # objective: normalized(idle + maxrun + instr_days + nonadjacent +
-      #                       evening + instr_idle + fairness + room_stable + free_day)
+      #                       evening + instr_idle + fairness + room_stable +
+      #                       free_day + min_working_days)
       # guard: conf (cohort-conflict) must not increase
       anneal_soft(state, cand_by_block, cfg, budget)
 
@@ -793,7 +855,7 @@ placement converges. Stored as `"quality_mode"` in the Settings dict;
 | Balanced | 300 s **(default)** | Recommended for most schools. |
 | Best | 600 s | Longest polish; best room-stability and anti-fatigue results. |
 
-The actual polish time is `min(soft_polish_budget_s, max(30, 0.75 × placed_count), remaining_deadline)` — see §6b pseudocode. Hard constraints are never affected; only soft-objective metrics (idle, maxrun, consecutive teaching days, late-hour load, instructor idle gaps, fairness, room_stable, free_day) can improve.
+The actual polish time is `min(soft_polish_budget_s, max(30, 0.75 × placed_count), remaining_deadline)` — see §6b pseudocode. Hard constraints are never affected; only soft-objective metrics (idle, maxrun, consecutive teaching days, late-hour load, instructor idle gaps, fairness, room_stable, free_day, min_working_days) can improve.
 
 ### 8.4 Blackouts (add/remove list)
 
@@ -829,8 +891,9 @@ when the upload path validates the schema defensively.
 - **Solve budget** (`solve_time_limit_s` / `repair_time_limit_s`) comes from the **Solve** step,
   not Settings; it is the `solve_seconds` argument to `build_config`.
 - **Course-list column overrides** ride on the uploaded CSV, not the Settings dict: `Year`,
-  `Part-time`, `Room Type`, and `Fixed` override the string-derived cohort / part-time / lab /
-  pinned-slot per row (§0, §3).
+  `Part-time`, `Room Type`, `Fixed`, and `Min Working Days` override the string-derived
+  cohort / part-time / lab / pinned-slot defaults or add a per-row soft day-spread target
+  (§0, §3).
 - **Fixed at `config.py` defaults — deliberately not exposed:** the cohort-conflict weight
   (`w_cohort_conflict=50`, §5.12), the always-on idle weight (`w_idle=15.0`, §5.2),
   cohort-compactness (`w_cohort_gap=10.0`, §5.2), level-ordering (`w_order`, §5.10),

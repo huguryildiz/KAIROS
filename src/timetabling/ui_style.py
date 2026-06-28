@@ -69,6 +69,7 @@ _LIGHT_TOKENS = {
     "--good": "#0F766E", "--good-bg": "#ECFDF6", "--good-bd": "#A7E3D4", "--good-mid": "#34D399",
     "--warn": "#B4490F", "--warn-bg": "#FEF4EE", "--warn-bd": "#F3CBB4",
     "--error": "#C81E1E", "--error-bg": "#FEF2F2", "--error-bd": "#FECACA",
+    "--ylw": "#D97706", "--ylw-bg": "#FFFBEB", "--ylw-bd": "#FEF08A",
     "--info": "#1F4FB8", "--info-bg": "#EEF3FC", "--info-bd": "#C4D6F4",
     "--font": "'Inter',system-ui,-apple-system,sans-serif",
     "--serif": "'Fraunces',Georgia,'Times New Roman',serif",
@@ -95,6 +96,7 @@ _DARK_TOKENS = {**_LIGHT_TOKENS, **{
     "--good": "#34D6AA", "--good-bg": "rgba(52,214,170,.13)", "--good-bd": "rgba(52,214,170,.36)", "--good-mid": "#34D6AA",
     "--warn": "#EFA463", "--warn-bg": "rgba(239,164,99,.13)", "--warn-bd": "rgba(239,164,99,.36)",
     "--error": "#F87171", "--error-bg": "rgba(248,113,113,.13)", "--error-bd": "rgba(248,113,113,.36)",
+    "--ylw": "#FBBF24", "--ylw-bg": "rgba(251,191,36,.13)", "--ylw-bd": "rgba(251,191,36,.36)",
     "--info": "#7E90EE", "--info-bg": "rgba(126,144,238,.12)", "--info-bd": "rgba(126,144,238,.32)",
     "--sh-1": "0 1px 2px rgba(0,0,0,.4)", "--sh-2": "0 6px 22px -8px rgba(0,0,0,.55)",
     "--sh-3": "0 18px 50px -16px rgba(0,0,0,.65)",
@@ -860,62 +862,84 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
 /* ── Instructor availability heatmap ── when2meet-style hourly grid: time rows ×
    day columns, tap a cell to block that hour for the instructor. Mirrors the result
    timetable's hour×day shape so the picker and the schedule read in one language.
-   Each cell is a Streamlit checkbox restyled into a flat tile that fills amber when
-   blocked (:has(input:checked)); the native box + label are hidden — the tile colour
-   is the only signal. Scoped to .st-key-av_hm. Columns are forced nowrap + min-width:0
-   so the grid never stacks on a phone (the cells just shrink to fit). */
-.st-key-av_hm{background:var(--card);border:1px solid var(--card-bd);
+   Each cell is a Streamlit checkbox restyled into a flat tile that fills a colour when
+   selected (:has(input:checked)); the native box + label are hidden — the tile colour
+   is the only signal. Scoped to [class*="st-key-av_hm_"]. Columns are forced nowrap +
+   min-width:0 so the grid never stacks on a phone (the cells just shrink to fit). */
+[class*="st-key-av_hm_"]{background:var(--card);border:1px solid var(--card-bd);
   border-radius:var(--r-lg);box-shadow:var(--sh-1);padding:12px 12px 9px;margin:2px 0 6px;overflow:hidden;}
-.st-key-av_hm [data-testid="stVerticalBlock"]{gap:4px!important;}
-.st-key-av_hm [data-testid="stHorizontalBlock"]{flex-wrap:nowrap!important;gap:4px!important;align-items:stretch;}
-.st-key-av_hm [data-testid="stColumn"],.st-key-av_hm [data-testid="column"]{min-width:0!important;flex:1 1 0!important;}
+[class*="st-key-av_hm_"] [data-testid="stVerticalBlock"]{gap:4px!important;}
+[class*="st-key-av_hm_"] [data-testid="stHorizontalBlock"]{flex-wrap:nowrap!important;gap:4px!important;align-items:stretch;}
+[class*="st-key-av_hm_"] [data-testid="stColumn"],[class*="st-key-av_hm_"] [data-testid="column"]{min-width:0!important;flex:1 1 0!important;}
 /* a column's element wrapper is content-sized by default — stretch it so the cell
    (checkbox) fills the column rather than collapsing to the hidden box's 16px. */
-.st-key-av_hm [data-testid="stElementContainer"]{width:100%!important;}
+[class*="st-key-av_hm_"] [data-testid="stElementContainer"]{width:100%!important;}
 /* first column of every row is the narrow time gutter */
-.st-key-av_hm [data-testid="stHorizontalBlock"]>[data-testid="stColumn"]:first-child,
-.st-key-av_hm [data-testid="stHorizontalBlock"]>[data-testid="column"]:first-child{flex:0 0 46px!important;}
+[class*="st-key-av_hm_"] [data-testid="stHorizontalBlock"]>[data-testid="stColumn"]:first-child,
+[class*="st-key-av_hm_"] [data-testid="stHorizontalBlock"]>[data-testid="column"]:first-child{flex:0 0 46px!important;}
 .hm-dh{text-align:center;font:700 .72rem/1 var(--font);color:var(--ink-2);padding:2px 0 5px;}
 .hm-tl{font:600 .64rem/1 var(--mono);color:var(--faint);text-align:right;padding-right:7px;
   height:30px;display:flex;align-items:center;justify-content:flex-end;white-space:nowrap;}
 .hm-mid{height:1px;background:var(--warn-bd);opacity:.7;margin:2px 0;border-radius:1px;}
 /* cell = restyled checkbox tile */
-.st-key-av_hm [data-testid="stCheckbox"]{width:100%;}
-.st-key-av_hm [data-testid="stCheckbox"] label{
+[class*="st-key-av_hm_"] [data-testid="stCheckbox"]{width:100%;}
+[class*="st-key-av_hm_"] [data-testid="stCheckbox"] label{
   display:flex!important;width:100%;height:30px;border-radius:7px;cursor:pointer;
   background:var(--surface-2);border:1px solid var(--border);
   transition:background .13s ease,border-color .13s ease;}
-.st-key-av_hm [data-testid="stCheckbox"] label:hover{border-color:var(--primary-100);background:var(--surface);}
-.st-key-av_hm [data-testid="stCheckbox"] label:focus-within{outline:2px solid var(--primary);outline-offset:1px;}
+[class*="st-key-av_hm_"] [data-testid="stCheckbox"] label:hover{border-color:var(--primary-100);background:var(--surface);}
+[class*="st-key-av_hm_"] [data-testid="stCheckbox"] label:focus-within{outline:2px solid var(--primary);outline-offset:1px;}
 /* hide the native box + label text */
-.st-key-av_hm [data-baseweb="checkbox"]>span:first-of-type{display:none!important;}
-.st-key-av_hm [data-testid="stCheckbox"] [data-testid="stWidgetLabel"]{display:none!important;}
-/* blocked = solid amber tile */
-.st-key-av_hm [data-testid="stCheckbox"] label:has(input:checked){
-  background:var(--warn);border-color:var(--warn);box-shadow:0 2px 7px -2px var(--warn);}
-.st-key-av_hm [data-testid="stCheckbox"] label:has(input:checked):hover{background:var(--warn);border-color:var(--warn-bd);}
-@media (prefers-reduced-motion:reduce){.st-key-av_hm [data-testid="stCheckbox"] label{transition:none;}}
-.st-key-av_hm .stButton{margin-top:10px;}
+[class*="st-key-av_hm_"] [data-baseweb="checkbox"]>span:first-of-type{display:none!important;}
+[class*="st-key-av_hm_"] [data-testid="stCheckbox"] [data-testid="stWidgetLabel"]{display:none!important;}
+/* unavailable tab — red tile */
+[class*="st-key-av_hm_av_u"] [data-testid="stCheckbox"] label:has(input:checked){
+  background:var(--error);border-color:var(--error);box-shadow:0 2px 7px -2px var(--error);}
+[class*="st-key-av_hm_av_u"] [data-testid="stCheckbox"] label:has(input:checked):hover{background:var(--error);border-color:var(--error-bd);}
+/* avoid tab — yellow tile */
+[class*="st-key-av_hm_av_a"] [data-testid="stCheckbox"] label:has(input:checked){
+  background:var(--ylw);border-color:var(--ylw);box-shadow:0 2px 7px -2px var(--ylw);}
+[class*="st-key-av_hm_av_a"] [data-testid="stCheckbox"] label:has(input:checked):hover{background:var(--ylw);border-color:var(--ylw-bd);}
+/* preferred tab — green tile */
+[class*="st-key-av_hm_av_p"] [data-testid="stCheckbox"] label:has(input:checked){
+  background:var(--good-mid);border-color:var(--good);box-shadow:0 2px 7px -2px var(--good-mid);}
+[class*="st-key-av_hm_av_p"] [data-testid="stCheckbox"] label:has(input:checked):hover{background:var(--good-mid);border-color:var(--good);}
+@media (prefers-reduced-motion:reduce){[class*="st-key-av_hm_"] [data-testid="stCheckbox"] label{transition:none;}}
+[class*="st-key-av_hm_"] .stButton{margin-top:10px;}
 /* Legend + count line under the grid */
 .hm-leg{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font:500 .74rem/1 var(--font);
   color:var(--muted);margin:2px 2px 11px;}
 .hm-leg span{display:inline-flex;align-items:center;}
 .hm-leg i{width:13px;height:13px;border-radius:4px;display:inline-block;margin-right:6px;}
 .hm-leg .av{background:var(--surface-2);border:1px solid var(--border);}
-.hm-leg .bl{background:var(--warn);}
+.hm-leg .bl{background:var(--error);border:1px solid var(--error);}
+.hm-leg .bl-a{background:var(--ylw);}
+.hm-leg .bl-p{background:var(--good-mid);}
 .hm-leg b{color:var(--warn);font-weight:700;}
-/* Blocked-slots overview — one warm-chipped row per restricted instructor */
+/* Per-tier saved-slot summary */
 .av-sum-who{font:600 .78rem/1.3 var(--font);color:var(--ink-2);margin-right:2px;word-break:break-word;}
-/* Interactive chip-buttons (replace static .av-chip spans) */
+.av-tier-lbl{font:700 .62rem/1 var(--mono);text-transform:uppercase;letter-spacing:.12em;margin:10px 0 3px;}
+.av-tier-u{color:var(--error);}
+.av-tier-a{color:var(--ylw);}
+.av-tier-p{color:var(--good);}
+/* Interactive chip-buttons */
 [class*="st-key-av_row_"]>[data-testid="stVerticalBlock"]{display:flex!important;flex-wrap:wrap!important;align-items:center!important;gap:7px!important;padding:9px 12px!important;background:var(--surface-2)!important;border:1px solid var(--border-2)!important;border-radius:10px!important;margin-bottom:8px!important;}
 [class*="st-key-av_row_"] [data-testid="stMarkdownContainer"]{flex:0 0 auto!important;margin:0!important;}
 [class*="st-key-av_row_"] [data-testid="stMarkdownContainer"] p{margin:0!important;}
 [class*="st-key-av_rm_"],[class*="st-key-av_rm_"]>[data-testid="stButton"]{display:inline-flex!important;flex:0 0 auto!important;}
-[class*="st-key-av_rm_"] [data-testid="stButton"]>button{font:600 .62rem/1 var(--mono)!important;padding:4px 8px!important;border-radius:6px!important;background:var(--warn-bg)!important;border:1px solid var(--warn-bd)!important;color:var(--warn)!important;white-space:nowrap!important;height:auto!important;min-height:0!important;line-height:1!important;transition:background .15s,color .15s,border-color .15s!important;}
-[class*="st-key-av_rm_"] [data-testid="stButton"]>button:hover{background:rgba(239,68,68,.12)!important;border-color:#ef4444!important;color:#b91c1c!important;cursor:pointer!important;}
+[class*="st-key-av_rm_"] [data-testid="stButton"]>button{font:600 .62rem/1 var(--mono)!important;padding:4px 8px!important;border-radius:6px!important;background:var(--error-bg)!important;border:1px solid var(--error-bd)!important;color:var(--error)!important;white-space:nowrap!important;height:auto!important;min-height:0!important;line-height:1!important;transition:background .15s,color .15s,border-color .15s!important;}
+[class*="st-key-av_rm_"] [data-testid="stButton"]>button:hover{background:var(--error-bg)!important;border-color:var(--error)!important;color:var(--error)!important;cursor:pointer!important;}
 [class*="st-key-av_rm_"] [data-testid="stButton"]>button{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:8px!important;}
 [class*="st-key-av_rm_"] [data-testid="stButton"]>button::after{content:"✕";font-size:1rem;font-weight:900;line-height:1;margin-left:auto;color:transparent;transition:color .15s;}
-[class*="st-key-av_rm_"] [data-testid="stButton"]>button:hover::after{color:#ef4444!important;}
+[class*="st-key-av_rm_"] [data-testid="stButton"]>button:hover::after{color:var(--error)!important;}
+/* avoid chips — yellow */
+[class*="st-key-av_rm_a_"] [data-testid="stButton"]>button{background:var(--ylw-bg)!important;border-color:var(--ylw-bd)!important;color:var(--ylw)!important;opacity:1;}
+[class*="st-key-av_rm_a_"] [data-testid="stButton"]>button:hover{background:var(--ylw-bg)!important;border-color:var(--ylw)!important;color:var(--ylw)!important;}
+[class*="st-key-av_rm_a_"] [data-testid="stButton"]>button:hover::after{color:var(--ylw)!important;}
+/* preferred chips — green */
+[class*="st-key-av_rm_p_"] [data-testid="stButton"]>button{background:var(--good-bg)!important;border-color:var(--good-bd)!important;color:var(--good)!important;opacity:1;}
+[class*="st-key-av_rm_p_"] [data-testid="stButton"]>button:hover{background:var(--good-bg)!important;border-color:var(--good)!important;color:var(--good)!important;}
+[class*="st-key-av_rm_p_"] [data-testid="stButton"]>button:hover::after{color:var(--good)!important;}
 
 /* Misc Streamlit chrome that should follow the theme */
 hr{border-color:var(--border) !important;}

@@ -29,6 +29,28 @@ class PipelineResult:
     schedule: dict
 
 
+def _unmet_min_working_days(assignments: list, sections: list) -> list:
+    days_by_section = {}
+    for a in assignments:
+        days_by_section.setdefault(a.section_id, set()).add(a.day)
+    out = []
+    for s in sections:
+        target = int(getattr(s, "min_working_days", 0) or 0)
+        if target <= 0:
+            continue
+        actual = len(days_by_section.get(s.section_id, ()))
+        missing = max(0, target - actual)
+        if missing:
+            out.append({
+                "kind": "min_working_days",
+                "section_id": s.section_id,
+                "target_days": target,
+                "actual_days": actual,
+                "missing_days": missing,
+            })
+    return out
+
+
 def run_pipeline(period: str, sections: list, rooms: Dict, instructors: Dict,
                  cfg: Config, solver: str = "auto", progress_cb=None) -> PipelineResult:
     t_total = time.perf_counter()
@@ -64,6 +86,7 @@ def run_pipeline(period: str, sections: list, rooms: Dict, instructors: Dict,
 
     schedule = build_schedule_dict(
         period, assignments, schedulable, rooms, instructors,
+        unmet_soft=_unmet_min_working_days(assignments, schedulable),
         conflicts=[{"kind": v.kind, "detail": v.detail} for v in viol])
 
     total_elapsed_s = round(time.perf_counter() - t_total, 3)

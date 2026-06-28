@@ -6,6 +6,24 @@ SATURDAY = "Sa"
 
 LAB_SUFFIXES = ("-PC-L", "-PSY-L", "-PSCG-L", "-PECE-L", "-EF-L", "-PC", "-L")
 
+PARALLEL_POLICIES = ("same-time", "spread", "lab-after-theory")
+
+
+def normalize_parallel_policy(value: str) -> str:
+    s = str(value or "").strip().lower().replace("_", "-")
+    s = "-".join(part for part in s.split() if part)
+    aliases = {
+        "sametime": "same-time",
+        "same-time": "same-time",
+        "same": "same-time",
+        "spread": "spread",
+        "spread-out": "spread",
+        "lab-after-theory": "lab-after-theory",
+        "lab-after": "lab-after-theory",
+        "labaftertheory": "lab-after-theory",
+    }
+    return aliases.get(s, "")
+
 
 @dataclass
 class Config:
@@ -25,6 +43,7 @@ class Config:
     w_maxrun: float = 10.0                  # dial: anti-fatigue consecutive runs
     w_room_stable: float = 10.0             # dial: per-section room stability
     w_free_day: float = 10.0                # dial: year-scoped free day
+    w_min_working_days: float = 10.0        # fixed: per-section minimum distinct teaching days
     w_evening: float = 0.0                  # optional dial: late-hour load
     w_instr_idle: float = 0.0               # optional dial: instructor same-day idle gaps
     w_fairness: float = 0.0                 # optional dial: spread bad load across entities
@@ -43,6 +62,10 @@ class Config:
     instr_prefer_ids: frozenset = frozenset() # derived: iids with >=1 preferred slot
     w_instr_prefer: float = 2.0              # miss-penalty: block not in preferred slot
     w_instr_avoid: float = 3.0              # penalty per hour in avoid slot
+    avoid_pairs: tuple = ()                  # tuple of frozenset({code_a, code_b})
+    w_avoid_pairs: float = 1.0              # penalty per overlapping hour-slot
+    parallel_policies: tuple = ()            # ((course_code, policy), ...)
+    w_parallel_coord: float = 10.0           # soft parallel-section coordination weight
     # AM/PM boundary hour for half-day instructor availability (UI setting)
     midday_split_hour: int = 13
     # toggles
@@ -88,9 +111,10 @@ class Config:
     soft_shaping_in_repair: bool = True
     # run the post-convergence move-based SOFT-POLISH (soft_search.anneal_soft) that re-seats
     # already-placed blocks to lower the normalized weighted-sum soft objective (idle/maxrun/
-    # instr_days/room_stable/free_day) under a conf no-regress guard. Default ON: the move-based
-    # local search measurably steers the surviving dials at scale (steerability gate, 2026-06-22)
-    # while never regressing placement (accept guard) or conf. Bounded by the repair deadline.
+    # instr_days/room_stable/free_day/min_working_days) under a conf no-regress guard.
+    # Default ON: the move-based local search measurably steers the surviving dials at scale
+    # (steerability gate, 2026-06-22) while never regressing placement (accept guard) or conf.
+    # Bounded by the repair deadline.
     soft_polish_in_repair: bool = True
     # move-based soft polish (soft_search.anneal_soft): acceptor + its single parameter.
     soft_polish_acceptor: str = "deluge"      # schc | lahc | deluge | sa (deluge wins full Fall+Spring A/B, measured 2026-06-23)

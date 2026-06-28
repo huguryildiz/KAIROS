@@ -1,5 +1,6 @@
 """Step 6 — Results: metric cards, weekly grid (view/selection), downloads."""
 import json
+import os
 
 import pandas as pd
 import streamlit as st
@@ -8,6 +9,7 @@ from timetabling.ui_grid import filter_assignments, distinct_values
 from timetabling.ui_style import metric_cards_html, week_grid_html, eyebrow_html, unschedulable_html
 from timetabling.pdf_export import build_pdf_bundle
 from timetabling.export import CSV_FIELDS
+from timetabling.cloud_storage import list_outputs_if_configured
 from timetabling.i18n import t
 
 # View dimension -> i18n label key for the "view by" selector.
@@ -25,12 +27,48 @@ def _bundle(sched: dict, view_field: str, entities: tuple,
     return build_pdf_bundle(sched, view_field, list(entities), dim_label, lang)
 
 
+@st.cache_data(show_spinner=False, ttl=60)
+def _archive_rows(bucket: str, prefix: str) -> list[dict]:
+    return list_outputs_if_configured(
+        env={"KAIROS_GCS_BUCKET": bucket, "KAIROS_GCS_PREFIX": prefix}
+    )
+
+
+def _render_archive_log(lang: str) -> None:
+    bucket = os.environ.get("KAIROS_GCS_BUCKET", "").strip()
+    if not bucket:
+        return
+
+    prefix = os.environ.get("KAIROS_GCS_PREFIX", "schedule-outputs")
+    with st.expander(t("res_archive_title", lang)):
+        try:
+            rows = _archive_rows(bucket, prefix)
+        except Exception as exc:
+            st.warning(t("res_archive_error", lang, error=str(exc)))
+        else:
+            if rows:
+                st.dataframe(
+                    pd.DataFrame(rows),
+                    hide_index=True,
+                    use_container_width=True,
+                    column_config={
+                        "updated": st.column_config.TextColumn(t("res_archive_updated", lang)),
+                        "file": st.column_config.TextColumn(t("res_archive_file", lang)),
+                        "size_bytes": st.column_config.NumberColumn(t("res_archive_size", lang)),
+                        "uri": st.column_config.TextColumn(t("res_archive_uri", lang)),
+                    },
+                )
+            else:
+                st.caption(t("res_archive_empty", lang))
+
+
 def render(lang: str) -> None:
     res = st.session_state.get("result")
-    if res is None:
-        return
     st.markdown(eyebrow_html(4, t("step_results", lang), "results"),
                 unsafe_allow_html=True)
+    if res is None:
+        _render_archive_log(lang)
+        return
 
     sched = res.schedule
     total_blocks = len(res.assignments) + sum(s.get("n_blocks", len(s.get("issues", []))) for s in res.unschedulable)
@@ -87,6 +125,8 @@ def render(lang: str) -> None:
                            key="dl_csv")
         st.download_button(t("res_dl_pdf", lang), pdf_data,
                            file_name=pdf_name, mime=pdf_mime, key="dl_pdf")
+
+    _render_archive_log(lang)
 
     if res.unschedulable:
         with st.expander(t("res_unsched_title", lang, n=len(res.unschedulable))):

@@ -175,8 +175,8 @@ def test_dept_override_sets_instructor_home_dept():
 def test_dept_column_in_importer_aliases():
     from timetabling.csv_import import COURSE_COL_MAP, COURSE_POSITIONAL
     assert "Dept" in COURSE_COL_MAP
-    # appended at the end so existing positional indices are unchanged
-    assert COURSE_POSITIONAL[-1] == "Dept"
+    # kept before newer columns so existing positional indices are unchanged
+    assert COURSE_POSITIONAL[-3:] == ("Dept", "Min Working Days", "Parallel Policy")
 
 
 def test_parttime_column_overrides_S_marker():
@@ -226,6 +226,42 @@ def test_fixed_column_sets_section_fields():
              "Instructor Email": "a@x.edu", "Fixed": "We 10"}]
     secs, _ = build_sections_from_courselist(rows, "001", Config())
     assert secs[0].fixed_day == "We" and secs[0].fixed_start == 10
+
+
+def test_min_working_days_column_sets_section_target():
+    rows = [{"Course Code": "X 101", "Section No": "01", "T": "1", "P": "0", "L": "1",
+             "Instructor Email": "a@x.edu", "Min Working Days": "2"}]
+    secs, _ = build_sections_from_courselist(rows, "001", Config())
+    assert secs[0].min_working_days == 2
+
+
+def test_min_working_days_blank_or_invalid_is_inert():
+    base = {"Course Code": "X 101", "Section No": "01", "T": "1", "P": "0", "L": "1",
+            "Instructor Email": "a@x.edu"}
+    rows = [base | {"Min Working Days": ""}, base | {"Section No": "02",
+                                                     "Min Working Days": "nope"}]
+    secs, _ = build_sections_from_courselist(rows, "001", Config())
+    assert [s.min_working_days for s in secs] == [0, 0]
+
+
+def test_parallel_policy_column_updates_config_when_valid():
+    cfg = Config()
+    rows = [
+        {"Course Code": "X 101", "Section No": "01", "T": "1", "P": "0", "L": "0",
+         "Instructor Email": "a@x.edu", "Parallel Policy": "same time"},
+        {"Course Code": "Y 101", "Section No": "01", "T": "1", "P": "0", "L": "0",
+         "Instructor Email": "b@x.edu", "Parallel Policy": "not-a-policy"},
+    ]
+    build_sections_from_courselist(rows, "001", cfg)
+    assert cfg.parallel_policies == (("X 101", "same-time"),)
+
+
+def test_settings_parallel_policy_overrides_csv_policy():
+    cfg = Config(parallel_policies=(("X 101", "spread"),))
+    rows = [{"Course Code": "X 101", "Section No": "01", "T": "1", "P": "0", "L": "0",
+             "Instructor Email": "a@x.edu", "Parallel Policy": "same-time"}]
+    build_sections_from_courselist(rows, "001", cfg)
+    assert cfg.parallel_policies == (("X 101", "spread"),)
 
 
 # --- Two-table data model: locked semantics --------------------------------

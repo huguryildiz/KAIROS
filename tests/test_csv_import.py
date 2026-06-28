@@ -147,7 +147,8 @@ def test_read_raw_and_parse_sample_all_ok():
 def test_optional_columns_appended_after_original_nine():
     assert COURSE_POSITIONAL[:9] == tuple(_EN_HEADER)
     assert COURSE_POSITIONAL[9:] == (
-        "Section Capacity", "Year", "Part-time", "Room Type", "Fixed", "Dept")
+        "Section Capacity", "Year", "Part-time", "Room Type", "Fixed", "Dept",
+        "Min Working Days", "Parallel Policy")
 
 
 def test_backward_compat_9col_still_parses_with_empty_new_fields():
@@ -161,16 +162,32 @@ def test_backward_compat_9col_still_parses_with_empty_new_fields():
 
 
 def test_new_column_aliases_detected_from_header():
-    header = _EN_HEADER + ["Year", "Part-time", "Room Type", "Fixed"]
-    raw = [header, _row() + ["2", "yes", "lab", "Mo 9"]]
+    header = _EN_HEADER + ["Year", "Part-time", "Room Type", "Fixed", "Min Working Days"]
+    raw = [header, _row() + ["2", "yes", "lab", "Mo 9", "2"]]
     m = map_columns(raw)
     assert m["col_index"]["Year"] == 9
     assert m["col_index"]["Part-time"] == 10
     assert m["col_index"]["Room Type"] == 11
     assert m["col_index"]["Fixed"] == 12
+    assert m["col_index"]["Min Working Days"] == 13
     r = ok_rows(parse_courselist(raw))[0]
     assert r["Year"] == "2" and r["Part-time"] == "yes"
     assert r["Room Type"] == "lab" and r["Fixed"] == "Mo 9"
+    assert r["Min Working Days"] == "2"
+
+
+def test_min_working_days_aliases_detected_from_header():
+    raw = [_EN_HEADER + ["Min Days"], _row() + ["3"]]
+    m = map_columns(raw)
+    assert m["col_index"]["Min Working Days"] == 9
+    assert ok_rows(parse_courselist(raw))[0]["Min Working Days"] == "3"
+
+
+def test_parallel_policy_aliases_detected_from_header():
+    raw = [_EN_HEADER + ["Parallel Policy"], _row() + ["same-time"]]
+    m = map_columns(raw)
+    assert m["col_index"]["Parallel Policy"] == 9
+    assert ok_rows(parse_courselist(raw))[0]["Parallel Policy"] == "same-time"
 
 
 # --- Classroom importer ---------------------------------------------------

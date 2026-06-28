@@ -2,7 +2,7 @@ from __future__ import annotations
 import re
 from typing import List, Dict, Tuple
 
-from .config import Config
+from .config import Config, normalize_parallel_policy
 from .model import Section, Room, Instructor
 from .derive import course_level, blocks_from_tpl
 from .textnorm import parse_int
@@ -110,10 +110,23 @@ def parse_fixed(v) -> Tuple[str, int]:
     return (day, hour) if 0 <= hour <= 23 else ("", -1)
 
 
+def _merge_parallel_policies_from_rows(rows: List[Dict], cfg: Config) -> None:
+    existing = {code: policy for code, policy in getattr(cfg, "parallel_policies", ())}
+    merged = list(getattr(cfg, "parallel_policies", ()))
+    for r in rows:
+        code = str(r.get("Course Code", "")).strip()
+        policy = normalize_parallel_policy(r.get("Parallel Policy", ""))
+        if code and policy and code not in existing:
+            existing[code] = policy
+            merged.append((code, policy))
+    cfg.parallel_policies = tuple(merged)
+
+
 def build_sections_from_courselist(rows: List[Dict], period: str,
                                    cfg: Config) -> Tuple[List[Section], Dict]:
     sections: List[Section] = []
     report = {"missing_email": 0, "missing_hours": 0}
+    _merge_parallel_policies_from_rows(rows, cfg)
     for r in rows:
         code = str(r.get("Course Code", "")).strip()
         if not code:
@@ -142,6 +155,8 @@ def build_sections_from_courselist(rows: List[Dict], period: str,
                     or parse_int(r.get("~Students"), 0) or 1)
         rtype = _room_type_demand(r.get("Room Type"))       # "" | lab | pc | studio
         fixed_day, fixed_start = parse_fixed(r.get("Fixed"))
+        min_days = parse_int(r.get("Min Working Days"), 0)
+        min_days = min(max(min_days, 0), len(cfg.days()))
         sections.append(Section(
             section_id=sid, period=period, code=code,
             name=str(r.get("Course Name", "")).strip(),
@@ -154,6 +169,7 @@ def build_sections_from_courselist(rows: List[Dict], period: str,
             requires_lab_room=(rtype in ("lab", "pc", "studio")),
             required_room_type=rtype,
             fixed_day=fixed_day, fixed_start=fixed_start,
+            min_working_days=min_days,
         ))
     return sections, report
 

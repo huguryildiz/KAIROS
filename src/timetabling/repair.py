@@ -196,6 +196,92 @@ def competitors(state: State, batch, cand_by_block) -> set:
     return comp - set(batch)
 
 
+def _avoid_pairs_viol(placed, sec_of, avoid_pairs) -> int:
+    """Count overlapping (day, hour) slots for each user-defined avoid pair."""
+    if not avoid_pairs:
+        return 0
+    pair_codes = {code for pair in avoid_pairs for code in pair}
+    code_day_hours: dict = {}   # (code, day) -> set of hours
+    for bid, c in placed.items():
+        code = sec_of[bid].code
+        if code in pair_codes:
+            key = (code, c.day)
+            if key not in code_day_hours:
+                code_day_hours[key] = set()
+            for hh in range(c.start, c.start + c.length):
+                code_day_hours[key].add(hh)
+    total = 0
+    for pair in avoid_pairs:
+        cl = list(pair)
+        if len(cl) != 2:
+            continue
+        a, b = cl[0], cl[1]
+        for (code, day), hours in code_day_hours.items():
+            if code == a:
+                total += len(hours & code_day_hours.get((b, day), set()))
+    return total
+
+
+_DAY_IDX = {"Mo": 0, "Tu": 1, "We": 2, "Th": 3, "Fr": 4, "Sa": 5}
+
+
+def _parallel_coord_viol(placed, sec_of, parallel_policies, course_codes=None) -> int:
+    """Soft violations for course-code scoped parallel-section policies."""
+    if not parallel_policies:
+        return 0
+    policies = {str(code).strip(): str(policy).strip()
+                for code, policy in parallel_policies
+                if str(code).strip() and str(policy).strip()}
+    if course_codes is not None:
+        wanted = {str(c).strip() for c in course_codes}
+        policies = {code: policy for code, policy in policies.items() if code in wanted}
+    if not policies:
+        return 0
+
+    by_code = defaultdict(list)
+    for bid, cand in placed.items():
+        s = sec_of[bid]
+        if s.code in policies:
+            by_code[s.code].append((bid, s, cand))
+
+    total = 0
+    for code, rows in by_code.items():
+        policy = policies.get(code)
+        section_ids = {s.section_id for _bid, s, _cand in rows}
+        if policy in ("same-time", "spread") and len(section_ids) < 2:
+            continue
+        if policy == "same-time":
+            slots_by_tag = defaultdict(set)
+            for bid, _s, cand in rows:
+                tag = bid.split("#", 1)[1] if "#" in bid else ""
+                if tag.startswith("T"):
+                    slots_by_tag[tag].add((cand.day, cand.start))
+            total += sum(max(0, len(slots) - 1) for slots in slots_by_tag.values())
+        elif policy == "spread":
+            counts_by_tag_slot = defaultdict(int)
+            for bid, _s, cand in rows:
+                tag = bid.split("#", 1)[1] if "#" in bid else ""
+                if tag.startswith("T"):
+                    counts_by_tag_slot[(tag, cand.day, cand.start)] += 1
+            total += sum(max(0, count - 1) for count in counts_by_tag_slot.values())
+        elif policy == "lab-after-theory":
+            theory_end = {}
+            labs = []
+            for bid, s, cand in rows:
+                if "#L" in bid:
+                    labs.append((s.section_id, cand))
+                else:
+                    key = (_DAY_IDX.get(cand.day, -1), cand.start + cand.length)
+                    theory_end[s.section_id] = max(theory_end.get(s.section_id, key), key)
+            for sid, cand in labs:
+                if sid not in theory_end:
+                    continue
+                lab_key = (_DAY_IDX.get(cand.day, -1), cand.start)
+                if lab_key < theory_end[sid]:
+                    total += 1
+    return total
+
+
 def _soft_total(state, cfg, staff_ids=frozenset()) -> int:
     """Global weighted soft sum over the current full placement. Single source of truth
     for the accept guard and the convergence check — mirrors the terms add_soft_objective
@@ -217,7 +303,30 @@ def _soft_total(state, cfg, staff_ids=frozenset()) -> int:
     total += cfg.w_cohort_gap * sum((max(h) + 1 - min(h)) - len(h)
                                     for h in coh_hours.values() if len(h) >= 2)
     total += cfg.w_instr_days * sum(len(days) for days in state.instr_active_days.values())
+    total += cfg.w_min_working_days * _min_working_days_missing(state)
+    total += cfg.w_avoid_pairs * _avoid_pairs_viol(state.placed, state.sec_of, cfg.avoid_pairs)
+    total += cfg.w_parallel_coord * _parallel_coord_viol(
+        state.placed, state.sec_of, cfg.parallel_policies)
     return total
+
+
+def _min_working_days_missing(state, section_ids=None) -> int:
+    """Missing distinct teaching days over section targets. `section_ids` scopes the
+    term for local-search neighborhoods; None means all sections known to the state."""
+    wanted = set(section_ids) if section_ids is not None else None
+    sections = {}
+    days_by_section = defaultdict(set)
+    for bid, s in state.sec_of.items():
+        if wanted is None or s.section_id in wanted:
+            sections[s.section_id] = s
+    for bid, c in state.placed.items():
+        s = state.sec_of[bid]
+        if wanted is None or s.section_id in wanted:
+            days_by_section[s.section_id].add(c.day)
+    return sum(max(0, int(getattr(s, "min_working_days", 0) or 0)
+                   - len(days_by_section.get(sid, ())))
+               for sid, s in sections.items()
+               if int(getattr(s, "min_working_days", 0) or 0) > 0)
 
 
 def add_soft_objective(m, x, free, cand_by_block, state, free_set, cfg,
@@ -326,6 +435,44 @@ def add_soft_objective(m, x, free, cand_by_block, state, free_set, cfg,
         m.Add(gap >= last - first - load)
         penalty.append(cfg.w_cohort_gap * gap)
         ub += cfg.w_cohort_gap * cfg.horizon_end
+
+    # --- per-section minimum working days: missing distinct days below target ---
+    free_sections = {state.sec_of[bid].section_id for bid in free}
+    sections_by_id = {s.section_id: s for s in state.sec_of.values()
+                      if s.section_id in free_sections}
+    frozen_section_days = _dd(set)
+    for bid, c in state.placed.items():
+        if bid in free_set:
+            continue
+        sid = state.sec_of[bid].section_id
+        if sid in free_sections:
+            frozen_section_days[sid].add(c.day)
+
+    free_section_day_vars = _dd(list)
+    for (bid, _room, day, _start), v in x.items():
+        sid = state.sec_of[bid].section_id
+        if sid in free_sections:
+            free_section_day_vars[(sid, day)].append(v)
+
+    for sid, s in sections_by_id.items():
+        target = int(getattr(s, "min_working_days", 0) or 0)
+        if target <= 0:
+            continue
+        active_days = len(frozen_section_days.get(sid, ()))
+        day_bools = []
+        for day in cfg.days():
+            if day in frozen_section_days.get(sid, ()):
+                continue
+            vs = free_section_day_vars.get((sid, day), ())
+            if not vs:
+                continue
+            d = m.NewBoolVar(f"secday|{sid}|{day}")
+            m.AddMaxEquality(d, vs)
+            day_bools.append(d)
+        missing = m.NewIntVar(0, target, f"minwd|{sid}")
+        m.Add(missing >= target - active_days - sum(day_bools))
+        penalty.append(cfg.w_min_working_days * missing)
+        ub += cfg.w_min_working_days * target
 
     return penalty, ub
 

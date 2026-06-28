@@ -12,7 +12,7 @@ import copy
 import json
 from typing import Dict, Tuple
 
-from .config import Config, DAYS, SATURDAY
+from .config import Config, DAYS, SATURDAY, normalize_parallel_policy
 
 # Upper bound of the occupancy horizon (Config.horizon_end). Not a settings field — used to
 # size the PM availability band. Closing hours past a section's own window is harmless.
@@ -55,6 +55,8 @@ DEFAULT_SETTINGS: dict = {
         "fairness": "off",
     },
     "free_day_years": [],     # -> Config.free_day_year_levels (cohort years that want a free day)
+    "avoid_pairs": [],        # -> Config.avoid_pairs (list of [code_a, code_b])
+    "parallel_policies": [],  # -> Config.parallel_policies (list of [course_code, policy])
     # Soft-polish wall-clock cap. Balanced is the interactive default: measured sample data
     # showed real quality gain above 180s, while 600s is better kept for best-quality runs.
     "quality_mode": "balanced",
@@ -216,6 +218,26 @@ def build_config(settings: dict, availability: Dict[str, list],
         availability_prefer or {}, {"day_start": day_start})
     prefer_ids = frozenset(iid for iid, _d, _h in prefer_slots)
 
+    raw_pairs = s.get("avoid_pairs", []) or []
+    avoid_pairs_cfg = tuple(
+        frozenset({str(p[0]).strip(), str(p[1]).strip()})
+        for p in raw_pairs
+        if isinstance(p, (list, tuple)) and len(p) == 2
+        and str(p[0]).strip() and str(p[1]).strip()
+        and str(p[0]).strip() != str(p[1]).strip()
+    )
+    seen_parallel = set()
+    parallel_cfg = []
+    for row in s.get("parallel_policies", []) or []:
+        if not isinstance(row, (list, tuple)) or len(row) != 2:
+            continue
+        code = str(row[0]).strip()
+        policy = normalize_parallel_policy(row[1])
+        if not code or not policy or code in seen_parallel:
+            continue
+        seen_parallel.add(code)
+        parallel_cfg.append((code, policy))
+
     return Config(
         horizon_start=day_start,
         undergrad_end=day_end,
@@ -245,6 +267,8 @@ def build_config(settings: dict, availability: Dict[str, list],
         solve_time_limit_s=float(solve_seconds),
         repair_time_limit_s=float(solve_seconds),
         soft_polish_budget_s=quality_seconds(s.get("quality_mode", "balanced")),
+        avoid_pairs=avoid_pairs_cfg,
+        parallel_policies=tuple(parallel_cfg),
     )
 
 

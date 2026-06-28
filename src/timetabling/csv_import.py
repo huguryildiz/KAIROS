@@ -42,9 +42,13 @@ COURSE_COL_MAP: Dict[str, List[str]] = {
     "Room Type":      ["room_type", "oda_tipi", "roomtype", "venue_type"],
     "Fixed":          ["fixed", "fixed_slot", "sabit", "pinned", "pin"],
     # DEPT = department/faculty name (e.g. "Faculty of Econ…") -> Section.department, and the
-    # cohort-program fallback when COURSE_CODE is unparseable. Kept LAST so the
-    # positional indices of the columns above stay stable for header-less files.
+    # cohort-program fallback when COURSE_CODE is unparseable.
     "Dept":           ["dept", "department", "bolum", "faculty", "fakulte", "birim"],
+    "Min Working Days": ["min_working_days", "min_days", "minimum_working_days",
+                         "minimum_days", "asgari_gun", "min_gun", "minimum_gun"],
+    "Parallel Policy": ["parallel_policy", "parallel", "parallel_coord",
+                        "parallel_coordination", "sube_politikasi",
+                        "paralel_sube", "paralel_sube_politikasi"],
 }
 
 # Positional fallback order == the canonical column order.

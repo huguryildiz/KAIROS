@@ -44,6 +44,8 @@ fallback order.
 | `Room Type` | optional | **Required room category** (demand): `lab / pc / studio`. Empty or `normal` ⇒ no categorical restriction; explicit `lab`, `pc`, or `studio` restricts the section to exactly that room type. Shares Table 2's vocabulary. |
 | `Fixed` | optional | Fixed slot for the section's first block (e.g. `"Mo 9"`). |
 | `Year` | optional | Overrides the cohort year level. |
+| `Min Working Days` | optional | Soft target for how many distinct days this section should occupy. Empty/invalid means no target; unmet days are reported in `unmet_soft` and penalized, never treated as a hard violation. |
+| `Parallel Policy` | optional | Course-code scoped soft policy for parallel sections: `same-time`, `spread`, or `lab-after-theory`. Empty/invalid means off. Settings entries for the same course code override the CSV value. |
 
 **Not section columns** (deliberately excluded — they belong to the room table or
 are solver output): `ROOM`, `ROOM_CAP`, `SCHEDULE`.

@@ -400,8 +400,9 @@ def test_global_terms_raw_terms_plus_conf():
     # free_day: no year config -> 0 ; conf: hours 9,10 each 2 courses -> 2
     assert t == {"idle": 3, "maxrun": 0, "instr_days": 2, "nonadjacent": 0,
                  "evening": 2, "instr_idle": 3, "fairness": 20,
-                 "room_stable": 0, "free_day": 0, "room_util": 0, "conf": 2,
-                 "instr_avoid_viol": 0, "instr_prefer_miss": 0}
+                 "room_stable": 0, "free_day": 0, "room_util": 0,
+                 "min_working_days": 0, "parallel_coord": 0, "conf": 2,
+                 "instr_avoid_viol": 0, "instr_prefer_miss": 0, "avoid_pairs_viol": 0}
 
 
 def test_local_terms_match_global_over_all_entities():
@@ -421,6 +422,36 @@ def test_local_terms_match_global_over_all_entities():
     all_rooms = set(st.room_hours_used)
     all_blocks = set(st.placed)
     assert _local_terms(st, all_cohorts, all_instrs, all_rooms, all_blocks, cfg) == _global_terms(st, cfg)
+
+
+def test_relocate_lowers_parallel_coord_without_conf_regress():
+    from timetabling.soft_search import try_relocate, _global_terms
+    cfg = Config(w_idle=0, w_maxrun=0, w_instr_days=0, w_nonadjacent=0,
+                 w_evening=0, w_instr_idle=0, w_fairness=0, w_room_stable=0,
+                 w_free_day=0, w_room_util=0, w_min_working_days=0,
+                 w_parallel_coord=10,
+                 parallel_policies=(("PSY101", "same-time"),))
+    a = _sec("A_01", "i1", level=2, code="PSY101")
+    b = _sec("A_02", "i2", level=2, code="PSY101")
+    cand = {
+        "A_02#T": [Candidate("A_02#T", "R2", "Tu", 9, 2),
+                   Candidate("A_02#T", "R2", "Mo", 9, 2)],
+    }
+    st = _state(a, b)
+    st.occupy("A_01#T", Candidate("A_01#T", "R1", "Mo", 9, 2))
+    st.occupy("A_02#T", cand["A_02#T"][0])
+    base = _global_terms(st, cfg)
+    assert base["parallel_coord"] == 1 and base["conf"] == 0
+
+    res = try_relocate(st, cand, "A_02#T", random.Random(0), _eval_fn(cfg, base))
+
+    assert res is not None
+    dobj, dterms, revert = res
+    assert dterms["parallel_coord"] == -1
+    assert dterms["conf"] == 0
+    assert dobj < 0
+    assert len(st.placed) == 2
+    revert()
 
 
 def test_lahc_initializes_history_and_cursor():

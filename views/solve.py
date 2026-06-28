@@ -15,6 +15,7 @@ from timetabling.ui_input import (build_sections_from_courselist,
 from timetabling.route import mark_virtual
 from timetabling.pipeline import run_pipeline, AUTO_REPAIR_THRESHOLD
 from timetabling.export import write_schedule_outputs
+from timetabling.cloud_storage import upload_outputs_if_configured
 from timetabling.i18n import t
 from timetabling.ui_style import eyebrow_html
 
@@ -238,7 +239,11 @@ def render(lang: str) -> None:
             raise _error[0]
 
         res = _result[0]
-        write_schedule_outputs(Path("out"), res.schedule, period=_PERIOD)
+        written = write_schedule_outputs(Path("out"), res.schedule, period=_PERIOD)
+        try:
+            upload_outputs_if_configured(written)
+        except Exception as exc:
+            st.warning(f"Cloud Storage upload failed: {exc}")
         st.session_state["result"] = res
         st.success(t("solve_done", lang, a=len(res.assignments),
                      v=len(res.violations), u=len(res.unschedulable)))

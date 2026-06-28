@@ -56,6 +56,7 @@ class Section:
     required_room_type: str = ""     # normal|lab|pc|studio demand; "" = derive from L
     fixed_day: str = ""         # pin the section's first block to this day ("" = unpinned)
     fixed_start: int = -1       # pin the section's first block to this start hour (-1 = unpinned)
+    min_working_days: int = 0   # soft target: section should occupy at least this many days
 
 
 @dataclass(frozen=True)
@@ -93,4 +94,3 @@ def weekly_load_hours(sections) -> dict:
         for iid in s.instructor_ids:
             load[iid] = load.get(iid, 0) + h
     return load
-

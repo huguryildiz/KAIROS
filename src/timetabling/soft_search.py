@@ -7,7 +7,10 @@ from collections import defaultdict
 from time import perf_counter
 
 from .config import Config
-from .repair import _cand_soft, _soft_total
+from .repair import (
+    _cand_soft, _soft_total, _min_working_days_missing, _avoid_pairs_viol,
+    _parallel_coord_viol,
+)
 
 CHAIN_MAX_DEPTH = 4   # bounded ejection-chain length in anneal_soft
 
@@ -22,8 +25,8 @@ def _day_span(days) -> int:
 
 def _local_soft(state, cohorts, instrs, rooms, blocks, cfg: Config) -> int:
     """Weighted soft over only the given entities. Each term is owned by one entity type
-    (per-candidate->block, cohort-conflict/gap->cohort, instr_days->instructor), so summing
-    over the FULL entity sets equals _soft_total."""
+    (per-candidate->block, cohort-conflict/gap->cohort, instr_days->instructor,
+    min_working_days->section), so summing over the FULL entity sets equals _soft_total."""
     total = 0
     # per-candidate over the given blocks
     for bid in blocks:
@@ -50,6 +53,8 @@ def _local_soft(state, cohorts, instrs, rooms, blocks, cfg: Config) -> int:
     # instr_days over the given instructors
     total += cfg.w_instr_days * sum(len(state.instr_active_days.get(iid, ())) for iid in instrs)
     total += cfg.w_nonadjacent * sum(_day_span(state.instr_active_days.get(iid, ())) for iid in instrs)
+    section_ids = {state.sec_of[bid].section_id for bid in blocks if bid in state.sec_of}
+    total += cfg.w_min_working_days * _min_working_days_missing(state, section_ids)
     return total
 
 
@@ -104,8 +109,8 @@ def _fairness_of(coh_day, instr_day, cfg) -> int:
 
 def _global_terms(state, cfg) -> dict:
     """Raw counts of the soft terms over the FULL placement. idle/conf over cohorts (all),
-    maxrun over cohorts+instructors, instr_days over instructors, room_stable per section,
-    free_day over cohorts in the configured year-levels."""
+    maxrun over cohorts+instructors, instr_days over instructors, room_stable and
+    min_working_days per section, free_day over cohorts in the configured year-levels."""
     coh_day = defaultdict(set)        # (cohort, day) -> {hour}
     coh_slot = defaultdict(set)       # (cohort, day, hour) -> {course}
     instr_day = defaultdict(set)      # (iid, day) -> {hour}
@@ -155,18 +160,24 @@ def _global_terms(state, cfg) -> dict:
         "room_stable": sum(max(0, len(rs) - 1) for rs in sec_rooms.values()),
         "free_day": free_day,
         "room_util": room_util,
+        "min_working_days": _min_working_days_missing(state),
+        "parallel_coord": _parallel_coord_viol(
+            state.placed, state.sec_of, cfg.parallel_policies),
         "instr_avoid_viol": instr_avoid_viol,
         "instr_prefer_miss": instr_prefer_miss,
         "conf": sum(max(0, len(v) - 1) for v in coh_slot.values()),
+        "avoid_pairs_viol": _avoid_pairs_viol(state.placed, state.sec_of, cfg.avoid_pairs),
     }
 
 
 def _local_terms(state, cohorts, instrs, rooms, blocks, cfg) -> dict:
     """Same terms over only the given entities. Each term is owned by one entity type:
     idle/conf/free_day -> cohort, maxrun -> cohort+instructor, instr_days -> instructor,
-    room_stable -> section (derived from blocks). Summing over the full sets == _global_terms."""
+    room_stable/min_working_days -> section (derived from blocks). Summing over the full
+    sets == _global_terms."""
     cohort_set, instr_set = set(cohorts), set(instrs)
     sections = {bid.split("#")[0] for bid in blocks}
+    course_codes = {state.sec_of[bid].code for bid in blocks if bid in state.sec_of}
     coh_day = defaultdict(set)
     coh_slot = defaultdict(set)
     coh_days_used = defaultdict(set)
@@ -219,9 +230,17 @@ def _local_terms(state, cohorts, instrs, rooms, blocks, cfg) -> dict:
                          for bid, c in state.placed.items()
                          if bid.split("#")[0] in sections
                          and not state.sec_of[bid].is_virtual and c.cap > 0),
+        "min_working_days": _min_working_days_missing(state, sections),
+        "parallel_coord": _parallel_coord_viol(
+            state.placed, state.sec_of, cfg.parallel_policies, course_codes),
         "instr_avoid_viol": instr_avoid_viol,
         "instr_prefer_miss": instr_prefer_miss,
         "conf": sum(max(0, len(v) - 1) for v in coh_slot.values()),
+        "avoid_pairs_viol": _avoid_pairs_viol(
+            state.placed, state.sec_of,
+            [p for p in cfg.avoid_pairs
+             if p & {state.sec_of[bid].code for bid in blocks if bid in state.sec_of}]
+            if cfg.avoid_pairs else []),
     }
 
 
@@ -239,8 +258,11 @@ def _norm_obj(terms, base, cfg) -> float:
             + cfg.w_room_stable * terms["room_stable"] / max(base["room_stable"], 1)
             + cfg.w_free_day * terms["free_day"] / max(base["free_day"], 1)
             + cfg.w_room_util * terms["room_util"] / max(base["room_util"], 1)
+            + cfg.w_min_working_days * terms["min_working_days"] / max(base["min_working_days"], 1)
+            + cfg.w_parallel_coord * terms["parallel_coord"] / max(base["parallel_coord"], 1)
             + cfg.w_instr_avoid * terms["instr_avoid_viol"] / max(base["instr_avoid_viol"], 1)
-            + cfg.w_instr_prefer * terms["instr_prefer_miss"] / max(base["instr_prefer_miss"], 1))
+            + cfg.w_instr_prefer * terms["instr_prefer_miss"] / max(base["instr_prefer_miss"], 1)
+            + cfg.w_avoid_pairs * terms["avoid_pairs_viol"] / max(base["avoid_pairs_viol"], 1))
 
 
 def _slot(c):
@@ -701,7 +723,8 @@ def _make_acceptor(cfg, rng=None):
 
 def anneal_soft(state, cand_by_block, cfg, budget_s, seed=0):
     """Relocate/swap/chain already-placed blocks to lower the normalized weighted-sum objective
-    over the five non-guard terms (idle, maxrun, instr_days, room_stable, free_day); each is
+    over the non-guard soft terms (idle, maxrun, instr_days, room_stable, free_day,
+    min_working_days, and optional advanced dials); each is
     divided by its polish-start baseline so weights are pure relative preference. cohort
     conflict (conf) is a no-regress guard. Never unplaces; restores the best incumbent so the
     objective never regresses globally."""
@@ -722,7 +745,7 @@ def anneal_soft(state, cand_by_block, cfg, budget_s, seed=0):
         t = _local_terms(st, cohorts, instrs, rooms, blocks, cfg)
         return _norm_obj(t, base, cfg), t
 
-    # Objective = normalized weighted sum over the five non-guard terms, evaluated on the
+    # Objective = normalized weighted sum over the non-guard soft terms, evaluated on the
     # GLOBAL per-term totals (cur_terms, tracked incrementally via the moves' per-term local
     # deltas, dterms). No-regress guard over cohort_conflict only; placement invariant by
     # construction.

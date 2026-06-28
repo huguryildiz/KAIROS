@@ -16,7 +16,10 @@ AUTO_REPAIR_THRESHOLD = 50
 
 
 def _emit(event: str, **kw) -> None:
-    print(json.dumps({"event": event, **kw}), flush=True)
+    parts = " ".join(f"{k}={v}" for k, v in kw.items())
+    msg = f"[kairos:{event}] {parts}"
+    print(json.dumps({"message": msg, "severity": "INFO", "event": event,
+                      **{k: str(v) for k, v in kw.items()}}), flush=True)
 
 
 @dataclass
@@ -54,6 +57,8 @@ def _unmet_min_working_days(assignments: list, sections: list) -> list:
 def run_pipeline(period: str, sections: list, rooms: Dict, instructors: Dict,
                  cfg: Config, solver: str = "auto", progress_cb=None) -> PipelineResult:
     t_total = time.perf_counter()
+    _emit("pipeline_start", period=period, sections=len(sections),
+          rooms=len(rooms), solver_hint=solver)
 
     room_list = list(rooms.values())
     t0 = time.perf_counter()

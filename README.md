@@ -30,7 +30,13 @@ It runs two ways: a **web app** for non-technical users and a **command-line sol
 
 ## What it does
 
-- **Conflict-free by construction.** Placement-legality rules are enforced during candidate generation, while cross-block resource conflicts are enforced in the solver; room capacity, lab pinning, time-window, blackout, room-overlap, and instructor-overlap violations cannot appear in the output.
+- **Conflict-free by construction.** Placement-legality rules are enforced during candidate generation; cross-block resource conflicts are enforced in the solver. Violations cannot appear in the output:
+  - room capacity respected for every block
+  - lab blocks pinned to lab/pc/studio rooms; theory blocks excluded from them
+  - day window and blackout slots observed
+  - no room double-booking, no instructor double-booking, no section self-overlap
+  - theory sessions of the same course placed on different days
+  - instructor unavailability slots strictly blocked
 - **Optimized, not just valid.** The soft polish phase steers the schedule toward comfort after placement — never at the cost of hard constraints:
   - minimizes cohort idle gaps, compacts instructor weeks, reduces late-hour load
   - keeps each section in a stable room across its blocks

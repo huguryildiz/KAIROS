@@ -75,7 +75,8 @@ def render(lang: str) -> None:
     placed_pct = (len(res.assignments) / total_blocks * 100) if total_blocks else 0
     conflicts = len(res.violations)
     elapsed = res.stats.get("total_elapsed_s", 0)
-    elapsed_str = f"{elapsed:.0f} s" if elapsed < 60 else f"{elapsed/60:.1f} dk"
+    _min = "dk" if lang == "tr" else "min"
+    elapsed_str = f"{elapsed:.0f} s" if elapsed < 60 else f"{elapsed/60:.1f} {_min}"
     st.markdown(metric_cards_html([
         (t("res_m_placed", lang), f"{placed_pct:.0f}%", "good" if placed_pct >= 99 else "brand"),
         (t("res_m_conflicts", lang), str(conflicts), "good" if conflicts == 0 else "bad"),

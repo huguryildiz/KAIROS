@@ -1,5 +1,8 @@
 # Native baseline = light (matches ui_style _LIGHT_TOKENS). Dark theme is driven
 # at runtime by ui_style.brand_css("dark") via the in-app ☀️/🌙 toggle.
+[server]
+enableStaticServing = true
+
 [theme]
 base = "light"
 primaryColor = "#2B3A8C"

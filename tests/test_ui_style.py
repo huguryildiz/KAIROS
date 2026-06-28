@@ -56,8 +56,7 @@ def test_brand_css_light_vs_dark_tokens():
     light, dark = brand_css("light"), brand_css("dark")
     assert "#F4F6FA" in light and "#0E1220" not in light      # light canvas only
     assert "#0E1220" in dark                                   # dark canvas present
-    assert ".tt-blk" in light and ".tt-blk" in dark            # component CSS in both
-    assert 'data-testid="stHeader"' in light                   # hides native chrome
+    assert "brand_static.css" in light and "brand_static.css" in dark  # static file linked
     assert brand_css() == light                                # default is light
 
 
@@ -92,9 +91,9 @@ def test_hero_html_embeds_decorative_animation():
     assert 'class="tt-hero-anim"' in html and 'aria-hidden="true"' in html
     assert html.count('class="blk"') == 9          # all course blocks rendered
     assert html.count("<i></i>") == 25             # 5×5 empty-cell backdrop
-    css = brand_css("dark")
-    assert "@keyframes solveIn" in css and ".tt-hero-anim" in css
-    assert "prefers-reduced-motion" in css         # freezes when motion reduced
+    from timetabling.ui_style import _COMPONENT_CSS
+    assert "@keyframes solveIn" in _COMPONENT_CSS and ".tt-hero-anim" in _COMPONENT_CSS
+    assert "prefers-reduced-motion" in _COMPONENT_CSS   # freezes when motion reduced
 
 
 def test_hero_anim_day_labels_follow_language():

@@ -64,9 +64,9 @@ def test_instr_days_no_target_with_saturday_is_six():
     assert cfg.w_instr_days == 0.0
 
 
-def test_default_settings_instr_days_target_is_no_target():
+def test_default_settings_instr_days_target():
     cfg = build_config(DEFAULT_SETTINGS, {}, 60)
-    assert cfg.max_instr_days == 5 and cfg.w_instr_days == 0.0
+    assert cfg.max_instr_days == 3 and cfg.w_instr_days == 10.0
 
 
 def test_legacy_5level_profile_migrates_to_three():

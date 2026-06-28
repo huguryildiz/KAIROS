@@ -16,23 +16,23 @@ def test_default_settings_build_config_matches_today():
     assert cfg.midday_split_hour == 13
     assert cfg.max_theory_session == 2
     assert cfg.max_block_len == 4
-    # uniform 0-1 UI scale: every "normal" toggle -> 0.5 x UI_REF(20) = 10
+    # uniform 0-1 UI scale: every "medium" toggle -> 0.5 x UI_REF(20) = 10
     assert cfg.w_cohort_conflict == 50
     assert cfg.w_cohort_gap == 10
-    assert cfg.w_instr_days == 0      # instr_days default target is "No target" -> dial off
-    assert cfg.w_parttime_days == 0
-    assert DEFAULT_SETTINGS["weights"]["evening"] == "off"
-    assert DEFAULT_SETTINGS["weights"]["instr_idle"] == "off"
-    assert DEFAULT_SETTINGS["weights"]["fairness"] == "off"
-    assert DEFAULT_SETTINGS["weights"]["dept_compact"] == "off"
-    assert DEFAULT_SETTINGS["weights"]["dept_fairness"] == "off"
-    assert DEFAULT_SETTINGS["weights"]["session_gap"] == "off"
-    assert cfg.w_evening == 0
-    assert cfg.w_instr_idle == 0
-    assert cfg.w_fairness == 0
-    assert cfg.w_dept_compact == 0
-    assert cfg.w_dept_fairness == 0
-    assert cfg.w_session_gap == 0
+    assert cfg.w_instr_days == 10     # target=3 active -> medium dial applies
+    assert cfg.w_parttime_days == 14  # medium w_instr_days -> parttime scaled
+    assert DEFAULT_SETTINGS["weights"]["evening"] == "medium"
+    assert DEFAULT_SETTINGS["weights"]["instr_idle"] == "medium"
+    assert DEFAULT_SETTINGS["weights"]["fairness"] == "medium"
+    assert DEFAULT_SETTINGS["weights"]["dept_compact"] == "medium"
+    assert DEFAULT_SETTINGS["weights"]["dept_fairness"] == "medium"
+    assert DEFAULT_SETTINGS["weights"]["session_gap"] == "medium"
+    assert cfg.w_evening == 10
+    assert cfg.w_instr_idle == 10
+    assert cfg.w_fairness == 10
+    assert cfg.w_dept_compact == 10
+    assert cfg.w_dept_fairness == 10
+    assert cfg.w_session_gap == 10
     assert cfg.primetime_start == 9
     assert cfg.primetime_end == 16
     assert cfg.parallel_policies == ()

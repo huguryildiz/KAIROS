@@ -42,21 +42,21 @@ DEFAULT_SETTINGS: dict = {
     # instructor-days target -> Config.max_instr_days. The instr_days priority dial only
     # bites when this target creates headroom below the active week length; 0 = "No target"
     # (term off: max_instr_days = week length, w_instr_days = 0). Active values: 4 / 3 / 2.
-    # Default 0 (opt-in) so an untouched Settings step reproduces today's schedule.
-    "instr_days_target": 0,
+    # Default 3 (≤3 days): medium weight applies for an untouched Settings step.
+    "instr_days_target": 3,
     "weights": {              # preset levels, never raw numbers
         "maxrun": "medium",
         "instr_days": "medium",
-        "nonadjacent": "off",
+        "nonadjacent": "medium",
         "room_stable": "medium",
         "free_day": "medium",
-        "evening": "off",
-        "instr_idle": "off",
-        "fairness": "off",
+        "evening": "medium",
+        "instr_idle": "medium",
+        "fairness": "medium",
         "perturbation": "off",
-        "dept_compact": "off",
-        "dept_fairness": "off",
-        "session_gap": "off",
+        "dept_compact": "medium",
+        "dept_fairness": "medium",
+        "session_gap": "medium",
     },
     "min_session_gap_days": 2,
     "free_day_years": [],     # -> Config.free_day_year_levels (cohort years that want a free day)

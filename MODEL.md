@@ -99,9 +99,9 @@ time. The CP-SAT monolith (§6a) and the repair soft polish (§6b) use separate 
 - **Compress instructor weeks** (`w_instr_days=10.0` full-time, `w_parttime_days=14.0`
   part-time when an instructor-days target is active; repair polish uses `w_instr_days` only) —
   CP-SAT monolith penalizes every teaching day; repair polish penalizes days beyond
-  `max_instr_days`. In the UI default (`instr_days_target = No target`) `build_config()` forces
-  both weights to 0.0; choosing ≤4/≤3/≤2 activates the term and maps the priority preset to
-  5.0/10.0/20.0, with part-time set to `w_instr_days + 4.0`.
+  `max_instr_days`. UI default is **≤3 days** (target active, medium weight applies); choosing
+  No target forces both weights to 0.0; ≤4/≤3/≤2 sets the target and maps the priority preset
+  to 5.0/10.0/20.0, with part-time set to `w_instr_days + 4.0`.
 - **Room stability** (`w_room_stable=10.0`) — penalize each section that uses more than one
   room across its blocks (repair polish).
 - **Section minimum working days** (`w_min_working_days=10.0`) — penalize each missing
@@ -130,37 +130,37 @@ time. The CP-SAT monolith (§6a) and the repair soft polish (§6b) use separate 
   auditoriums, independent of absolute room size. Hard capacity (room must fit) is unchanged.
   Virtual rooms exempt. Applies to both the CP-SAT monolith and the repair solver
   (greedy, LNS sub-model, and soft polish).
-- **Compact teaching days** (`w_nonadjacent=0.0` default / 10.0 when UI dial is active) —
+- **Compact teaching days** (`w_nonadjacent=10.0` default, medium) —
   penalize the span between each instructor's first and last teaching day of the week
   (e.g. Mon–Fri = 4, Mon–Tue = 1, single day = 0); pushes teaching days to cluster together.
   Repair polish term; CP-SAT monolith reuses the same weight name for a different, narrower
   purpose (penalizing split blocks on the same day).
-  UI dial: off / low / medium / high (default off, opt-in via Settings).
-- **Late-hour load** (`w_evening=0.0` default / 5.0–20.0 when enabled) — penalize occupied
+  UI dial: off / low / medium / high (default medium).
+- **Late-hour load** (`w_evening=10.0` default, medium) — penalize occupied
   hour-slots at or after `evening_from_hour` (default 17:00) for both cohorts and instructors.
-  Repair polish term; optional Settings dial: off / low / medium / high.
-- **Instructor idle gaps** (`w_instr_idle=0.0` default / 5.0–20.0 when enabled) — penalize
-  same-day holes between an instructor's classes. Repair polish term; optional Settings dial:
-  off / low / medium / high.
-- **Bad-load fairness** (`w_fairness=0.0` default / 5.0–20.0 when enabled) — square the
+  Repair polish term; Settings dial: off / low / medium / high (default medium).
+- **Instructor idle gaps** (`w_instr_idle=10.0` default, medium) — penalize
+  same-day holes between an instructor's classes. Repair polish term; Settings dial:
+  off / low / medium / high (default medium).
+- **Bad-load fairness** (`w_fairness=10.0` default, medium) — square the
   per-cohort and per-instructor concentration of bad load (idle gaps + long runs + late slots),
   making it more expensive to dump all discomfort on the same entity. Repair polish term;
-  optional Settings dial: off / low / medium / high.
+  Settings dial: off / low / medium / high (default medium).
 - **Building transition cost** (`w_building_change=0.0` default) — penalize consecutive
   teaching hours for the same instructor that occur in different buildings on the same day.
   Building is derived from the room code prefix: first letter (`A`–`K`); `XB…` prefixes
   (bodrum/basement) resolve to building `X`. Online and unknown rooms are excluded.
   Repair polish term and CP-SAT monolith term (linearized `t ≥ v1 + v2 − 1`); off by default.
-- **Department building compactness** (`w_dept_compact=0.0` default) — penalize spreading a
+- **Department building compactness** (`w_dept_compact=10.0` default, medium) — penalize spreading a
   department across multiple buildings by counting placed blocks outside that department's
   most-used known building. Building is inferred from the same `building_of(room)` room-code
-  prefix rule; `Online` and unknown buildings are ignored. Repair polish term only; optional
-  Settings dial off / low / medium / high.
-- **Department prime-time fairness** (`w_dept_fairness=0.0` default) — balance each
+  prefix rule; `Online` and unknown buildings are ignored. Repair polish term only; Settings
+  dial off / low / medium / high (default medium).
+- **Department prime-time fairness** (`w_dept_fairness=10.0` default, medium) — balance each
   department's share of teaching hours placed in the prime-time window
   `[primetime_start, primetime_end)`, default 09:00-16:00. Uses `Section.department`
   (falling back to `dept_code`) and compares prime-time ratios, not raw counts. Active in
-  CP-SAT and repair polish; optional Settings dial off / low / medium / high.
+  CP-SAT and repair polish; Settings dial off / low / medium / high (default medium).
 - **Minimum perturbation** (`w_perturbation=0.0` default) — penalize each block placed at a
   `(day, start, room)` that differs from the reference schedule uploaded by the user. The
   reference is a previously exported `schedule_*.json`; parsed by `load_ref_schedule` into
@@ -168,13 +168,13 @@ time. The CP-SAT monolith (§6a) and the repair soft polish (§6b) use separate 
   `w_perturbation=0.0` the term is inert. Active in the repair greedy phase (`_cand_soft`),
   repair soft polish (`_global_terms` / `_local_terms` / `_norm_obj`), and the CP-SAT monolith
   objective. UI: optional JSON uploader in the Solve step expander; off by default.
-- **Session day-gap** (`w_session_gap=0.0` default) — penalize multi-session sections whose
+- **Session day-gap** (`w_session_gap=10.0` default, medium) — penalize multi-session sections whose
   theory sessions are placed closer than `min_session_gap_days` apart (default 2 days). For
   each pair of consecutive session-days of the same section, shortfall = `max(0, min_gap −
   gap)` days; the term sums these across all sections. Repair soft polish only
   (`_session_gap_penalty` helper, `_global_terms` / `_local_terms` / `_norm_obj`). UI:
-  optional Settings dial off / low / medium / high, with a companion 1/2/3-day radio for
-  `min_session_gap_days`; off by default (opt-in).
+  Settings dial off / low / medium / high (default medium), with a companion 1/2/3-day radio
+  for `min_session_gap_days`.
 
 ### What "0 resource conflicts" means
 
@@ -387,15 +387,15 @@ $$
 **Semantics differ by path.** In the CP-SAT monolith the weight applies to *every* teaching
 day; in the repair soft polish it applies to days **beyond the target** $T = $ `max_instr_days`
 ($\max(0,\ \text{days}_i - T)$). In the School-Settings/UI path, `build_config` forces
-`w_instr_days = w_parttime_days = 0` when `instr_days_target` is "No target" (the default),
-making the term inert until the target dial is activated. Raw `Config()` still carries the
+`w_instr_days = w_parttime_days = 0` when `instr_days_target` is "No target",
+making the term inert. UI default is **≤3 days** (target active, medium weight). Raw `Config()` still carries the
 legacy nonzero weights used by CLI/model tests unless a Settings dict is built.
 
 **Target lever (`instr_days_target` → `max_instr_days`).** The School-Settings control maps
 **No target → $T = $ week length** (5, or 6 with Saturday) which is the term's **off state**
 (no headroom ⇒ inert ⇒ the build forces $w_{\text{instr}} = w_{\text{pt}} = 0$), and **≤4 /
-≤3 / ≤2 → $T = 4/3/2$**, which creates headroom so the priority dial steers. Default is **No
-target** (opt-in; an untouched settings step reproduces today's schedule). The consolidation
+≤3 / ≤2 → $T = 4/3/2$**, which creates headroom so the priority dial steers. Default is **≤3
+days** (target active, medium weight; an untouched settings step activates the term). The consolidation
 move in the soft polish (`soft_search`) is gated on $T < $ week length, so a weight alone
 cannot steer this term — *the target must create headroom first*.
 
@@ -420,25 +420,24 @@ $$
   cohorts and instructors.
 - Repair soft polish term only. UI dial: low / medium / high (default medium = 10.0).
 
-### 5.4 Compact teaching days — $w_{\text{nonadjacent}}=0.0$ (repair polish, opt-in)
+### 5.4 Compact teaching days — $w_{\text{nonadjacent}}=10.0$ (repair polish)
 
 - Measures the span between each instructor's first and last teaching day of the week
   (`max_day_idx − min_day_idx`; e.g. Mon+Fri = 4, Mon+Tue = 1, single day = 0). Sum across all
   instructors is the `nonadjacent` term.
-- Default weight is 0.0 (opt-in); `settings.build_config` maps the UI dial medium → 10.0.
-  With weight 0 the term is computed but never steers moves.
-- Repair soft polish term only. UI dial: off / low / medium / high (default off).
+- Default weight is 10.0 (medium); `settings.build_config` maps the UI dial low/medium/high → 5.0/10.0/20.0.
+- Repair soft polish term only. UI dial: off / low / medium / high (default medium).
 
-### 5.5 Late-hour load — $w_{\text{evening}}=0.0$ (repair polish, opt-in)
+### 5.5 Late-hour load — $w_{\text{evening}}=10.0$ (repair polish)
 
 - Counts occupied hour-slots at or after `evening_from_hour` (default 17:00), once for the
   affected cohort load and once for the affected instructor load. A 17:00-18:00 block taught
   by one instructor therefore contributes 2 raw units: one cohort unit and one instructor unit.
-- Default weight is 0.0 (off); `settings.build_config` maps low / medium / high to
+- Default weight is 10.0 (medium); `settings.build_config` maps low / medium / high to
   5.0 / 10.0 / 20.0.
-- Repair soft polish term only. UI dial: off / low / medium / high.
+- Repair soft polish term only. UI dial: off / low / medium / high (default medium).
 
-### 5.6 Instructor idle gaps — $w_{\text{instr\_idle}}=0.0$ (repair polish, opt-in)
+### 5.6 Instructor idle gaps — $w_{\text{instr\_idle}}=10.0$ (repair polish)
 
 $$
 \mathrm{idle}_{i,d} = \max(H_{i,d}) + 1 - \min(H_{i,d}) - |H_{i,d}|
@@ -446,11 +445,11 @@ $$
 
 - Penalizes holes inside an instructor's same-day teaching span, mirroring the cohort idle
   gap definition but scoped to instructors only.
-- Default weight is 0.0 (off); `settings.build_config` maps low / medium / high to
+- Default weight is 10.0 (medium); `settings.build_config` maps low / medium / high to
   5.0 / 10.0 / 20.0.
-- Repair soft polish term only. UI dial: off / low / medium / high.
+- Repair soft polish term only. UI dial: off / low / medium / high (default medium).
 
-### 5.7 Bad-load fairness — $w_{\text{fairness}}=0.0$ (repair polish, opt-in)
+### 5.7 Bad-load fairness — $w_{\text{fairness}}=10.0$ (repair polish)
 
 $$
 \mathrm{pain}_e = \sum_d
@@ -463,9 +462,9 @@ $$
   concentration: two entities with pain 2+2 cost 8, while one entity with pain 4 costs 16.
 - Uses the same ingredients as the student idle, maxrun, and late-hour terms, but changes the
   distribution preference rather than adding a new hard rule.
-- Default weight is 0.0 (off); `settings.build_config` maps low / medium / high to
+- Default weight is 10.0 (medium); `settings.build_config` maps low / medium / high to
   5.0 / 10.0 / 20.0.
-- Repair soft polish term only. UI dial: off / low / medium / high.
+- Repair soft polish term only. UI dial: off / low / medium / high (default medium).
 
 ### 5.8 Room stability — $w_{\text{room\_stable}}=10.0$ (repair polish)
 
@@ -519,7 +518,7 @@ $$
   the objective. Integer weight: `int(round(w_building_change)) or 1`.
 - Default weight is 0.0 (off); no UI dial yet — activate via `Config(w_building_change=…)`.
 
-### 5.9d Department building compactness — $w_{\text{dept\_compact}}=0.0$ (repair polish)
+### 5.9d Department building compactness — $w_{\text{dept\_compact}}=10.0$ (repair polish)
 
 $$
 \mathrm{pen}_{\text{dept\_compact}} =
@@ -533,10 +532,10 @@ $$
   `XB…` resolving to `X`. `Online` and unknown rooms return `None` and are ignored.
 - **Repair polish only:** tracked as `dept_compactness` in `_global_terms` / `_local_terms` /
   `_norm_obj`. It is not modeled in the CP-SAT monolith.
-- Default weight is 0.0 (off); `settings.build_config` maps the optional Settings dial
+- Default weight is 10.0 (medium); `settings.build_config` maps the Settings dial
   low / medium / high to 5.0 / 10.0 / 20.0.
 
-### 5.9e Department prime-time fairness — $w_{\text{dept\_fairness}}=0.0$
+### 5.9e Department prime-time fairness — $w_{\text{dept\_fairness}}=10.0$
 
 For each department $d$, let $p_d$ be scheduled teaching hours inside
 `[cfg.primetime_start, cfg.primetime_end)` and $t_d$ be total scheduled teaching hours. The
@@ -552,8 +551,8 @@ $$
   ignored, and schedules with fewer than two departments cost 0.
 - The cross-multiplied form keeps CP-SAT integer-linear while comparing ratios instead of raw
   prime-time counts, so larger departments are not punished for having more total hours.
-- Active in the CP-SAT monolith and repair soft polish. Default weight is 0.0 (off);
-  `settings.build_config` maps the optional Settings dial low / medium / high to
+- Active in the CP-SAT monolith and repair soft polish. Default weight is 10.0 (medium);
+  `settings.build_config` maps the Settings dial low / medium / high to
   5.0 / 10.0 / 20.0.
 
 ### 5.10 S-Order — $w_{\text{order}}=1$ (monolith)
@@ -888,7 +887,7 @@ every bad field falls back to its default and the solve proceeds.
 | Day end | 13–21 | `undergrad_end` | undergrad end-of-day window (default 18:00) |
 | Max theory session | 1–6 | `max_theory_session` | longest single theory session before splitting (default 2 h) |
 | Max block length | 1–8 | `max_block_len` | longest lab block before splitting (default 4 h) |
-| Instructor-days target | No target / ≤4 / ≤3 / ≤2 | `max_instr_days` + `w_instr_days` | No target → term off (weight forced 0); ≤4/≤3/≤2 sets target and activates the instr_days soft term. See §5.1. |
+| Instructor-days target | No target / ≤4 / ≤3 / ≤2 | `max_instr_days` + `w_instr_days` | No target → term off (weight forced 0); ≤4/≤3/≤2 sets target and activates the instr_days soft term; **≤3 is the default**. See §5.1. |
 | Saturday | checkbox | `saturday_enabled` | add Sa to the teaching week |
 | Graduate | (always True — not a UI control; hardcoded `s["include_grad"] = True` in `views/settings.py`) | `include_grad` | graduate courses are always scheduled; the field exists in `Config` and `DEFAULT_SETTINGS` but no checkbox is rendered. |
 | Graduate earliest start | 6–20 | `grad_start` | earliest hour a graduate block may start (default 18:00). Lower it to allow daytime graduate classes; guarded to `day_start ≤ grad_start < 21`, else reverts to 18. |
@@ -910,7 +909,7 @@ Schools pick a **plain-language level**, never a raw number. Presets: `UI_REF=20
 | Consecutive teaching days | `w_nonadjacent` (§5.4) | 5.0 / 10.0 / 20.0 |
 | Room stability | `w_room_stable` (§5.8) | 5.0 / 10.0 / 20.0 |
 
-Optional advanced dials use the same numeric scale but include an explicit **off** state:
+These dials use the same numeric scale and include an explicit **off** state; all default to **medium** (10.0):
 
 | UI control | `Config` field | off / low / medium / high |
 |---|---|---|

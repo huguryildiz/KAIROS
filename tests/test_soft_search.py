@@ -400,7 +400,7 @@ def test_global_terms_raw_terms_plus_conf():
     # free_day: no year config -> 0 ; conf: hours 9,10 each 2 courses -> 2
     assert t == {"idle": 3, "maxrun": 0, "instr_days": 2, "nonadjacent": 0,
                  "evening": 2, "instr_idle": 3, "fairness": 20,
-                 "room_stable": 0, "free_day": 0, "conf": 2}
+                 "room_stable": 0, "free_day": 0, "room_util": 0, "conf": 2}
 
 
 def test_local_terms_match_global_over_all_entities():

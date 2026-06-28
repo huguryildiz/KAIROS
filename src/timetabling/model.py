@@ -65,6 +65,7 @@ class Candidate:
     day: str
     start: int              # start hour
     length: int
+    cap: int = 0            # room capacity (0 for virtual rooms)
 
 
 @dataclass(frozen=True)

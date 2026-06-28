@@ -117,9 +117,9 @@ def _soft_score(state: State, c, s, cfg: Config) -> int:
     return score
 
 
-def _cand_soft(c, s, cfg: Config) -> int:
-    """Per-candidate separable soft cost: S-Order + S-EngLab. Independent of other blocks,
-    so it folds into a variable's objective coefficient. Mirrors the per-variable
+def _cand_soft(c, s, cfg: Config):
+    """Per-candidate separable soft cost: S-Order + S-EngLab + S-RoomUtil. Independent of
+    other blocks, so it folds into a variable's objective coefficient. Mirrors the per-variable
     coefficients in model_cpsat.build_and_solve."""
     cost = 0
     if 2 <= s.level <= 4:
@@ -127,6 +127,8 @@ def _cand_soft(c, s, cfg: Config) -> int:
     if (cfg.eng_department_match in s.department and "#L" in c.block_id
             and c.day not in cfg.eng_lab_days):
         cost += cfg.w_englab
+    if cfg.w_room_util and not s.is_virtual and c.cap > s.students:
+        cost += cfg.w_room_util * (c.cap - s.students)
     return cost
 
 

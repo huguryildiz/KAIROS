@@ -132,6 +132,9 @@ def _global_terms(state, cfg) -> dict:
     free_day = sum(max(0, len(days) - (n_days - 1))
                    for cohort, days in coh_days_used.items()
                    if cohort.rsplit("-", 1)[-1] in years) if years else 0
+    room_util = sum(max(0, c.cap - state.sec_of[bid].students)
+                    for bid, c in state.placed.items()
+                    if not state.sec_of[bid].is_virtual and c.cap > 0)
     return {
         "idle": _gap_of(coh_day),
         "maxrun": maxrun,
@@ -143,6 +146,7 @@ def _global_terms(state, cfg) -> dict:
         "fairness": fairness,
         "room_stable": sum(max(0, len(rs) - 1) for rs in sec_rooms.values()),
         "free_day": free_day,
+        "room_util": room_util,
         "conf": sum(max(0, len(v) - 1) for v in coh_slot.values()),
     }
 
@@ -193,6 +197,10 @@ def _local_terms(state, cohorts, instrs, rooms, blocks, cfg) -> dict:
         "fairness": fairness,
         "room_stable": sum(max(0, len(rs) - 1) for rs in sec_rooms.values()),
         "free_day": free_day,
+        "room_util": sum(max(0, c.cap - state.sec_of[bid].students)
+                         for bid, c in state.placed.items()
+                         if bid.split("#")[0] in sections
+                         and not state.sec_of[bid].is_virtual and c.cap > 0),
         "conf": sum(max(0, len(v) - 1) for v in coh_slot.values()),
     }
 
@@ -209,7 +217,8 @@ def _norm_obj(terms, base, cfg) -> float:
             + cfg.w_instr_idle * terms["instr_idle"] / max(base["instr_idle"], 1)
             + cfg.w_fairness * terms["fairness"] / max(base["fairness"], 1)
             + cfg.w_room_stable * terms["room_stable"] / max(base["room_stable"], 1)
-            + cfg.w_free_day * terms["free_day"] / max(base["free_day"], 1))
+            + cfg.w_free_day * terms["free_day"] / max(base["free_day"], 1)
+            + cfg.w_room_util * terms["room_util"] / max(base["room_util"], 1))
 
 
 def _slot(c):

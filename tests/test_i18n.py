@@ -48,7 +48,8 @@ def test_settings_keys_bilingual():
             "set_day_start", "set_avail_save", "set_grad_dept_pick",
             "set_w_evening", "set_w_evening_help",
             "set_w_instr_idle", "set_w_instr_idle_help",
-            "set_w_fairness", "set_w_fairness_help"]
+            "set_w_fairness", "set_w_fairness_help",
+            "set_w_dept_fairness", "set_w_dept_fairness_help"]
     for k in keys:
         for lang in LANGS:
             assert t(k, lang) and t(k, lang) != k

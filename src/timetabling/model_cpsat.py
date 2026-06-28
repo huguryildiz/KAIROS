@@ -51,6 +51,10 @@ def _instructors_of(section: Section, instructors: Dict[str, Instructor]) -> Lis
     return [instructors.get(i, default) for i in section.instructor_ids] or [default]
 
 
+def _department_key(section: Section) -> str:
+    return str(section.department or section.dept_code or "").strip()
+
+
 def split_roomable(sections, rooms, cfg, instructors=None):
     instructors = instructors or {}
     roomable, excluded = [], []
@@ -127,10 +131,17 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
     section_occ = defaultdict(list)       # (section_id, day, hour) -> vars
     instr_day_vars = defaultdict(list)            # (instr_id, day) -> vars
     section_day_vars = defaultdict(list)           # (section_id, day) -> vars
+    dept_total_hours = defaultdict(int)
+    dept_primetime_terms = defaultdict(list)
 
     compact_years = {str(y) for y in cfg.compact_cohort_years}
     virtual_names = {r.room for r in rooms if r.is_virtual}
     _avoid_pair_codes = {code for pair in cfg.avoid_pairs for code in pair}
+
+    for b, s in blocks:
+        dept = _department_key(s)
+        if dept:
+            dept_total_hours[dept] += b.length
 
     for b, s in blocks:
         ins_list = _instructors_of(s, instructors)
@@ -191,6 +202,14 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
                 instr_day_vars[(iid, c.day)].append(v)
             if s.min_working_days > 0:
                 section_day_vars[(s.section_id, c.day)].append(v)
+            dept = _department_key(s)
+            if dept:
+                prime_hours = sum(
+                    1 for hh in range(c.start, c.start + c.length)
+                    if cfg.primetime_start <= hh < cfg.primetime_end
+                )
+                if prime_hours:
+                    dept_primetime_terms[dept].append(prime_hours * v)
         model.AddExactlyOne(bvars)   # H1
 
     # H2/H3/H_self: at most one occupant per resource-slot
@@ -286,6 +305,26 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
         missing = model.NewIntVar(0, s.min_working_days, f"minwd|{s.section_id}")
         model.Add(missing >= s.min_working_days - sum(days))
         obj.append(cfg.w_min_working_days * missing)
+    w_dept_fairness = int(round(cfg.w_dept_fairness))
+    depts = sorted(d for d, total in dept_total_hours.items() if total > 0)
+    if w_dept_fairness > 0 and len(depts) >= 2:
+        dept_pt = {}
+        for idx, dept in enumerate(depts):
+            total_hours = dept_total_hours[dept]
+            pt = model.NewIntVar(0, total_hours, f"deptpt|{idx}")
+            model.Add(pt == sum(dept_primetime_terms.get(dept, [])))
+            dept_pt[dept] = pt
+        for i, d1 in enumerate(depts):
+            for j, d2 in enumerate(depts[i + 1:], start=i + 1):
+                ub = dept_total_hours[d1] * dept_total_hours[d2]
+                diff = model.NewIntVar(-ub, ub, f"deptptdiff|{i}|{j}")
+                model.Add(diff == (
+                    dept_total_hours[d2] * dept_pt[d1]
+                    - dept_total_hours[d1] * dept_pt[d2]
+                ))
+                abs_diff = model.NewIntVar(0, ub, f"deptptabs|{i}|{j}")
+                model.AddAbsEquality(abs_diff, diff)
+                obj.append(w_dept_fairness * abs_diff)
     obj += [cfg.w_cohort_gap * g for g in gap_terms]
     obj += order_terms
     obj += englab_terms

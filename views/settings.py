@@ -23,11 +23,6 @@ _WEIGHT_KNOBS = ()
 _OPTIONAL_WEIGHT_KNOBS = ("maxrun", "instr_days", "room_stable", "evening", "instr_idle", "fairness", "nonadjacent")
 
 
-def _sync_segmented_key(key: str, options, current):
-    """Keep Streamlit's widget key on stable option values, not translated labels."""
-    if st.session_state.get(key) not in options:
-        st.session_state[key] = current
-
 
 def _hour_select(col, label: str, lo: int, hi: int, cur, key: str, help: str = "") -> int:
     """Native HH:00 selectbox over [lo, hi]. Returns the chosen hour as int.
@@ -179,14 +174,14 @@ def _policy(lang: str, s: dict) -> None:
     st.caption(t("set_quality_desc", lang))
     cur_q = str(s.get("quality_mode", "balanced"))
     cur_q = cur_q if cur_q in _QUALITY_LEVELS else "balanced"
-    _sync_segmented_key("set_quality_mode", _QUALITY_LEVELS, cur_q)
-    chosen_q = st.segmented_control(
-        t("set_quality_mode", lang), _QUALITY_LEVELS, default=cur_q,
+    chosen_q = st.radio(
+        t("set_quality_mode", lang), _QUALITY_LEVELS,
+        index=_QUALITY_LEVELS.index(cur_q),
         format_func=lambda lv: t(f"set_quality_{lv}", lang),
         key="set_quality_mode", help=t("set_quality_mode_help", lang),
+        horizontal=True,
     )
-    if chosen_q is not None:
-        s["quality_mode"] = chosen_q
+    s["quality_mode"] = chosen_q
     st.caption(t("set_quality_budget", lang,
                  n=int(QUALITY_MODES.get(s.get("quality_mode", "balanced"), 300))))
 
@@ -199,30 +194,28 @@ def _policy(lang: str, s: dict) -> None:
         cur = _LEGACY_LEVEL.get(weights.get(knob, "medium"), weights.get(knob, "medium"))
         cur = cur if cur in _LEVELS else "medium"
         key = f"set_w_{knob}"
-        _sync_segmented_key(key, _LEVELS, cur)
-        chosen = wc[i % 2].segmented_control(
-            t(f"set_w_{knob}", lang), _LEVELS, default=cur,
+        chosen = wc[i % 2].radio(
+            t(f"set_w_{knob}", lang), _LEVELS,
+            index=list(_LEVELS).index(cur),
             format_func=lambda lv: t(f"set_w_{lv}", lang), key=key,
-            help=t(f"set_w_{knob}_help", lang))
-        if chosen is not None:
-            weights[knob] = chosen
+            help=t(f"set_w_{knob}_help", lang), horizontal=True)
+        weights[knob] = chosen
     for j, knob in enumerate(_OPTIONAL_WEIGHT_KNOBS, start=len(_WEIGHT_KNOBS)):
         cur = str(weights.get(knob, "off")).strip().lower()
         cur = cur if cur in _OPTIONAL_LEVELS else "off"
         key = f"set_w_{knob}"
-        _sync_segmented_key(key, _OPTIONAL_LEVELS, cur)
         # instr_days dial is inert when no target is set; grey it out so users
         # don't think it's active.
         disabled = (knob == "instr_days"
                     and int(s.get("instr_days_target", 0) or 0) == 0)
         help_key = (f"set_w_{knob}_disabled_help" if disabled
                     else f"set_w_{knob}_help")
-        chosen = wc[j % 2].segmented_control(
-            t(f"set_w_{knob}", lang), _OPTIONAL_LEVELS, default=cur,
+        chosen = wc[j % 2].radio(
+            t(f"set_w_{knob}", lang), _OPTIONAL_LEVELS,
+            index=list(_OPTIONAL_LEVELS).index(cur),
             format_func=lambda lv: t(f"set_w_{lv}", lang), key=key,
-            help=t(help_key, lang), disabled=disabled)
-        if chosen is not None:
-            weights[knob] = chosen
+            help=t(help_key, lang), disabled=disabled, horizontal=True)
+        weights[knob] = chosen
     # instr_days target: companion to the "compact instructor days" priority dial above.
     # "No target" keeps the term off (no headroom); ≤4/≤3/≤2 give the dial something to
     # optimize toward. The priority dial is inert until a target is picked (build_config
@@ -233,14 +226,14 @@ def _policy(lang: str, s: dict) -> None:
     except (TypeError, ValueError):
         cur_t = 0
     cur_t = cur_t if cur_t in _t_opts else 0
-    _sync_segmented_key("set_instr_days_target", _t_opts, cur_t)
-    chosen_t = wc[1].segmented_control(
-        t("set_instr_days_target", lang), _t_opts, default=cur_t,
+    chosen_t = wc[1].radio(
+        t("set_instr_days_target", lang), list(_t_opts),
+        index=list(_t_opts).index(cur_t),
         format_func=lambda v: t("set_instr_days_no_target", lang) if v == 0
         else t("set_instr_days_at_most", lang, n=v),
-        key="set_instr_days_target", help=t("set_instr_days_target_help", lang))
-    if chosen_t is not None:
-        s["instr_days_target"] = chosen_t
+        key="set_instr_days_target", help=t("set_instr_days_target_help", lang),
+        horizontal=True)
+    s["instr_days_target"] = chosen_t
     # free_day: controlled by which cohort year-levels want a free day (the gate showed a
     # strength slider can't steer it; the year selection IS its on/off control).
     cur_years = [int(y) for y in s.get("free_day_years", []) if str(y).strip().isdigit()]
@@ -330,8 +323,8 @@ def _blackouts(lang: str, s: dict) -> None:
     nt = _hour_select(a3, t("set_blackout_hour_to", lang), 7, 21, 17, f"bl_to_{rev}")
     add_clicked = a4.button(t("set_blackout_add", lang), icon=":material/add:",
                             key=f"bl_add_{rev}", type="primary")
-    nscope = st.segmented_control(t("set_blackout_scope", lang), scope_opts,
-                                  default=scope_opts[0], key=f"bl_scope_{rev}")
+    nscope = st.radio(t("set_blackout_scope", lang), list(scope_opts),
+                      index=0, key=f"bl_scope_{rev}", horizontal=True)
     if add_clicked:
         staff = nscope == scope_opts[1]
         if nd and nt > nf:

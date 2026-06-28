@@ -1,5 +1,15 @@
 steps:
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - >-
+        gcloud storage buckets update gs://kairos-uctp-schedule-outputs
+        --lifecycle-file=gcs-lifecycle.json
+        --project=$PROJECT_ID
+        || echo "Lifecycle update skipped"
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     args:
       - gcloud
       - run

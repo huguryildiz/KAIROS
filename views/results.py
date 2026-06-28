@@ -4,6 +4,7 @@ import os
 
 import pandas as pd
 import streamlit as st
+from datetime import timezone as _tz
 
 from timetabling.ui_grid import filter_assignments, distinct_values
 from timetabling.ui_style import metric_cards_html, week_grid_html, eyebrow_html, unschedulable_html
@@ -34,6 +35,14 @@ def _archive_rows(bucket: str, prefix: str) -> list[dict]:
     )
 
 
+def _fmt_size(n: int) -> str:
+    if n < 1024:
+        return f"{n} B"
+    if n < 1024 ** 2:
+        return f"{n / 1024:.1f} KB"
+    return f"{n / 1024 ** 2:.1f} MB"
+
+
 def _render_archive_log(lang: str) -> None:
     bucket = os.environ.get("KAIROS_GCS_BUCKET", "").strip()
     if not bucket:
@@ -47,15 +56,25 @@ def _render_archive_log(lang: str) -> None:
             st.warning(t("res_archive_error", lang, error=str(exc)))
         else:
             if rows:
+                df = pd.DataFrame(rows)
+                df["updated"] = pd.to_datetime(df["updated"], utc=True)
+                df["size_str"] = df["size_bytes"].apply(_fmt_size)
                 st.dataframe(
-                    pd.DataFrame(rows),
+                    df,
                     hide_index=True,
-                    width="stretch",
+                    use_container_width=True,
+                    column_order=["updated", "file", "size_str", "download_url"],
                     column_config={
-                        "updated": st.column_config.TextColumn(t("res_archive_updated", lang)),
+                        "updated": st.column_config.DatetimeColumn(
+                            t("res_archive_updated", lang),
+                            format="DD/MM/YYYY HH:mm",
+                        ),
                         "file": st.column_config.TextColumn(t("res_archive_file", lang)),
-                        "size_bytes": st.column_config.NumberColumn(t("res_archive_size", lang)),
-                        "uri": st.column_config.TextColumn(t("res_archive_uri", lang)),
+                        "size_str": st.column_config.TextColumn(t("res_archive_size", lang)),
+                        "download_url": st.column_config.LinkColumn(
+                            t("res_archive_dl", lang),
+                            display_text="⬇",
+                        ),
                     },
                 )
             else:

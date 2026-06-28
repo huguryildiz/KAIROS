@@ -128,10 +128,14 @@ def list_outputs_if_configured(
         name = str(item.get("name", ""))
         if not name:
             continue
+        download_url = (
+            f"https://storage.googleapis.com/download/storage/v1/b/"
+            f"{quote(bucket, safe='')}/o/{quote(name, safe='')}?alt=media&access_token={token}"
+        )
         rows.append({
             "updated": item.get("updated", ""),
             "file": Path(name).name,
             "size_bytes": int(item.get("size") or 0),
-            "uri": f"gs://{bucket}/{name}",
+            "download_url": download_url,
         })
     return sorted(rows, key=lambda r: (r["updated"], r["file"]), reverse=True)

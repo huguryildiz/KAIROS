@@ -24,9 +24,17 @@ def test_default_settings_build_config_matches_today():
     assert DEFAULT_SETTINGS["weights"]["evening"] == "off"
     assert DEFAULT_SETTINGS["weights"]["instr_idle"] == "off"
     assert DEFAULT_SETTINGS["weights"]["fairness"] == "off"
+    assert DEFAULT_SETTINGS["weights"]["dept_compact"] == "off"
+    assert DEFAULT_SETTINGS["weights"]["dept_fairness"] == "off"
+    assert DEFAULT_SETTINGS["weights"]["session_gap"] == "off"
     assert cfg.w_evening == 0
     assert cfg.w_instr_idle == 0
     assert cfg.w_fairness == 0
+    assert cfg.w_dept_compact == 0
+    assert cfg.w_dept_fairness == 0
+    assert cfg.w_session_gap == 0
+    assert cfg.primetime_start == 9
+    assert cfg.primetime_end == 16
     assert cfg.parallel_policies == ()
     assert cfg.w_parallel_coord == 10.0
     assert cfg.solve_time_limit_s == 3000.0
@@ -117,6 +125,23 @@ def test_weight_presets_levels_and_parttime_offset():
     lo = build_config(dict(DEFAULT_SETTINGS, weights={"cohort_gap": "low"}), {}, 60.0)
     hi = build_config(dict(DEFAULT_SETTINGS, weights={"cohort_gap": "high"}), {}, 60.0)
     assert lo.w_cohort_gap == 5 and hi.w_cohort_gap == 20
+
+
+def test_optional_department_compactness_weight_maps_to_config():
+    cfg = build_config(dict(DEFAULT_SETTINGS, weights={"dept_compact": "high"}), {}, 60.0)
+
+    assert cfg.w_dept_compact == 20
+
+
+def test_optional_department_fairness_weight_maps_to_config():
+    cfg = build_config(dict(DEFAULT_SETTINGS, weights={"dept_fairness": "high"}), {}, 60.0)
+
+    assert cfg.w_dept_fairness == 20
+
+
+def test_optional_session_gap_weight_maps_to_config():
+    cfg = build_config(dict(DEFAULT_SETTINGS, weights={"session_gap": "high"}), {}, 60.0)
+    assert cfg.w_session_gap == 20
 
 
 # --- Block 7: availability closed-slots -------------------------------------

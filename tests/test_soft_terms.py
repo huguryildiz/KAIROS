@@ -30,12 +30,122 @@ def test_global_terms_keys_and_room_stable():
                       "instr_idle", "fairness", "room_stable", "free_day", "room_util",
                       "min_working_days", "parallel_coord", "conf",
                       "instr_avoid_viol", "instr_prefer_miss", "avoid_pairs_viol",
-                      "building_change"}
+                      "building_change", "perturbation", "dept_compactness",
+                      "dept_fairness", "session_gap"}
     assert t["room_stable"] == 0          # one section, one room
     assert t["instr_days"] == 1           # i1 teaches 1 day, excess over 0 = 1
     assert t["evening"] == 0
     assert t["instr_idle"] == 0
     assert t["fairness"] == 0
+
+
+def test_global_terms_counts_department_primetime_ratio_spread():
+    sec_of = {
+        "A1#T": _sec("A1", "PSY-2", "PSY101", ["i1"]),
+        "A2#T": _sec("A2", "PSY-2", "PSY102", ["i2"]),
+        "B1#T": _sec("B1", "ECON-2", "ECON101", ["i3"]),
+        "B2#T": _sec("B2", "ECON-2", "ECON102", ["i4"]),
+    }
+    sec_of["A1#T"].department = "Psychology"
+    sec_of["A2#T"].department = "Psychology"
+    sec_of["B1#T"].department = "Economics"
+    sec_of["B2#T"].department = "Economics"
+    state = State(sec_of, {"A1": ["i1"], "A2": ["i2"], "B1": ["i3"], "B2": ["i4"]}, set())
+    state.occupy("A1#T", Candidate("A1#T", "R1", "Mo", 9, 1))
+    state.occupy("A2#T", Candidate("A2#T", "R1", "Mo", 16, 1))
+    state.occupy("B1#T", Candidate("B1#T", "R2", "Mo", 16, 1))
+    state.occupy("B2#T", Candidate("B2#T", "R2", "Tu", 16, 1))
+
+    terms = _global_terms(state, Config(primetime_start=9, primetime_end=16))
+
+    assert terms["dept_fairness"] == 2
+
+
+def test_global_terms_department_primetime_balanced_or_single_dept_is_zero():
+    sec_of = {
+        "A1#T": _sec("A1", "PSY-2", "PSY101", ["i1"]),
+        "A2#T": _sec("A2", "PSY-2", "PSY102", ["i2"]),
+        "B1#T": _sec("B1", "ECON-2", "ECON101", ["i3"]),
+        "B2#T": _sec("B2", "ECON-2", "ECON102", ["i4"]),
+    }
+    sec_of["A1#T"].department = "Psychology"
+    sec_of["A2#T"].department = "Psychology"
+    sec_of["B1#T"].department = "Economics"
+    sec_of["B2#T"].department = "Economics"
+    state = State(sec_of, {"A1": ["i1"], "A2": ["i2"], "B1": ["i3"], "B2": ["i4"]}, set())
+    state.occupy("A1#T", Candidate("A1#T", "R1", "Mo", 9, 1))
+    state.occupy("A2#T", Candidate("A2#T", "R1", "Mo", 16, 1))
+    state.occupy("B1#T", Candidate("B1#T", "R2", "Mo", 10, 1))
+    state.occupy("B2#T", Candidate("B2#T", "R2", "Tu", 16, 1))
+
+    assert _global_terms(state, Config())["dept_fairness"] == 0
+
+    sec_of["B1#T"].department = ""
+    sec_of["B1#T"].dept_code = ""
+    sec_of["B2#T"].department = ""
+    sec_of["B2#T"].dept_code = ""
+
+    assert _global_terms(state, Config())["dept_fairness"] == 0
+
+
+def test_local_terms_count_department_primetime_for_affected_pairs():
+    sec_of = {
+        "A1#T": _sec("A1", "PSY-2", "PSY101", ["i1"]),
+        "A2#T": _sec("A2", "PSY-2", "PSY102", ["i2"]),
+        "B1#T": _sec("B1", "ECON-2", "ECON101", ["i3"]),
+        "B2#T": _sec("B2", "ECON-2", "ECON102", ["i4"]),
+    }
+    sec_of["A1#T"].department = "Psychology"
+    sec_of["A2#T"].department = "Psychology"
+    sec_of["B1#T"].department = "Economics"
+    sec_of["B2#T"].department = "Economics"
+    state = State(sec_of, {"A1": ["i1"], "A2": ["i2"], "B1": ["i3"], "B2": ["i4"]}, set())
+    state.occupy("A1#T", Candidate("A1#T", "R1", "Mo", 9, 1))
+    state.occupy("A2#T", Candidate("A2#T", "R1", "Mo", 16, 1))
+    state.occupy("B1#T", Candidate("B1#T", "R2", "Mo", 16, 1))
+    state.occupy("B2#T", Candidate("B2#T", "R2", "Tu", 16, 1))
+
+    terms = _local_terms(state, {"PSY-2"}, {"i1"}, {"R1"}, {"A1#T"}, Config())
+
+    assert terms["dept_fairness"] == 2
+
+
+def test_global_terms_counts_department_building_compactness():
+    sec_of = {
+        "A#T": _sec("A", "PSY-2", "PSY101", ["i1"]),
+        "B#T": _sec("B", "PSY-2", "PSY102", ["i2"]),
+        "C#T": _sec("C", "ECON-2", "ECON101", ["i3"]),
+    }
+    sec_of["A#T"].department = "Psychology"
+    sec_of["B#T"].department = "Psychology"
+    sec_of["C#T"].department = "Economics"
+    state = State(sec_of, {"A": ["i1"], "B": ["i2"], "C": ["i3"]}, set())
+    state.occupy("A#T", Candidate("A#T", "A101", "Mo", 9, 1))
+    state.occupy("B#T", Candidate("B#T", "B201", "Tu", 9, 1))
+    state.occupy("C#T", Candidate("C#T", "C301", "We", 9, 1))
+
+    terms = _global_terms(state, Config())
+
+    assert terms["dept_compactness"] == 1
+
+
+def test_local_terms_count_department_compactness_for_affected_department():
+    sec_of = {
+        "A#T": _sec("A", "PSY-2", "PSY101", ["i1"]),
+        "B#T": _sec("B", "PSY-2", "PSY102", ["i2"]),
+        "C#T": _sec("C", "ECON-2", "ECON101", ["i3"]),
+    }
+    sec_of["A#T"].department = "Psychology"
+    sec_of["B#T"].department = "Psychology"
+    sec_of["C#T"].department = "Economics"
+    state = State(sec_of, {"A": ["i1"], "B": ["i2"], "C": ["i3"]}, set())
+    state.occupy("A#T", Candidate("A#T", "A101", "Mo", 9, 1))
+    state.occupy("B#T", Candidate("B#T", "B201", "Tu", 9, 1))
+    state.occupy("C#T", Candidate("C#T", "C301", "We", 9, 1))
+
+    terms = _local_terms(state, {"PSY-2"}, {"i1"}, {"A101", "B201"}, {"A#T"}, Config())
+
+    assert terms["dept_compactness"] == 1
 
 
 def test_global_terms_count_evening_instr_idle_and_fairness():
@@ -76,16 +186,18 @@ def test_norm_obj_weights_and_normalization():
             "parallel_coord": 5,
             "conf": 0,
             "instr_avoid_viol": 0, "instr_prefer_miss": 0, "avoid_pairs_viol": 0,
-            "building_change": 0}
+            "building_change": 0, "perturbation": 0, "dept_compactness": 2,
+            "dept_fairness": 2, "session_gap": 2}
     cfg = Config(w_idle=15, w_maxrun=10, w_instr_days=10, w_nonadjacent=10,
                  w_evening=10, w_instr_idle=10, w_fairness=10,
                  w_room_stable=10, w_free_day=10, w_room_util=1,
-                 w_min_working_days=10, w_parallel_coord=10)
+                 w_min_working_days=10, w_parallel_coord=10, w_dept_compact=10,
+                 w_dept_fairness=10, w_session_gap=10)
     # at base, every term/base == 1 -> objective == sum of weights
-    assert _norm_obj(base, base, cfg) == 15 + 10 + 10 + 10 + 10 + 10 + 10 + 10 + 10 + 1 + 10 + 10
+    assert _norm_obj(base, base, cfg) == 15 + 10 + 10 + 10 + 10 + 10 + 10 + 10 + 10 + 1 + 10 + 10 + 10 + 10 + 10
     halved = dict(base, idle=5)               # idle halved -> drops 7.5
     assert abs(_norm_obj(halved, base, cfg)
-               - (15 * 0.5 + 10 + 10 + 10 + 10 + 10 + 10 + 10 + 10 + 1 + 10 + 10)) < 1e-9
+               - (15 * 0.5 + 10 + 10 + 10 + 10 + 10 + 10 + 10 + 10 + 1 + 10 + 10 + 10 + 10 + 10)) < 1e-9
 
 
 def test_global_terms_counts_min_working_days_missing_days():

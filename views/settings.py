@@ -20,7 +20,10 @@ _QUALITY_LEVELS = ("fast", "balanced", "best")
 _PARALLEL_POLICIES = PARALLEL_POLICIES
 _MIDDAY = 13  # hardcoded AM/PM boundary; no longer a user-facing setting
 _WEIGHT_KNOBS = ()
-_OPTIONAL_WEIGHT_KNOBS = ("maxrun", "instr_days", "room_stable", "evening", "instr_idle", "fairness", "nonadjacent")
+_OPTIONAL_WEIGHT_KNOBS = (
+    "maxrun", "instr_days", "room_stable", "dept_compact", "dept_fairness",
+    "evening", "instr_idle", "fairness", "nonadjacent", "session_gap",
+)
 
 
 
@@ -234,6 +237,23 @@ def _policy(lang: str, s: dict) -> None:
         key="set_instr_days_target", help=t("set_instr_days_target_help", lang),
         horizontal=True)
     s["instr_days_target"] = chosen_t
+    # session_gap companion: minimum day gap integer (1–3). Only meaningful when the
+    # session_gap weight dial is active (>off); inert otherwise (build_config gates it).
+    _sg_opts = (1, 2, 3)
+    try:
+        cur_sg = int(s.get("min_session_gap_days", 2) or 2)
+    except (TypeError, ValueError):
+        cur_sg = 2
+    cur_sg = cur_sg if cur_sg in _sg_opts else 2
+    chosen_sg = wc[1].radio(
+        t("set_min_session_gap_days", lang), list(_sg_opts),
+        index=list(_sg_opts).index(cur_sg),
+        format_func=lambda v: t("set_gap_days", lang, n=v),
+        key="set_min_session_gap_days",
+        help=t("set_min_session_gap_days_help", lang),
+        horizontal=True,
+    )
+    s["min_session_gap_days"] = chosen_sg
     # free_day: controlled by which cohort year-levels want a free day (the gate showed a
     # strength slider can't steer it; the year selection IS its on/off control).
     cur_years = [int(y) for y in s.get("free_day_years", []) if str(y).strip().isdigit()]

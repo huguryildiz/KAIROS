@@ -54,7 +54,11 @@ DEFAULT_SETTINGS: dict = {
         "instr_idle": "off",
         "fairness": "off",
         "perturbation": "off",
+        "dept_compact": "off",
+        "dept_fairness": "off",
+        "session_gap": "off",
     },
+    "min_session_gap_days": 2,
     "free_day_years": [],     # -> Config.free_day_year_levels (cohort years that want a free day)
     "avoid_pairs": [],        # -> Config.avoid_pairs (list of [code_a, code_b])
     "parallel_policies": [],  # -> Config.parallel_policies (list of [course_code, policy])
@@ -263,6 +267,10 @@ def build_config(settings: dict, availability: Dict[str, list],
         w_evening=_optional_preset(weights, "evening"),
         w_instr_idle=_optional_preset(weights, "instr_idle"),
         w_fairness=_optional_preset(weights, "fairness"),
+        w_dept_compact=_optional_preset(weights, "dept_compact"),
+        w_dept_fairness=_optional_preset(weights, "dept_fairness"),
+        w_session_gap=_optional_preset(weights, "session_gap"),
+        min_session_gap_days=_int(s.get("min_session_gap_days"), 2),
         instr_unavailable=closed,
         instr_avoid=avoid_closed,
         instr_preferred=prefer_slots,

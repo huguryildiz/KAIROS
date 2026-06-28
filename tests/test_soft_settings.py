@@ -15,11 +15,13 @@ def test_build_config_maps_soft_dials_and_free_day_years():
 
 def test_build_config_maps_optional_soft_dials():
     s = dict(DEFAULT_SETTINGS,
-             weights={"evening": "low", "instr_idle": "medium", "fairness": "high"})
+             weights={"evening": "low", "instr_idle": "medium",
+                      "fairness": "high", "dept_fairness": "high"})
     cfg = build_config(s, {}, 60)
     assert cfg.w_evening == 5.0
     assert cfg.w_instr_idle == 10.0
     assert cfg.w_fairness == 20.0
+    assert cfg.w_dept_fairness == 20.0
 
 
 def test_build_config_three_levels_map_to_5_10_20():
@@ -81,7 +83,10 @@ def test_legacy_5level_profile_migrates_to_three():
 
 def test_settings_view_exposes_optional_soft_knobs():
     from views.settings import _OPTIONAL_WEIGHT_KNOBS
-    assert _OPTIONAL_WEIGHT_KNOBS == ("maxrun", "instr_days", "room_stable", "evening", "instr_idle", "fairness", "nonadjacent")
+    assert _OPTIONAL_WEIGHT_KNOBS == (
+        "maxrun", "instr_days", "room_stable", "dept_compact", "dept_fairness",
+        "evening", "instr_idle", "fairness", "nonadjacent", "session_gap",
+    )
 
 
 def test_settings_view_exposes_parallel_policy_options():

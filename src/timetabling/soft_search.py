@@ -107,6 +107,83 @@ def _fairness_of(coh_day, instr_day, cfg) -> int:
     return sum(v * v for v in pain.values())
 
 
+def _department_key(section) -> str:
+    return str(getattr(section, "department", "") or getattr(section, "dept_code", "") or "").strip()
+
+
+def _dept_compactness_of(state, departments=None) -> int:
+    """Penalty for spreading one department across multiple buildings.
+
+    For each department, count placed blocks outside that department's most-used building.
+    Lower is better; 0 means every scheduled block for that department is in one known
+    building. Unknown/virtual room buildings are ignored.
+    """
+    dept_filter = set(departments) if departments is not None else None
+    dept_buildings = defaultdict(lambda: defaultdict(int))
+    for bid, c in state.placed.items():
+        dept = _department_key(state.sec_of[bid])
+        if not dept or (dept_filter is not None and dept not in dept_filter):
+            continue
+        bldg = building_of(c.room)
+        if bldg is None:
+            continue
+        dept_buildings[dept][bldg] += 1
+    total = 0
+    for counts in dept_buildings.values():
+        load = sum(counts.values())
+        if load:
+            total += load - max(counts.values())
+    return total
+
+
+def _dept_primetime_fairness_of(state, cfg, departments=None) -> int:
+    """Pairwise spread of department prime-time ratios.
+
+    Uses occupied teaching hours. For departments A/B, the normalized ratio difference
+    pt_A/total_A vs pt_B/total_B is kept integer by cross-multiplying:
+    abs(pt_A * total_B - pt_B * total_A).
+    """
+    affected = set(departments) if departments is not None else None
+    dept_pt = defaultdict(int)
+    dept_total = defaultdict(int)
+    p0, p1 = int(cfg.primetime_start), int(cfg.primetime_end)
+    for bid, c in state.placed.items():
+        dept = _department_key(state.sec_of[bid])
+        if not dept:
+            continue
+        for hh in range(c.start, c.start + c.length):
+            dept_total[dept] += 1
+            if p0 <= hh < p1:
+                dept_pt[dept] += 1
+    depts = sorted(d for d, total in dept_total.items() if total > 0)
+    if len(depts) < 2:
+        return 0
+    total = 0
+    for i, d1 in enumerate(depts):
+        for d2 in depts[i + 1:]:
+            if affected is not None and d1 not in affected and d2 not in affected:
+                continue
+            total += abs(dept_pt[d1] * dept_total[d2] - dept_pt[d2] * dept_total[d1])
+    return total
+
+
+def _session_gap_penalty(placed, min_gap: int, sections=None) -> int:
+    section_days = defaultdict(set)
+    for bid, c in placed.items():
+        sec_id = bid.split("#")[0]
+        if sections is not None and sec_id not in sections:
+            continue
+        section_days[sec_id].add(_DAY_IDX.get(c.day, -1))
+    penalty = 0
+    for days in section_days.values():
+        valid = sorted(d for d in days if d >= 0)
+        for i in range(len(valid) - 1):
+            gap = valid[i + 1] - valid[i]
+            if gap < min_gap:
+                penalty += min_gap - gap
+    return penalty
+
+
 def _global_terms(state, cfg) -> dict:
     """Raw counts of the soft terms over the FULL placement. idle/conf over cohorts (all),
     maxrun over cohorts+instructors, instr_days over instructors, room_stable and
@@ -183,11 +260,14 @@ def _global_terms(state, cfg) -> dict:
         "conf": sum(max(0, len(v) - 1) for v in coh_slot.values()),
         "avoid_pairs_viol": _avoid_pairs_viol(state.placed, state.sec_of, cfg.avoid_pairs),
         "building_change": building_change,
+        "dept_compactness": _dept_compactness_of(state),
+        "dept_fairness": _dept_primetime_fairness_of(state, cfg),
         "perturbation": sum(
             1 for bid, c in state.placed.items()
             if cfg.ref_schedule.get(bid) is not None
             and (c.day, c.start, c.room) != cfg.ref_schedule[bid]
         ) if cfg.ref_schedule else 0,
+        "session_gap": _session_gap_penalty(state.placed, cfg.min_session_gap_days),
     }
 
 
@@ -198,6 +278,11 @@ def _local_terms(state, cohorts, instrs, rooms, blocks, cfg) -> dict:
     sets == _global_terms."""
     cohort_set, instr_set = set(cohorts), set(instrs)
     sections = {bid.split("#")[0] for bid in blocks}
+    departments = {
+        _department_key(state.sec_of[bid])
+        for bid in blocks
+        if bid in state.sec_of and _department_key(state.sec_of[bid])
+    }
     course_codes = {state.sec_of[bid].code for bid in blocks if bid in state.sec_of}
     coh_day = defaultdict(set)
     coh_slot = defaultdict(set)
@@ -278,6 +363,8 @@ def _local_terms(state, cohorts, instrs, rooms, blocks, cfg) -> dict:
              if p & {state.sec_of[bid].code for bid in blocks if bid in state.sec_of}]
             if cfg.avoid_pairs else []),
         "building_change": local_building_change,
+        "dept_compactness": _dept_compactness_of(state, departments),
+        "dept_fairness": _dept_primetime_fairness_of(state, cfg, departments),
         "perturbation": sum(
             1 for bid in blocks
             if bid in state.placed
@@ -285,6 +372,7 @@ def _local_terms(state, cohorts, instrs, rooms, blocks, cfg) -> dict:
             and (state.placed[bid].day, state.placed[bid].start, state.placed[bid].room)
             != cfg.ref_schedule[bid]
         ) if cfg.ref_schedule else 0,
+        "session_gap": _session_gap_penalty(state.placed, cfg.min_session_gap_days, sections),
     }
 
 
@@ -308,7 +396,10 @@ def _norm_obj(terms, base, cfg) -> float:
             + cfg.w_instr_prefer * terms["instr_prefer_miss"] / max(base["instr_prefer_miss"], 1)
             + cfg.w_avoid_pairs * terms["avoid_pairs_viol"] / max(base["avoid_pairs_viol"], 1)
             + cfg.w_building_change * terms["building_change"] / max(base["building_change"], 1)
-            + cfg.w_perturbation * terms["perturbation"] / max(base["perturbation"], 1))
+            + cfg.w_dept_compact * terms["dept_compactness"] / max(base["dept_compactness"], 1)
+            + cfg.w_dept_fairness * terms["dept_fairness"] / max(base["dept_fairness"], 1)
+            + cfg.w_perturbation * terms["perturbation"] / max(base["perturbation"], 1)
+            + cfg.w_session_gap * terms["session_gap"] / max(base["session_gap"], 1))
 
 
 def _slot(c):

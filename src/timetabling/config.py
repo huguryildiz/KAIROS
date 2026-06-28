@@ -65,6 +65,8 @@ class Config:
     w_instr_idle: float = 0.0               # optional dial: instructor same-day idle gaps
     w_fairness: float = 0.0                 # optional dial: spread bad load across entities
     w_building_change: float = 0.0          # optional dial: instructor building transitions
+    w_dept_compact: float = 0.0             # optional repair-only dial: department building spread
+    w_dept_fairness: float = 0.0            # optional dial: balance department prime-time access
     # blackouts: (day, hour, staff_only) hour-slots that are closed. staff_only=True closes
     # the slot only for sections taught by a full-time instructor (e.g. a faculty seminar);
     # staff_only=False (or a bare 2-tuple) closes it for everyone. Use
@@ -142,6 +144,10 @@ class Config:
     soft_polish_seed: int = 0
     soft_polish_budget_s: float = 300.0       # UI quality mode cap: fast/balanced/best
     evening_from_hour: int = 17   # an hour-slot >= this counts as "evening" for the soft penalty
+    primetime_start: int = 9      # inclusive hour for department prime-time fairness
+    primetime_end: int = 16       # exclusive hour for department prime-time fairness
+    w_session_gap: float = 0.0             # optional dial: min day-gap between same-section sessions
+    min_session_gap_days: int = 2          # target minimum day gap between sessions
 
     def days(self) -> list:
         return DAYS + [SATURDAY] if self.saturday_enabled else list(DAYS)

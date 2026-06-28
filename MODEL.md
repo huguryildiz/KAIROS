@@ -151,6 +151,16 @@ time. The CP-SAT monolith (§6a) and the repair soft polish (§6b) use separate 
   Building is derived from the room code prefix: first letter (`A`–`K`); `XB…` prefixes
   (bodrum/basement) resolve to building `X`. Online and unknown rooms are excluded.
   Repair polish term and CP-SAT monolith term (linearized `t ≥ v1 + v2 − 1`); off by default.
+- **Department building compactness** (`w_dept_compact=0.0` default) — penalize spreading a
+  department across multiple buildings by counting placed blocks outside that department's
+  most-used known building. Building is inferred from the same `building_of(room)` room-code
+  prefix rule; `Online` and unknown buildings are ignored. Repair polish term only; optional
+  Settings dial off / low / medium / high.
+- **Department prime-time fairness** (`w_dept_fairness=0.0` default) — balance each
+  department's share of teaching hours placed in the prime-time window
+  `[primetime_start, primetime_end)`, default 09:00-16:00. Uses `Section.department`
+  (falling back to `dept_code`) and compares prime-time ratios, not raw counts. Active in
+  CP-SAT and repair polish; optional Settings dial off / low / medium / high.
 - **Minimum perturbation** (`w_perturbation=0.0` default) — penalize each block placed at a
   `(day, start, room)` that differs from the reference schedule uploaded by the user. The
   reference is a previously exported `schedule_*.json`; parsed by `load_ref_schedule` into
@@ -158,6 +168,13 @@ time. The CP-SAT monolith (§6a) and the repair soft polish (§6b) use separate 
   `w_perturbation=0.0` the term is inert. Active in the repair greedy phase (`_cand_soft`),
   repair soft polish (`_global_terms` / `_local_terms` / `_norm_obj`), and the CP-SAT monolith
   objective. UI: optional JSON uploader in the Solve step expander; off by default.
+- **Session day-gap** (`w_session_gap=0.0` default) — penalize multi-session sections whose
+  theory sessions are placed closer than `min_session_gap_days` apart (default 2 days). For
+  each pair of consecutive session-days of the same section, shortfall = `max(0, min_gap −
+  gap)` days; the term sums these across all sections. Repair soft polish only
+  (`_session_gap_penalty` helper, `_global_terms` / `_local_terms` / `_norm_obj`). UI:
+  optional Settings dial off / low / medium / high, with a companion 1/2/3-day radio for
+  `min_session_gap_days`; off by default (opt-in).
 
 ### What "0 resource conflicts" means
 
@@ -346,12 +363,12 @@ The CP-SAT monolith (§6a) and the repair soft polish (§6b) minimize different 
 objectives. Weights live in `config.py`. The two paths share the weight fields
 `w_instr_days` / `w_parttime_days` (but with different semantics — see §5.1). The repair
 polish has terms absent from the monolith (`w_idle`, `w_maxrun`, `w_room_stable`,
-`w_free_day`, `w_nonadjacent`, `w_evening`, `w_instr_idle`, `w_fairness`). Both paths share
-`w_building_change`, `w_room_util`, `w_avoid_pairs`, and the per-section `w_min_working_days`
-target when a row supplies it. The monolith has terms
-not in the polish objective (`w_cohort_gap`, `w_order`, `w_englab`). `w_cohort_conflict`
-appears in both but as an objective term in the monolith and as a no-regress guard in the
-polish.
+`w_free_day`, `w_nonadjacent`, `w_evening`, `w_instr_idle`, `w_fairness`,
+`w_dept_compact`). Both paths share `w_dept_fairness`, `w_building_change`, `w_room_util`,
+`w_avoid_pairs`, and the per-section `w_min_working_days` target when a row supplies it. The
+monolith has terms not in the polish objective (`w_cohort_gap`, `w_order`, `w_englab`).
+`w_cohort_conflict` appears in both but as an objective term in the monolith and as a
+no-regress guard in the polish.
 
 $$
 \min \;\; \sum_{t} w_t \cdot \mathrm{pen}_t
@@ -502,6 +519,43 @@ $$
   the objective. Integer weight: `int(round(w_building_change)) or 1`.
 - Default weight is 0.0 (off); no UI dial yet — activate via `Config(w_building_change=…)`.
 
+### 5.9d Department building compactness — $w_{\text{dept\_compact}}=0.0$ (repair polish)
+
+$$
+\mathrm{pen}_{\text{dept\_compact}} =
+\sum_{\text{dept}} \left(\sum_{g}\mathrm{blocks}_{\text{dept},g}
+- \max_g \mathrm{blocks}_{\text{dept},g}\right)
+$$
+
+- For each department, count placed blocks by known building and penalize the blocks outside
+  that department's most-used building. A department entirely in one known building costs 0.
+- Building is derived by `building_of(room)`: first letter of the room code (`A`–`K`), with
+  `XB…` resolving to `X`. `Online` and unknown rooms return `None` and are ignored.
+- **Repair polish only:** tracked as `dept_compactness` in `_global_terms` / `_local_terms` /
+  `_norm_obj`. It is not modeled in the CP-SAT monolith.
+- Default weight is 0.0 (off); `settings.build_config` maps the optional Settings dial
+  low / medium / high to 5.0 / 10.0 / 20.0.
+
+### 5.9e Department prime-time fairness — $w_{\text{dept\_fairness}}=0.0$
+
+For each department $d$, let $p_d$ be scheduled teaching hours inside
+`[cfg.primetime_start, cfg.primetime_end)` and $t_d$ be total scheduled teaching hours. The
+penalty is the cross-multiplied pairwise ratio spread:
+
+$$
+\mathrm{pen}_{\text{dept\_fairness}} =
+\sum_{d_1 < d_2} |p_{d_1}t_{d_2} - p_{d_2}t_{d_1}|
+$$
+
+- Counts occupied teaching hours, not blocks. A two-hour class contributes two hours.
+- Department key is `Section.department`, falling back to `dept_code`; blank departments are
+  ignored, and schedules with fewer than two departments cost 0.
+- The cross-multiplied form keeps CP-SAT integer-linear while comparing ratios instead of raw
+  prime-time counts, so larger departments are not punished for having more total hours.
+- Active in the CP-SAT monolith and repair soft polish. Default weight is 0.0 (off);
+  `settings.build_config` maps the optional Settings dial low / medium / high to
+  5.0 / 10.0 / 20.0.
+
 ### 5.10 S-Order — $w_{\text{order}}=1$ (monolith)
 
 $$
@@ -641,7 +695,7 @@ Both solvers share the same candidate generation and constraints.
    re-seat already-placed blocks to lower the normalized non-guard objective
    (idle / maxrun / instr_days / nonadjacent / evening / instr_idle / fairness /
    room_stable / free_day / min_working_days / instr_avoid_viol / instr_prefer_miss /
-   avoid_pairs_viol) under a `conf`
+   avoid_pairs_viol / dept_compactness / dept_fairness) under a `conf`
    no-regress guard.
    Moves: relocate, chain, swap, consolidate_instr, free_cohort_day. Acceptor: Great Deluge
    (default). Bounded by the `repair_time_limit_s` deadline; the placement count never
@@ -710,7 +764,7 @@ solve_repair(sections, rooms, cfg, progress_cb=None):
       #              consolidate_instr / free_cohort_day
       # objective: normalized(idle + maxrun + instr_days + nonadjacent +
       #                       evening + instr_idle + fairness + room_stable +
-      #                       free_day + min_working_days)
+      #                       free_day + min_working_days + dept_compactness)
       # guard: conf (cohort-conflict) must not increase
       anneal_soft(state, cand_by_block, cfg, budget)
 
@@ -863,13 +917,15 @@ Optional advanced dials use the same numeric scale but include an explicit **off
 | Late-hour load | `w_evening` (§5.5) | 0.0 / 5.0 / 10.0 / 20.0 |
 | Instructor idle gaps | `w_instr_idle` (§5.6) | 0.0 / 5.0 / 10.0 / 20.0 |
 | Bad-load fairness | `w_fairness` (§5.7) | 0.0 / 5.0 / 10.0 / 20.0 |
-| Building transition cost | `w_building_change` (§5.9c) | 0.0 (off, no UI dial yet) |
+| Department building compactness | `w_dept_compact` (§5.9d) | 0.0 / 5.0 / 10.0 / 20.0 |
+| Department prime-time fairness | `w_dept_fairness` (§5.9e) | 0.0 / 5.0 / 10.0 / 20.0 |
 
 `free_day` (§5.9) has a fixed `Config` weight of 10.0 and is not exposed as a dial — only its
 year scope (multiselect) is configurable. With no selected years it is inert. `w_cohort_gap=10.0`
 is not exposed as a dial — `settings.build_config` reads it via the preset fallback
 (`_preset(weights, "cohort_gap")`), but since no UI control writes "cohort_gap" into the
-weights dict it always resolves to the medium preset (10.0).
+weights dict it always resolves to the medium preset (10.0). `w_building_change` (§5.9c)
+is still Config-only; no Settings UI control writes it.
 
 ¹ Only active when `instr_days_target` is set. With "No target", `build_config()` forces
 `w_instr_days = 0.0` and `w_parttime_days = 0.0`; when active,
@@ -887,7 +943,7 @@ placement converges. Stored as `"quality_mode"` in the Settings dict;
 | Balanced | 300 s **(default)** | Recommended for most schools. |
 | Best | 600 s | Longest polish; best room-stability and anti-fatigue results. |
 
-The actual polish time is `min(soft_polish_budget_s, max(30, 0.75 × placed_count), remaining_deadline)` — see §6b pseudocode. Hard constraints are never affected; only soft-objective metrics (idle, maxrun, consecutive teaching days, late-hour load, instructor idle gaps, fairness, room_stable, free_day, min_working_days) can improve.
+The actual polish time is `min(soft_polish_budget_s, max(30, 0.75 × placed_count), remaining_deadline)` — see §6b pseudocode. Hard constraints are never affected; only soft-objective metrics (idle, maxrun, consecutive teaching days, late-hour load, instructor idle gaps, fairness, room_stable, free_day, min_working_days, dept_compactness, dept_fairness) can improve.
 
 ### 8.4 Blackouts (add/remove list)
 

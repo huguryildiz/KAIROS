@@ -50,7 +50,7 @@ def _render_archive_log(lang: str) -> None:
                 st.dataframe(
                     pd.DataFrame(rows),
                     hide_index=True,
-                    use_container_width=True,
+                    width="stretch",
                     column_config={
                         "updated": st.column_config.TextColumn(t("res_archive_updated", lang)),
                         "file": st.column_config.TextColumn(t("res_archive_file", lang)),

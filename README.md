@@ -128,16 +128,6 @@ JSON/CSV schedule outputs to `gs://<bucket>/<prefix>/`.
 
 ---
 
-## Roadmap
-
-High-value improvements that need richer input data:
-
-- **Weighted conflict graph.** Replace the current cohort proxy with enrollment-based conflict weights between course pairs.
-- **Separate optimization profiles.** Split the objective into student-focused and instructor-focused components, with balanced presets in the UI.
-- **Course relationship rules.** Support user-defined pairwise rules such as before/after, same day, different day, same room, or consecutive slots.
-
----
-
 ## Reference
 
 [`MODEL.md`](MODEL.md) — time grid, hard constraints, soft objective, block derivation, design decisions, and benchmarks.

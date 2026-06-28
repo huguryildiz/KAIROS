@@ -57,8 +57,7 @@ def _unmet_min_working_days(assignments: list, sections: list) -> list:
 def run_pipeline(period: str, sections: list, rooms: Dict, instructors: Dict,
                  cfg: Config, solver: str = "auto", progress_cb=None) -> PipelineResult:
     t_total = time.perf_counter()
-    _emit("pipeline_start", period=period, sections=len(sections),
-          rooms=len(rooms), solver_hint=solver)
+    _emit("pipeline_start", sections=len(sections), rooms=len(rooms), solver_hint=solver)
 
     room_list = list(rooms.values())
     t0 = time.perf_counter()
@@ -96,8 +95,10 @@ def run_pipeline(period: str, sections: list, rooms: Dict, instructors: Dict,
 
     total_elapsed_s = round(time.perf_counter() - t_total, 3)
     stats["total_elapsed_s"] = total_elapsed_s
-    _emit("pipeline_done", period=period, solver=chosen,
+    # Cloud Run europe-west1: 4 vCPU × $0.000024/s + 8 GiB × $0.0000025/s
+    cost_usd = round(total_elapsed_s * (4 * 0.000024 + 8 * 0.0000025), 4)
+    _emit("pipeline_done", solver=chosen,
           sections=len(schedulable), violations=len(viol),
-          total_elapsed_s=total_elapsed_s)
+          total_elapsed_s=total_elapsed_s, cost_usd=cost_usd)
 
     return PipelineResult(schedulable, unschedulable, assignments, stats, viol, schedule)

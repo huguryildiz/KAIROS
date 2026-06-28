@@ -89,7 +89,9 @@ def render(lang: str) -> None:
     if ph.button(t("solve_button", lang), type="primary", key="solve_btn",
                  disabled=not valid):
         cfg = build_config(st.session_state["settings"],
-                           st.session_state["availability"], _SOLVE_SECONDS)
+                           st.session_state["availability"], _SOLVE_SECONDS,
+                           availability_avoid=st.session_state.get("availability_avoid", {}),
+                           availability_prefer=st.session_state.get("availability_prefer", {}))
         secs, _ = build_sections_from_courselist(courses, _PERIOD, cfg)
         instr = build_instructors_from_courselist(courses)
         rooms = build_rooms_from_ui(st.session_state["classrooms"], cfg)

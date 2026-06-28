@@ -129,6 +129,17 @@ def _cand_soft(c, s, cfg: Config):
         cost += cfg.w_englab
     if cfg.w_room_util and c.cap > 0 and not s.is_virtual and c.cap > s.students:
         cost += cfg.w_room_util * (c.cap - s.students) / c.cap
+    if cfg.instr_avoid:
+        for iid in s.instructor_ids:
+            for hh in range(c.start, c.start + c.length):
+                if (iid, c.day, hh) in cfg.instr_avoid:
+                    cost += cfg.w_instr_avoid
+    if cfg.instr_prefer_ids:
+        for iid in s.instructor_ids:
+            if iid in cfg.instr_prefer_ids:
+                if not any((iid, c.day, hh) in cfg.instr_preferred
+                           for hh in range(c.start, c.start + c.length)):
+                    cost += cfg.w_instr_prefer
     return cost
 
 

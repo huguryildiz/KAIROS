@@ -38,6 +38,11 @@ class Config:
     # per-instructor unavailability (UI School-Settings populates this; CLI leaves it empty).
     # frozenset of (instructor_id/email, day, hour) — read in gen_candidates like a per-id blackout.
     instr_unavailable: frozenset = frozenset()
+    instr_preferred: frozenset = frozenset()  # (iid, day, hour) softly preferred
+    instr_avoid: frozenset = frozenset()      # (iid, day, hour) soft penalty per hour
+    instr_prefer_ids: frozenset = frozenset() # derived: iids with >=1 preferred slot
+    w_instr_prefer: float = 2.0              # miss-penalty: block not in preferred slot
+    w_instr_avoid: float = 3.0              # penalty per hour in avoid slot
     # AM/PM boundary hour for half-day instructor availability (UI setting)
     midday_split_hour: int = 13
     # toggles

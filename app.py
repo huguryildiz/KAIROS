@@ -18,7 +18,7 @@ from views import upload, review, classrooms, settings, solve, results
 
 _ICON = os.path.join(os.path.dirname(__file__), "assets", "icon.svg")
 st.set_page_config(
-    page_title="KAIROS | Ders Programı Optimizasyonu / Timetable Optimization",
+    page_title="KAIROS",
     page_icon=_ICON,
     layout="wide",
 )
@@ -31,6 +31,8 @@ st.session_state.setdefault("lang", "en")
 st.session_state.setdefault("theme", "light")
 st.session_state.setdefault("settings", default_settings())
 st.session_state.setdefault("availability", {})
+st.session_state.setdefault("availability_avoid", {})
+st.session_state.setdefault("availability_prefer", {})
 
 st.markdown(brand_css(get_theme()), unsafe_allow_html=True)
 
@@ -45,6 +47,16 @@ def _solve_status() -> str:
     return "done" if has_result else "active"
 
 lang = get_lang()
+
+_PAGE_TITLES = {
+    "tr": "KAIROS | Ders Programı Optimizasyonu",
+    "en": "KAIROS | Timetable Optimization",
+}
+import streamlit.components.v1 as _cmp  # noqa: E402
+_cmp.html(
+    f"<script>window.parent.document.title={_PAGE_TITLES[lang]!r};</script>",
+    height=0,
+)
 
 # Streamlit's file-uploader widget hardcodes English strings in its React bundle.
 # When the UI language is TR, inject a tiny MutationObserver that rewrites those

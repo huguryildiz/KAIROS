@@ -133,20 +133,44 @@ def test_availability_empty():
     assert availability_closed_slots({}, {"day_start": 9}) == frozenset()
 
 
+def test_build_config_avoid_prefer():
+    avoid = {"dr@x": [["Mo", 9]]}
+    prefer = {"dr@x": [["We", 10]]}
+    cfg = build_config(DEFAULT_SETTINGS, {}, 60.0,
+                       availability_avoid=avoid,
+                       availability_prefer=prefer)
+    assert ("dr@x", "Mo", 9) in cfg.instr_avoid
+    assert ("dr@x", "We", 10) in cfg.instr_preferred
+    assert "dr@x" in cfg.instr_prefer_ids
+    assert ("dr@x", "Mo", 9) not in cfg.instr_preferred
+
+
 # --- Block 8: profile JSON --------------------------------------------------
 
 def test_profile_roundtrip():
-    s, a = profile_from_json(profile_to_json(DEFAULT_SETTINGS, {"x@y": [["Mo", "AM"]]}))
+    s, a, av, pr = profile_from_json(profile_to_json(DEFAULT_SETTINGS, {"x@y": [["Mo", "AM"]]}))
     assert s == DEFAULT_SETTINGS
     assert a == {"x@y": [["Mo", "AM"]]}
+    assert av == {}
+    assert pr == {}
+
+
+def test_profile_roundtrip_with_tiers():
+    avoid = {"p@q": [["Tu", 10]]}
+    prefer = {"p@q": [["Mo", 9]]}
+    s, a, av, pr = profile_from_json(profile_to_json(DEFAULT_SETTINGS, {}, avoid, prefer))
+    assert av == avoid
+    assert pr == prefer
 
 
 def test_profile_partial_merges_defaults():
-    s, a = profile_from_json('{"settings": {"day_start": 8}, "availability": {}}')
+    s, a, av, pr = profile_from_json('{"settings": {"day_start": 8}, "availability": {}}')
     assert s["day_start"] == 8
     assert s["day_end"] == DEFAULT_SETTINGS["day_end"]
     assert s["weights"] == DEFAULT_SETTINGS["weights"]
     assert a == {}
+    assert av == {}
+    assert pr == {}
 
 
 def test_quality_modes_map_to_soft_polish_budget():

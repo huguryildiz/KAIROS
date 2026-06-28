@@ -111,6 +111,8 @@ def _global_terms(state, cfg) -> dict:
     instr_day = defaultdict(set)      # (iid, day) -> {hour}
     sec_rooms = defaultdict(set)      # section_id -> {room}
     coh_days_used = defaultdict(set)  # cohort -> {day}
+    instr_avoid_viol = 0
+    instr_prefer_miss = 0
     for bid, c in state.placed.items():
         s = state.sec_of[bid]
         sec_rooms[s.section_id].add(c.room)
@@ -121,6 +123,12 @@ def _global_terms(state, cfg) -> dict:
         for iid in state.sec_instr.get(s.section_id, []):
             for hh in range(c.start, c.start + c.length):
                 instr_day[(iid, c.day)].add(hh)
+                if cfg.instr_avoid and (iid, c.day, hh) in cfg.instr_avoid:
+                    instr_avoid_viol += 1
+            if iid in cfg.instr_prefer_ids:
+                if not any((iid, c.day, hh) in cfg.instr_preferred
+                           for hh in range(c.start, c.start + c.length)):
+                    instr_prefer_miss += 1
     T = cfg.max_consecutive_hours
     maxrun = (sum(_run_excess(h, T) for h in coh_day.values())
               + sum(_run_excess(h, T) for h in instr_day.values()))
@@ -147,6 +155,8 @@ def _global_terms(state, cfg) -> dict:
         "room_stable": sum(max(0, len(rs) - 1) for rs in sec_rooms.values()),
         "free_day": free_day,
         "room_util": room_util,
+        "instr_avoid_viol": instr_avoid_viol,
+        "instr_prefer_miss": instr_prefer_miss,
         "conf": sum(max(0, len(v) - 1) for v in coh_slot.values()),
     }
 
@@ -162,6 +172,8 @@ def _local_terms(state, cohorts, instrs, rooms, blocks, cfg) -> dict:
     coh_days_used = defaultdict(set)
     instr_day = defaultdict(set)
     sec_rooms = defaultdict(set)
+    instr_avoid_viol = 0
+    instr_prefer_miss = 0
     for bid, c in state.placed.items():
         s = state.sec_of[bid]
         if s.section_id in sections:
@@ -175,6 +187,12 @@ def _local_terms(state, cohorts, instrs, rooms, blocks, cfg) -> dict:
             if iid in instr_set:
                 for hh in range(c.start, c.start + c.length):
                     instr_day[(iid, c.day)].add(hh)
+                    if cfg.instr_avoid and (iid, c.day, hh) in cfg.instr_avoid:
+                        instr_avoid_viol += 1
+                if s.section_id in sections and iid in cfg.instr_prefer_ids:
+                    if not any((iid, c.day, hh) in cfg.instr_preferred
+                               for hh in range(c.start, c.start + c.length)):
+                        instr_prefer_miss += 1
     T = cfg.max_consecutive_hours
     maxrun = (sum(_run_excess(h, T) for h in coh_day.values())
               + sum(_run_excess(h, T) for h in instr_day.values()))
@@ -201,6 +219,8 @@ def _local_terms(state, cohorts, instrs, rooms, blocks, cfg) -> dict:
                          for bid, c in state.placed.items()
                          if bid.split("#")[0] in sections
                          and not state.sec_of[bid].is_virtual and c.cap > 0),
+        "instr_avoid_viol": instr_avoid_viol,
+        "instr_prefer_miss": instr_prefer_miss,
         "conf": sum(max(0, len(v) - 1) for v in coh_slot.values()),
     }
 
@@ -218,7 +238,9 @@ def _norm_obj(terms, base, cfg) -> float:
             + cfg.w_fairness * terms["fairness"] / max(base["fairness"], 1)
             + cfg.w_room_stable * terms["room_stable"] / max(base["room_stable"], 1)
             + cfg.w_free_day * terms["free_day"] / max(base["free_day"], 1)
-            + cfg.w_room_util * terms["room_util"] / max(base["room_util"], 1))
+            + cfg.w_room_util * terms["room_util"] / max(base["room_util"], 1)
+            + cfg.w_instr_avoid * terms["instr_avoid_viol"] / max(base["instr_avoid_viol"], 1)
+            + cfg.w_instr_prefer * terms["instr_prefer_miss"] / max(base["instr_prefer_miss"], 1))
 
 
 def _slot(c):

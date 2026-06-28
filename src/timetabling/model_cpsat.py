@@ -115,6 +115,8 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
     order_terms = []
     englab_terms = []
     room_util_terms = []
+    avoid_terms = []
+    prefer_miss_terms = []
     sbd = defaultdict(list)  # (section_id, block_id, day) -> vars (multi-block sections)
 
     room_occ = defaultdict(list)          # (room, day, hour) -> vars
@@ -159,6 +161,15 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
                 waste = c.cap - s.students
                 if waste > 0:
                     room_util_terms.append(cfg.w_room_util * (100 * waste // c.cap) * v)
+            for iid in s.instructor_ids:
+                if cfg.instr_avoid:
+                    for hh in range(c.start, c.start + c.length):
+                        if (iid, c.day, hh) in cfg.instr_avoid:
+                            avoid_terms.append(int(round(cfg.w_instr_avoid)) * v)
+                if iid in cfg.instr_prefer_ids:
+                    if not any((iid, c.day, hh) in cfg.instr_preferred
+                               for hh in range(c.start, c.start + c.length)):
+                        prefer_miss_terms.append(int(round(cfg.w_instr_prefer)) * v)
             if len(s.blocks) >= 2:
                 sbd[(s.section_id, b.block_id, c.day)].append(v)
             for hh in range(c.start, c.start + c.length):
@@ -258,6 +269,8 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
     obj += [cfg.w_nonadjacent * t for t in nonadj_terms]
     obj += [cfg.w_cohort_conflict * t for t in cohort_conflict_terms]
     obj += room_util_terms
+    obj += avoid_terms
+    obj += prefer_miss_terms
     if obj:
         model.Minimize(sum(obj))
 

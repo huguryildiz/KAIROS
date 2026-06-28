@@ -151,3 +151,54 @@ def test_build_and_solve_tiny_feasible_instance():
     assert len(assigns) == 2
     a1, a2 = assigns
     assert not (a1.day == a2.day and a1.start == a2.start)
+
+
+def test_dept_fairness_balances_primetime_ratios():
+    closed = tuple(
+        (day, hour)
+        for day in ("Tu", "We", "Th", "Fr")
+        for hour in range(9, 17)
+    ) + tuple(("Mo", hour) for hour in range(10, 16))
+    cfg = Config(
+        horizon_start=9,
+        undergrad_end=17,
+        blackout=closed,
+        w_dept_fairness=100,
+        w_cohort_gap=0,
+        w_cohort_conflict=0,
+        w_order=0,
+        w_englab=0,
+        w_nonadjacent=0,
+        w_room_util=0,
+        w_instr_days=0,
+        w_parttime_days=0,
+    )
+    rooms = [Room("R1", 50, False, True), Room("R2", 50, False, True)]
+    instructors = {
+        f"i{i}": Instructor(f"i{i}", f"n{i}", False, "D")
+        for i in range(4)
+    }
+    sections = [
+        _sec("PSY1_01", 2, 10, [Block("PSY1_01#T", "PSY1_01", "theory", 1, False)],
+             instr="i0", cohort="PSY-2"),
+        _sec("PSY2_01", 2, 10, [Block("PSY2_01#T", "PSY2_01", "theory", 1, False)],
+             instr="i1", cohort="PSY-3"),
+        _sec("ECON1_01", 2, 10, [Block("ECON1_01#T", "ECON1_01", "theory", 1, False)],
+             instr="i2", cohort="ECON-2"),
+        _sec("ECON2_01", 2, 10, [Block("ECON2_01#T", "ECON2_01", "theory", 1, False)],
+             instr="i3", cohort="ECON-3"),
+    ]
+    for section in sections:
+        section.department = "Psychology" if section.section_id.startswith("PSY") else "Economics"
+
+    assigns, stats = model_cpsat.build_and_solve(sections, rooms, instructors, cfg)
+
+    assert stats["status_name"] == "OPTIMAL"
+    by_section = {a.section_id: a for a in assigns}
+    prime_by_dept = defaultdict(int)
+    for section in sections:
+        assignment = by_section[section.section_id]
+        if cfg.primetime_start <= assignment.start < cfg.primetime_end:
+            prime_by_dept[section.department] += 1
+    assert prime_by_dept == {"Psychology": 1, "Economics": 1}
+    assert stats["objective"] == 0.0

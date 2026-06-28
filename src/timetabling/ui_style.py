@@ -859,6 +859,7 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
 [data-testid="stCheckbox"] label[data-baseweb="checkbox"]>div:first-child>div{
   background:#fff!important;box-shadow:0 1px 4px rgba(0,0,0,.35)!important;}
 
+
 /* ── Instructor availability heatmap ── when2meet-style hourly grid: time rows ×
    day columns, tap a cell to block that hour for the instructor. Mirrors the result
    timetable's hour×day shape so the picker and the schedule read in one language.

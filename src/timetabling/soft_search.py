@@ -183,6 +183,11 @@ def _global_terms(state, cfg) -> dict:
         "conf": sum(max(0, len(v) - 1) for v in coh_slot.values()),
         "avoid_pairs_viol": _avoid_pairs_viol(state.placed, state.sec_of, cfg.avoid_pairs),
         "building_change": building_change,
+        "perturbation": sum(
+            1 for bid, c in state.placed.items()
+            if cfg.ref_schedule.get(bid) is not None
+            and (c.day, c.start, c.room) != cfg.ref_schedule[bid]
+        ) if cfg.ref_schedule else 0,
     }
 
 
@@ -273,6 +278,13 @@ def _local_terms(state, cohorts, instrs, rooms, blocks, cfg) -> dict:
              if p & {state.sec_of[bid].code for bid in blocks if bid in state.sec_of}]
             if cfg.avoid_pairs else []),
         "building_change": local_building_change,
+        "perturbation": sum(
+            1 for bid in blocks
+            if bid in state.placed
+            and cfg.ref_schedule.get(bid) is not None
+            and (state.placed[bid].day, state.placed[bid].start, state.placed[bid].room)
+            != cfg.ref_schedule[bid]
+        ) if cfg.ref_schedule else 0,
     }
 
 
@@ -295,7 +307,8 @@ def _norm_obj(terms, base, cfg) -> float:
             + cfg.w_instr_avoid * terms["instr_avoid_viol"] / max(base["instr_avoid_viol"], 1)
             + cfg.w_instr_prefer * terms["instr_prefer_miss"] / max(base["instr_prefer_miss"], 1)
             + cfg.w_avoid_pairs * terms["avoid_pairs_viol"] / max(base["avoid_pairs_viol"], 1)
-            + cfg.w_building_change * terms["building_change"] / max(base["building_change"], 1))
+            + cfg.w_building_change * terms["building_change"] / max(base["building_change"], 1)
+            + cfg.w_perturbation * terms["perturbation"] / max(base["perturbation"], 1))
 
 
 def _slot(c):

@@ -146,6 +146,11 @@ time. The CP-SAT monolith (§6a) and the repair soft polish (§6b) use separate 
   per-cohort and per-instructor concentration of bad load (idle gaps + long runs + late slots),
   making it more expensive to dump all discomfort on the same entity. Repair polish term;
   optional Settings dial: off / low / medium / high.
+- **Building transition cost** (`w_building_change=0.0` default) — penalize consecutive
+  teaching hours for the same instructor that occur in different buildings on the same day.
+  Building is derived from the room code prefix: first letter (`A`–`K`); `XB…` prefixes
+  (bodrum/basement) resolve to building `X`. Online and unknown rooms are excluded.
+  Repair polish term and CP-SAT monolith term (linearized `t ≥ v1 + v2 − 1`); off by default.
 
 ### What "0 resource conflicts" means
 
@@ -335,7 +340,8 @@ objectives. Weights live in `config.py`. The two paths share the weight fields
 `w_instr_days` / `w_parttime_days` (but with different semantics — see §5.1). The repair
 polish has terms absent from the monolith (`w_idle`, `w_maxrun`, `w_room_stable`,
 `w_free_day`, `w_nonadjacent`, `w_evening`, `w_instr_idle`, `w_fairness`). Both paths share
-the per-section `w_min_working_days` target when a row supplies it. The monolith has terms
+`w_building_change`, `w_room_util`, `w_avoid_pairs`, and the per-section `w_min_working_days`
+target when a row supplies it. The monolith has terms
 not in the polish objective (`w_cohort_gap`, `w_order`, `w_englab`). `w_cohort_conflict`
 appears in both but as an objective term in the monolith and as a no-regress guard in the
 polish.
@@ -470,6 +476,24 @@ $$
   counts section labs placed before that section's latest theory block.
 - This is a soft repair-polish term only in the first version. It never relaxes hard resource
   constraints and cannot pass the `conf` no-regress guard.
+
+### 5.9c Building transition cost — $w_{\text{building\_change}}=0.0$ (both paths)
+
+$$
+\mathrm{pen}_{\text{bldg}} \;=\; \sum_{i,d,h}\mathbb{1}\!\left[\mathrm{bldg}(i,d,h) \neq \mathrm{bldg}(i,d,h{+}1)\right]
+$$
+
+- For each instructor $i$, day $d$, and consecutive hour pair $(h, h{+}1)$, counts one penalty
+  if the instructor occupies both hours in **different** buildings.
+- `building_of(room)`: first letter of the room code (`A`–`K`); `XB…` prefix resolves to
+  building `X` (bodrum/basement = same building). Online and unknown rooms return `None` and
+  are excluded from the count.
+- **Repair polish:** tracked as `building_change` in `_global_terms` / `_local_terms` /
+  `_norm_obj`. Computation skipped entirely when `w_building_change = 0.0`.
+- **CP-SAT monolith:** for every cross-building candidate pair $(v_1, v_2)$ covering adjacent
+  hours, introduces a Boolean $t$ with `model.Add(t ≥ v1 + v2 − 1)` and adds $w \cdot t$ to
+  the objective. Integer weight: `int(round(w_building_change)) or 1`.
+- Default weight is 0.0 (off); no UI dial yet — activate via `Config(w_building_change=…)`.
 
 ### 5.10 S-Order — $w_{\text{order}}=1$ (monolith)
 
@@ -832,6 +856,7 @@ Optional advanced dials use the same numeric scale but include an explicit **off
 | Late-hour load | `w_evening` (§5.5) | 0.0 / 5.0 / 10.0 / 20.0 |
 | Instructor idle gaps | `w_instr_idle` (§5.6) | 0.0 / 5.0 / 10.0 / 20.0 |
 | Bad-load fairness | `w_fairness` (§5.7) | 0.0 / 5.0 / 10.0 / 20.0 |
+| Building transition cost | `w_building_change` (§5.9c) | 0.0 (off, no UI dial yet) |
 
 `free_day` (§5.9) has a fixed `Config` weight of 10.0 and is not exposed as a dial — only its
 year scope (multiselect) is configurable. With no selected years it is inert. `w_cohort_gap=10.0`

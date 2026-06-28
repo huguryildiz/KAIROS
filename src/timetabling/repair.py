@@ -127,8 +127,8 @@ def _cand_soft(c, s, cfg: Config):
     if (cfg.eng_department_match in s.department and "#L" in c.block_id
             and c.day not in cfg.eng_lab_days):
         cost += cfg.w_englab
-    if cfg.w_room_util and not s.is_virtual and c.cap > s.students:
-        cost += cfg.w_room_util * (c.cap - s.students)
+    if cfg.w_room_util and c.cap > 0 and not s.is_virtual and c.cap > s.students:
+        cost += cfg.w_room_util * (c.cap - s.students) / c.cap
     return cost
 
 

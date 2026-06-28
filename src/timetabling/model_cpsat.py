@@ -155,10 +155,10 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
             if (cfg.eng_department_match in s.department and b.needs_lab
                     and c.day not in cfg.eng_lab_days):
                 englab_terms.append(cfg.w_englab * v)
-            if cfg.w_room_util and not s.is_virtual:
+            if cfg.w_room_util and c.cap > 0 and not s.is_virtual:
                 waste = c.cap - s.students
                 if waste > 0:
-                    room_util_terms.append(cfg.w_room_util * waste * v)
+                    room_util_terms.append(cfg.w_room_util * (100 * waste // c.cap) * v)
             if len(s.blocks) >= 2:
                 sbd[(s.section_id, b.block_id, c.day)].append(v)
             for hh in range(c.start, c.start + c.length):

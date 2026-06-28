@@ -105,9 +105,10 @@ time. The CP-SAT monolith (§6a) and the repair soft polish (§6b) use separate 
   level-1 and graduate excluded (CP-SAT monolith).
 - **Engineering labs late-week** (`w_englab=1`) — prefer Engineering lab blocks on Thu/Fri
   (CP-SAT monolith).
-- **Room utilisation** (`w_room_util=1`) — penalize `(room_cap − students)` per placed block;
-  discourages assigning small classes to very large auditoriums. Hard capacity (room must fit)
-  is unchanged. Virtual rooms exempt. Applies to both the CP-SAT monolith and the repair solver
+- **Room utilisation** (`w_room_util=1`) — penalize `(room_cap − students) / room_cap` per
+  placed block (waste fraction, 0–1); discourages assigning small classes to very large
+  auditoriums, independent of absolute room size. Hard capacity (room must fit) is unchanged.
+  Virtual rooms exempt. Applies to both the CP-SAT monolith and the repair solver
   (greedy, LNS sub-model, and soft polish).
 - **Compact teaching days** (`w_nonadjacent=0.0` default / 10.0 when UI dial is active) —
   penalize the span between each instructor's first and last teaching day of the week
@@ -447,16 +448,15 @@ $$
 ### 5.12 S-RoomUtil — $w_{\text{room\_util}}=1$ (both paths)
 
 $$
-\mathrm{pen}_{\text{room\_util}} \;=\; \sum_{b,r,d,h} w_{\text{room\_util}}\,(\mathrm{cap}_r - n_s)\; x_{b,r,d,h}
+\mathrm{pen}_{\text{room\_util}} \;=\; \sum_{b,r,d,h} w_{\text{room\_util}}\,\frac{\mathrm{cap}_r - n_s}{\mathrm{cap}_r}\; x_{b,r,d,h}
 \qquad (\,\mathrm{cap}_r > n_s,\; s \text{ not virtual}\,)
 $$
 
-- Penalizes slack between the assigned room's capacity and the section's enrolment per placed block.
+- Penalizes the **waste fraction** `(cap_r − n_s) / cap_r ∈ [0, 1)` per placed block, not the raw seat slack. A 10-student section in a 200-seat auditorium (fraction 0.95) is penalized only slightly more than in a 100-seat room (fraction 0.90), rather than 2× more as the raw formula would give.
 - Discourages assigning small classes to very large auditoriums; rooms that exactly fit are preferred.
 - Hard capacity (`cap_r ≥ n_s`) is enforced by candidate pruning and is **never relaxed**.
 - Virtual rooms (cap = 0) are exempt via the `c.cap > 0` guard.
-- Applies to the CP-SAT monolith (per-candidate coefficient), the repair greedy and LNS
-  sub-model (`_cand_soft`), and the move-based soft polish (`_global_terms` / `_norm_obj`).
+- CP-SAT monolith uses integer-scaled form `100 × (cap_r − n_s) // cap_r` (percentage, 0–99); repair `_cand_soft` and the move-based polish (`_global_terms` / `_norm_obj`) use the float fraction directly.
 
 ### 5.13 Cohort-conflict — $w_{\text{coh}}=50$
 

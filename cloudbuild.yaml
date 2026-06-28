@@ -17,7 +17,7 @@ steps:
       - kairos
       - --source=.
       - --region=europe-west1
-      - --no-allow-unauthenticated
+      - --allow-unauthenticated
       - --memory=8Gi
       - --cpu=4
       - --cpu-boost

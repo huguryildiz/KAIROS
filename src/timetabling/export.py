@@ -26,6 +26,7 @@ def build_schedule_dict(period, assignments: List[Assignment], sections: List[Se
         ids = s.instructor_ids if s else []
         names = [instructors[i].name for i in ids if i in instructors and instructors[i].name]
         items.append({
+            "block_id": a.block_id,
             "section_id": a.section_id,
             "course_code": s.code if s else "",
             "course_name": s.name if s else "",
@@ -49,6 +50,17 @@ def build_schedule_dict(period, assignments: List[Assignment], sections: List[Se
         "unmet_soft": unmet_soft or [],
         "conflicts": conflicts or [],
     }
+
+
+def load_ref_schedule(data: dict) -> dict:
+    """Parse a schedule_*.json dict into {block_id: (day, start, room)}.
+    Entries without a 'block_id' key are skipped for backward compatibility."""
+    ref = {}
+    for item in (data or {}).get("assignments", []):
+        bid = item.get("block_id")
+        if bid:
+            ref[bid] = (item["day"], int(item["start"]), item["room"])
+    return ref
 
 
 def write_schedule_json(path: str, payload: dict) -> None:

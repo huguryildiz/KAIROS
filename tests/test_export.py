@@ -58,3 +58,40 @@ def test_write_schedule_outputs_can_omit_period_from_filename(tmp_path):
 
     assert written["json"] == tmp_path / "out" / "schedule_20260628_140509.json"
     assert written["csv"] == tmp_path / "out" / "schedule_20260628_140509.csv"
+
+
+def test_build_schedule_dict_includes_block_id():
+    s = Section("ADA 403_01", "001", "ADA 403", "EDA", 4, "ADA", "Fac", "ADA-4",
+                ["i1"], 24, 3, 0, 0, 3, "Course")
+    s.blocks = [Block("ADA 403_01#T", "ADA 403_01", "theory", 3, False)]
+    rooms = {"G005": Room("G005", 60, False, True)}
+    instr = {"i1": Instructor("i1", "Test", True, "ADA")}
+    a = [Assignment("ADA 403_01#T", "ADA 403_01", "theory", "G005", "Fr", 13, 16)]
+    payload = export.build_schedule_dict("001", a, [s], rooms, instr)
+    assert payload["assignments"][0]["block_id"] == "ADA 403_01#T"
+
+
+def test_load_ref_schedule_extracts_block_day_start_room():
+    data = {
+        "assignments": [
+            {"block_id": "ADA 403_01#T", "day": "Fr", "start": 13, "room": "G005"},
+            {"block_id": "ADA 403_01#L", "day": "Mo", "start": 9,  "room": "PC-L1"},
+        ]
+    }
+    ref = export.load_ref_schedule(data)
+    assert ref["ADA 403_01#T"] == ("Fr", 13, "G005")
+    assert ref["ADA 403_01#L"] == ("Mo", 9,  "PC-L1")
+
+
+def test_load_ref_schedule_skips_entries_without_block_id():
+    data = {
+        "assignments": [
+            {"section_id": "ADA 403_01", "day": "Fr", "start": 13, "room": "G005"},
+        ]
+    }
+    assert export.load_ref_schedule(data) == {}
+
+
+def test_load_ref_schedule_empty_input():
+    assert export.load_ref_schedule({}) == {}
+    assert export.load_ref_schedule({"assignments": []}) == {}

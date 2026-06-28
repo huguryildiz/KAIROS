@@ -140,6 +140,10 @@ def _cand_soft(c, s, cfg: Config):
                 if not any((iid, c.day, hh) in cfg.instr_preferred
                            for hh in range(c.start, c.start + c.length)):
                     cost += cfg.w_instr_prefer
+    if cfg.ref_schedule and cfg.w_perturbation:
+        ref = cfg.ref_schedule.get(c.block_id)
+        if ref is not None and (c.day, c.start, c.room) != ref:
+            cost += cfg.w_perturbation
     return cost
 
 

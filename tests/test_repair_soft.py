@@ -111,3 +111,28 @@ def test_cohort_pass_preserves_placement_and_conflict():
     assert stats["placed"] == len(secs)          # all placed
     from timetabling.validate import validate
     assert validate(assigns, secs, rooms, instr, cfg) == []   # 0 hard violations
+
+
+def test_cand_soft_perturbation_penalizes_deviation():
+    ref = {"A_01#T": ("Mo", 9, "R1")}
+    cfg = Config(ref_schedule=ref, w_perturbation=5.0)
+    s = _sec("A_01", "i1", level=1)
+    matching = Candidate("A_01#T", "R1", "Mo", 9, 2)   # exact match → no penalty
+    deviant = Candidate("A_01#T", "R2", "Tu", 9, 2)    # different room+day → penalty
+    assert _cand_soft(matching, s, cfg) == 0
+    assert _cand_soft(deviant, s, cfg) == 5.0
+
+
+def test_cand_soft_perturbation_off_by_default():
+    cfg = Config()  # w_perturbation=0.0, ref_schedule={}
+    s = _sec("A_01", "i1", level=1)
+    c = Candidate("A_01#T", "R1", "Tu", 11, 2)
+    assert _cand_soft(c, s, cfg) == 0
+
+
+def test_cand_soft_perturbation_no_penalty_for_unknown_block():
+    ref = {"OTHER#T": ("Mo", 9, "R1")}
+    cfg = Config(ref_schedule=ref, w_perturbation=5.0)
+    s = _sec("A_01", "i1", level=1)
+    c = Candidate("A_01#T", "R1", "Tu", 11, 2)  # not in ref → no penalty
+    assert _cand_soft(c, s, cfg) == 0

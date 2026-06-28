@@ -71,12 +71,13 @@ def write_schedule_outputs(
     payload: dict,
     period: str | None = None,
     generated_at: datetime | None = None,
+    include_period: bool = True,
 ) -> dict[str, Path]:
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    suffix = period or payload.get("period") or "schedule"
     stamp = (generated_at or datetime.now()).strftime("%Y%m%d_%H%M%S")
-    stem = f"schedule_{suffix}_{stamp}"
+    suffix = period or payload.get("period")
+    stem = f"schedule_{suffix}_{stamp}" if include_period and suffix else f"schedule_{stamp}"
     paths = {
         "json": out / f"{stem}.json",
         "csv": out / f"{stem}.csv",

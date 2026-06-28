@@ -239,7 +239,9 @@ def render(lang: str) -> None:
             raise _error[0]
 
         res = _result[0]
-        written = write_schedule_outputs(Path("out"), res.schedule, period=_PERIOD)
+        written = write_schedule_outputs(
+            Path("out"), res.schedule, period=_PERIOD, include_period=False
+        )
         try:
             upload_outputs_if_configured(written)
         except Exception as exc:

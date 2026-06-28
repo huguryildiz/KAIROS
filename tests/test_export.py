@@ -43,3 +43,18 @@ def test_write_schedule_outputs_creates_out_json_and_csv_with_timestamp(tmp_path
     assert written["csv"] == tmp_path / "out" / "schedule_001_20260628_140509.csv"
     assert json.loads(written["json"].read_text())["assignments"][0]["section_id"] == "ADA 403_01"
     assert written["csv"].read_text(encoding="utf-8-sig").startswith("section_id,course_code")
+
+
+def test_write_schedule_outputs_can_omit_period_from_filename(tmp_path):
+    payload = {"period": "001", "meta": {}, "assignments": []}
+
+    written = export.write_schedule_outputs(
+        tmp_path / "out",
+        payload,
+        period="001",
+        generated_at=datetime(2026, 6, 28, 14, 5, 9),
+        include_period=False,
+    )
+
+    assert written["json"] == tmp_path / "out" / "schedule_20260628_140509.json"
+    assert written["csv"] == tmp_path / "out" / "schedule_20260628_140509.csv"

@@ -151,6 +151,13 @@ time. The CP-SAT monolith (§6a) and the repair soft polish (§6b) use separate 
   Building is derived from the room code prefix: first letter (`A`–`K`); `XB…` prefixes
   (bodrum/basement) resolve to building `X`. Online and unknown rooms are excluded.
   Repair polish term and CP-SAT monolith term (linearized `t ≥ v1 + v2 − 1`); off by default.
+- **Minimum perturbation** (`w_perturbation=0.0` default) — penalize each block placed at a
+  `(day, start, room)` that differs from the reference schedule uploaded by the user. The
+  reference is a previously exported `schedule_*.json`; parsed by `load_ref_schedule` into
+  `cfg.ref_schedule = {block_id: (day, start, room)}`. With an empty reference or
+  `w_perturbation=0.0` the term is inert. Active in the repair greedy phase (`_cand_soft`),
+  repair soft polish (`_global_terms` / `_local_terms` / `_norm_obj`), and the CP-SAT monolith
+  objective. UI: optional JSON uploader in the Solve step expander; off by default.
 
 ### What "0 resource conflicts" means
 

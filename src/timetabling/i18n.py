@@ -79,6 +79,10 @@ STRINGS = {
         # settings step (School Settings)
         "set_caption": "Okulunuzun politikalarını, öğretim elemanı müsaitliğini ve tercih ağırlıklarını "
                        "buradan ayarlayın. Dokunmazsanız varsayılanlar kullanılır.",
+        "set_tab_policy": "Zaman & politika",
+        "set_tab_avail": "Müsaitlik",
+        "set_tab_conflicts": "Çakışmama",
+        "set_tab_parallel": "Paralel şube",
         "set_policy_header": "Zaman & politika",
         "set_policy_desc": "Derslerin planlanabileceği günlük zaman penceresi ve kurumsal kurallar. Bu değerler programdaki her blok için geçerli sert sınırlar oluşturur.",
         "set_day_start": "İlk ders saati",
@@ -385,6 +389,10 @@ STRINGS = {
         # settings step (School Settings)
         "set_caption": "Configure your school's policy, instructor availability, and "
                        "preference weights here. Leave untouched to use the defaults.",
+        "set_tab_policy": "Time & policy",
+        "set_tab_avail": "Availability",
+        "set_tab_conflicts": "Conflicts",
+        "set_tab_parallel": "Parallel",
         "set_policy_header": "Time & policy",
         "set_policy_desc": "The daily time window and institutional rules that govern all classes. These values create hard bounds applied to every block in the timetable.",
         "set_day_start": "First class hour",

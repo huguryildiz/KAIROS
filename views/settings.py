@@ -115,10 +115,20 @@ def render(lang: str) -> None:
                 unsafe_allow_html=True)
     st.caption(t("set_caption", lang))
     s = st.session_state["settings"]
-    _policy(lang, s)
-    _availability(lang)
-    _avoid_pairs(lang, s)
-    _parallel_policies(lang, s)
+    tab_pol, tab_avl, tab_con, tab_par = st.tabs([
+        t("set_tab_policy", lang),
+        t("set_tab_avail", lang),
+        t("set_tab_conflicts", lang),
+        t("set_tab_parallel", lang),
+    ])
+    with tab_pol:
+        _policy(lang, s)
+    with tab_avl:
+        _availability(lang)
+    with tab_con:
+        _avoid_pairs(lang, s)
+    with tab_par:
+        _parallel_policies(lang, s)
     # School-profile import/export is disabled: an out-of-spec JSON upload can crash
     # profile_from_json, and the feature has no clear use yet. Re-enable once the
     # upload path validates the schema defensively. Keep _profile() for that.

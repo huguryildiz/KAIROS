@@ -53,6 +53,7 @@ DEFAULT_SETTINGS: dict = {
         "evening": "off",
         "instr_idle": "off",
         "fairness": "off",
+        "perturbation": "off",
     },
     "free_day_years": [],     # -> Config.free_day_year_levels (cohort years that want a free day)
     "avoid_pairs": [],        # -> Config.avoid_pairs (list of [code_a, code_b])
@@ -143,7 +144,8 @@ def quality_seconds(mode: str) -> float:
 def build_config(settings: dict, availability: Dict[str, list],
                  solve_seconds: float,
                  availability_avoid: Dict[str, list] = None,
-                 availability_prefer: Dict[str, list] = None) -> Config:
+                 availability_prefer: Dict[str, list] = None,
+                 ref_schedule: dict = None) -> Config:
     """Map a Settings dict + availability into a Config. Never raises on bad input — every
     field falls back to its default and the solve proceeds."""
     s = settings or {}
@@ -207,6 +209,7 @@ def build_config(settings: dict, availability: Dict[str, list],
         w_instr = 0.0
     w_parttime = round(w_instr + 4, 1) if w_instr else 0.0
     w_nonadjacent = _optional_preset(weights, "nonadjacent")
+    w_perturb = _optional_preset(weights, "perturbation")
     free_day_years = tuple(int(y) for y in s.get("free_day_years", []) or []
                            if str(y).strip().isdigit())
 
@@ -269,6 +272,8 @@ def build_config(settings: dict, availability: Dict[str, list],
         soft_polish_budget_s=quality_seconds(s.get("quality_mode", "balanced")),
         avoid_pairs=avoid_pairs_cfg,
         parallel_policies=tuple(parallel_cfg),
+        ref_schedule=ref_schedule or {},
+        w_perturbation=w_perturb,
     )
 
 

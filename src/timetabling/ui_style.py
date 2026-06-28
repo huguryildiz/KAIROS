@@ -1265,13 +1265,12 @@ def _popover_css(tokens: dict) -> str:
 
 
 def brand_css(theme: str = "light") -> str:
-    """Theme variables + small overrides as a <style> block. Static component
-    CSS (~93 KB) lives in static/brand_static.css, loaded via @import so the
-    browser caches it and the WebSocket payload stays small (~2 KB)."""
+    """Full <style> block for the given theme ('light' | 'dark'). Switching is a
+    pure CSS-variable swap; every component rule reads the tokens."""
     tokens = _DARK_TOKENS if theme == "dark" else _LIGHT_TOKENS
     root = ":root{" + "".join(f"{k}:{v};" for k, v in tokens.items()) + "}"
-    return (f"<style>@import url('/app/static/brand_static.css');"
-            f"{root}{_datagrid_css(tokens)}{_popover_css(tokens)}</style>")
+    return (f"<style>{_FONT_IMPORT}{root}{_COMPONENT_CSS}"
+            f"{_datagrid_css(tokens)}{_popover_css(tokens)}{_HIDE_CHROME}</style>")
 
 
 # Back-compat alias for any importer expecting the old constant.

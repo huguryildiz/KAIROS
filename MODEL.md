@@ -34,8 +34,10 @@ A placement that breaks one of these is never even generated, so it cannot occur
 
 - **Capacity** — a block goes only in a room whose capacity ≥ the section's size. The virtual
   `Online` room is exempt (unlimited).
-- **Lab-room pinning** — a lab block is pinned to the section's designated real lab room; it
-  can go nowhere else. Labs with no designated lab room use regular rooms.
+- **Lab-room pinning / room segregation** — a lab block with a designated real lab room is
+  pinned to that room only. A lab block without a pinned room goes to any lab-family room
+  (`is_lab`). Theory/practice blocks are **excluded from lab-family rooms entirely** — they
+  can only go in ordinary classrooms (`not is_lab`).
 - **Daytime window** — an undergraduate block must end by the **Day end** hour (default
   **18:00**; tunable 13–21 in School Settings) and start no earlier than the **Day start**
   hour (default **09:00**; tunable 6–12). Graduate blocks (if enabled) end by **21:00**
@@ -55,7 +57,8 @@ A placement that breaks one of these is never even generated, so it cannot occur
 - **Room type** — rooms carry a categorical type (`normal / lab / pc / studio`). When a section
   declares a `Room Type` demand, its blocks go only in rooms of that **exact** category
   (`pc`→`pc`, `studio`→`studio`, `lab`→`lab`); a generic lab demand falls back to any lab-family
-  room (`is_lab`). With no demand, any fitting room.
+  room (`is_lab`). With no explicit demand: lab blocks go to lab-family rooms only; theory
+  blocks go to ordinary classrooms only (lab-family rooms are never eligible for theory).
 
 ### Hard constraints — enforced as model relations (across blocks)
 
@@ -191,7 +194,9 @@ creating* the variable rather than by adding a model row. `gen_candidates` emits
 $(r,d,h)$ only when it already satisfies:
 
 - room capacity $\mathrm{cap}_r \ge n_s$ (the virtual `Online` room is exempt — unlimited);
-- lab-room pinning — a lab block only in the section's designated lab room;
+- lab-room / room segregation — a lab block with a designated lab room is pinned to that
+  room only; a lab block without a designated room goes to any lab-family room (`is_lab`);
+  a theory/practice block (`not needs_lab`) is restricted to non-lab rooms (`not is_lab`);
 - undergrad window: $h \ge \texttt{cfg.horizon\_start}$ and $h + \ell_b \le \texttt{cfg.undergrad\_end}$ (default 9–18; tunable);
 - graduate window (level > 4): $h \ge \texttt{cfg.grad\_start\_for(dept)}$ and $h + \ell_b \le \texttt{cfg.grad\_end}$ (default start 18, end fixed 21);
 - configured blackout slots (`Config.blackout`; none by default — each is universal or

@@ -348,6 +348,19 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
                             t_idx += 1
                             model.Add(t >= v1 + v2 - 1)
                             obj.append(w_bc * t)
+    if cfg.ref_schedule and cfg.w_perturbation:
+        w_p = int(round(cfg.w_perturbation)) or 1
+        for b_obj, s in blocks:
+            ref = cfg.ref_schedule.get(b_obj.block_id)
+            if ref is None:
+                continue
+            ref_day, ref_start, ref_room = ref
+            for c in cand_by_block.get(b_obj.block_id, []):
+                if (c.day, c.start, c.room) == (ref_day, ref_start, ref_room):
+                    continue
+                v = x.get((b_obj.block_id, c.room, c.day, c.start))
+                if v is not None:
+                    obj.append(w_p * v)
     if obj:
         model.Minimize(sum(obj))
 

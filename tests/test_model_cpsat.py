@@ -48,6 +48,40 @@ def test_requires_lab_room_restricts_to_lab_rooms():
     assert cands and all(c.room == "LAB-L" for c in cands)
 
 
+def test_mixed_section_room_type_applies_to_lab_block_only():
+    cfg = Config()
+    rooms = [
+        Room("R1", 50, False, True, type="normal"),
+        Room("PC1", 50, True, True, type="pc"),
+    ]
+    theory = Block("S_01#T", "S_01", "theory", 2, False)
+    lab = Block("S_01#L", "S_01", "lab", 2, True)
+    s = _sec("S_01", 1, 20, [theory, lab])
+    s.requires_lab_room = True
+    s.required_room_type = "pc"
+
+    theory_rooms = [r.room for r in model_cpsat.feasible_rooms_for(theory, s, rooms, cfg)]
+    lab_rooms = [r.room for r in model_cpsat.feasible_rooms_for(lab, s, rooms, cfg)]
+
+    assert theory_rooms == ["R1"]
+    assert lab_rooms == ["PC1"]
+
+
+def test_plain_theory_excludes_lab_family_rooms():
+    cfg = Config()
+    rooms = [
+        Room("R1", 50, False, True, type="normal"),
+        Room("PC1", 50, True, True, type="pc"),
+        Room("ARCH-STD1", 60, True, True, type="studio"),
+    ]
+    theory = Block("EE 311_01#T", "EE 311_01", "theory", 2, False)
+    s = _sec("EE 311_01", 3, 35, [theory])
+
+    got = [r.room for r in model_cpsat.feasible_rooms_for(theory, s, rooms, cfg)]
+
+    assert got == ["R1"]
+
+
 def test_availability_removes_candidates():
     cfg = Config(instr_unavailable=frozenset(("i1", "Mo", h) for h in range(9, 13)))
     rooms = [Room("R1", 50, False, True)]
@@ -117,5 +151,3 @@ def test_build_and_solve_tiny_feasible_instance():
     assert len(assigns) == 2
     a1, a2 = assigns
     assert not (a1.day == a2.day and a1.start == a2.start)
-
-

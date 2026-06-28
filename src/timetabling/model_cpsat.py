@@ -19,7 +19,9 @@ def feasible_rooms_for(block: Block, section: Section, rooms: List[Room],
         return [r for r in rooms if r.is_virtual][:1]
     if block.needs_lab and section.lab_room:
         return [r for r in rooms if r.room == section.lab_room]   # pinned lab room
-    if section.requires_lab_room:        # explicit Room Type demand
+    has_lab_blocks = any(b.needs_lab for b in section.blocks)
+    room_type_applies = section.requires_lab_room and (block.needs_lab or not has_lab_blocks)
+    if room_type_applies:        # explicit Room Type demand
         rt = section.required_room_type
         if rt in ("pc", "studio", "lab"):
             # specific category -> only rooms of exactly that type (UI rooms carry it)
@@ -28,9 +30,12 @@ def feasible_rooms_for(block: Block, section: Section, rooms: List[Room],
         else:
             # generic lab-family demand -> is_lab keeps the CLI path working too
             fr = [r for r in rooms if r.is_physical and r.is_lab and r.cap >= section.students]
+    elif block.needs_lab:
+        fr = [r for r in rooms if r.is_physical and r.is_lab and r.cap >= section.students]
     else:
-        # non-lab block, or a lab held in a regular room (no designated lab room)
-        fr = [r for r in rooms if r.is_physical and r.cap >= section.students]
+        # Plain theory/practice belongs in ordinary classrooms. Lab-family rooms
+        # are reserved for lab blocks or explicit Room Type demand.
+        fr = [r for r in rooms if r.is_physical and not r.is_lab and r.cap >= section.students]
     # Dept ownership: if a room declares owner dept(s), restrict to sections
     # whose department matches one of them. Empty dept = open to all.
     if fr and section.department:

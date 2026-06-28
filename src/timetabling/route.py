@@ -7,10 +7,9 @@ from .clean import classify_room
 
 
 def mark_lab_rooms(sections: List[Section], rooms: Dict[str, Room], cfg: Config) -> List[Section]:
-    """Pin each section's lab block to the specific lab room recorded in the Plan
-    ROOM (the lab-suffixed token present in our inventory). Sections whose lab is
-    held in a regular room (no lab token) keep lab_room='' and their lab block is
-    later treated as a normal room block."""
+    """Pin each section's lab block to the specific lab-family room recorded in
+    the Plan ROOM. Sections without a recognized lab-family room keep
+    lab_room='', so their lab block can use any eligible lab-family room."""
     for s in sections:
         for t in s.plan_room.split():
             if classify_room(t) and t in rooms and rooms[t].is_lab:

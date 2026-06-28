@@ -38,6 +38,44 @@ def test_detects_capacity_and_lab_and_window_and_blackout():
     assert {"capacity", "lab_room", "blackout"} <= kinds
 
 
+def test_room_type_requirement_applies_to_lab_block_only_for_mixed_section():
+    rooms = {
+        "R1": Room("R1", 40, False, True, type="normal"),
+        "PC1": Room("PC1", 40, True, True, type="pc"),
+    }
+    instr = {"i1": Instructor("i1", "n", False, "D")}
+    theory = Block("S_01#T", "S_01", "theory", 2, False)
+    lab = Block("S_01#L", "S_01", "lab", 2, True)
+    s = _sec("S_01", 1, 20, [theory, lab], instr="i1")
+    s.requires_lab_room = True
+    s.required_room_type = "pc"
+
+    ok = [
+        Assignment("S_01#T", "S_01", "theory", "R1", "Mo", 9, 11),
+        Assignment("S_01#L", "S_01", "lab", "PC1", "Tu", 9, 11),
+    ]
+    wrong_lab = [
+        Assignment("S_01#T", "S_01", "theory", "R1", "Mo", 9, 11),
+        Assignment("S_01#L", "S_01", "lab", "R1", "Tu", 9, 11),
+    ]
+
+    assert validate.validate(ok, [s], rooms, instr, Config()) == []
+    assert any(v.kind == "room_type" for v in validate.validate(wrong_lab, [s], rooms, instr, Config()))
+
+
+def test_plain_theory_in_lab_family_room_is_room_type_violation():
+    rooms = {
+        "R1": Room("R1", 40, False, True, type="normal"),
+        "ARCH-STD1": Room("ARCH-STD1", 60, True, True, type="studio"),
+    }
+    instr = {"i1": Instructor("i1", "n", False, "D")}
+    theory = Block("EE 311_01#T", "EE 311_01", "theory", 2, False)
+    s = _sec("EE 311_01", 3, 35, [theory], instr="i1", code="EE 311")
+    a = [Assignment("EE 311_01#T", "EE 311_01", "theory", "ARCH-STD1", "Mo", 9, 11)]
+
+    assert any(v.kind == "room_type" for v in validate.validate(a, [s], rooms, instr, Config()))
+
+
 def test_instructor_unavailable_violation():
     s = _sec("S_01", 1, 10, [Block("S_01#T", "S_01", "theory", 2, False)], instr="i1")
     cfg = Config(instr_unavailable=frozenset({("i1", "Mo", 9), ("i1", "Mo", 10)}))

@@ -24,6 +24,8 @@ def validate(assignments: List[Assignment], sections: List[Section],
                 if placed.get(b.block_id, 0) != 1:
                     viol.append(Violation("placement",
                                 f"{b.block_id} placed {placed.get(b.block_id, 0)} times (expected 1)"))
+    block_by_id = {b.block_id: b for s in sections for b in s.blocks}
+    has_lab_blocks = {s.section_id: any(b.needs_lab for b in s.blocks) for s in sections}
 
     room_occ = defaultdict(list)
     instr_occ = defaultdict(list)
@@ -41,13 +43,23 @@ def validate(assignments: List[Assignment], sections: List[Section],
         if a.kind == "lab" and not is_virt and s.lab_room and a.room != s.lab_room:
             viol.append(Violation("lab_room",
                         f"{a.block_id} lab not in pinned {s.lab_room} (got {a.room})"))
-        if s.requires_lab_room and not is_virt and room is not None:
+        block = block_by_id.get(a.block_id)
+        is_lab_block = bool(block.needs_lab) if block is not None else (a.kind == "lab")
+        mixed_lab_section = has_lab_blocks.get(s.section_id, False)
+        room_type_applies = s.requires_lab_room and (is_lab_block or not mixed_lab_section)
+        if room_type_applies and not is_virt and room is not None:
             rt = s.required_room_type
             ok = (room.type == rt) if rt in ("pc", "studio", "lab") else room.is_lab
             if not ok:
                 viol.append(Violation("room_type",
                             f"{a.block_id} in {a.room} ({room.type}) but section "
                             f"requires {rt or 'a lab'} room"))
+        elif is_lab_block and not is_virt and room is not None and not room.is_lab:
+            viol.append(Violation("room_type",
+                        f"{a.block_id} lab in ordinary room {a.room} ({room.type})"))
+        elif not is_lab_block and not is_virt and room is not None and room.is_lab:
+            viol.append(Violation("room_type",
+                        f"{a.block_id} theory/practice in lab-family room {a.room} ({room.type})"))
         if s.fixed_day and s.blocks and a.block_id == s.blocks[0].block_id \
                 and (a.day != s.fixed_day or a.start != s.fixed_start):
             viol.append(Violation("fixed",

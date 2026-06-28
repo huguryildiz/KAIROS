@@ -51,7 +51,7 @@ class Section:
     blocks: List[Block] = field(default_factory=list)
     is_virtual: bool = False
     plan_room: str = ""
-    lab_room: str = ""          # pinned lab room (from Plan), "" = lab in a regular room
+    lab_room: str = ""          # pinned lab room (from Plan), "" = any lab-family room
     requires_lab_room: bool = False  # back-compat boolean (required_room_type in lab-family)
     required_room_type: str = ""     # normal|lab|pc|studio demand; "" = derive from L
     fixed_day: str = ""         # pin the section's first block to this day ("" = unpinned)
@@ -92,5 +92,4 @@ def weekly_load_hours(sections) -> dict:
         for iid in s.instructor_ids:
             load[iid] = load.get(iid, 0) + h
     return load
-
 

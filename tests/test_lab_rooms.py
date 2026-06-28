@@ -19,10 +19,10 @@ def test_feasible_rooms_pins_lab_block_to_designated_room():
     assert [r.room for r in got] == ["LAB2"]
 
 
-def test_lab_without_designated_room_uses_regular_rooms():
+def test_lab_without_designated_room_uses_lab_family_rooms():
     rooms = [Room("LAB1", 30, True, True), Room("R1", 40, False, True)]
     got = feasible_rooms_for(_lab_block(), _sec(""), rooms, Config())
-    assert any(r.room == "R1" for r in got)            # regular room allowed when no pin
+    assert [r.room for r in got] == ["LAB1"]
 
 
 def test_validate_flags_lab_not_in_pinned_room():
@@ -35,9 +35,9 @@ def test_validate_flags_lab_not_in_pinned_room():
     assert validate(right, [s], rooms, instr, Config()) == []
 
 
-def test_validate_allows_relaxed_lab_in_regular_room():
+def test_validate_flags_unpinned_lab_in_regular_room():
     rooms = {"R1": Room("R1", 40, False, True)}
     instr = {"i1": Instructor("i1", "n", False, "D")}
     s = _sec(""); s.blocks = [_lab_block()]
     a = [Assignment("S_01#L", "S_01", "lab", "R1", "Mo", 9, 11)]
-    assert validate(a, [s], rooms, instr, Config()) == []
+    assert any(x.kind == "room_type" for x in validate(a, [s], rooms, instr, Config()))

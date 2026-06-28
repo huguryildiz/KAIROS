@@ -11,6 +11,14 @@ from .repair import _cand_soft, _soft_total
 
 CHAIN_MAX_DEPTH = 4   # bounded ejection-chain length in anneal_soft
 
+_DAY_IDX = {"Mo": 0, "Tu": 1, "We": 2, "Th": 3, "Fr": 4, "Sa": 5}
+
+
+def _day_span(days) -> int:
+    """Teaching day span: last day index minus first (Mo+Tu=1, Mo+Fr=4, single day=0)."""
+    idxs = [_DAY_IDX[d] for d in days if d in _DAY_IDX]
+    return max(idxs) - min(idxs) if len(idxs) > 1 else 0
+
 
 def _local_soft(state, cohorts, instrs, rooms, blocks, cfg: Config) -> int:
     """Weighted soft over only the given entities. Each term is owned by one entity type
@@ -41,6 +49,7 @@ def _local_soft(state, cohorts, instrs, rooms, blocks, cfg: Config) -> int:
                                     for h in coh_hours.values() if len(h) >= 2)
     # instr_days over the given instructors
     total += cfg.w_instr_days * sum(len(state.instr_active_days.get(iid, ())) for iid in instrs)
+    total += cfg.w_nonadjacent * sum(_day_span(state.instr_active_days.get(iid, ())) for iid in instrs)
     return total
 
 
@@ -65,6 +74,34 @@ def _run_excess(hours, T: int) -> int:
     return total + max(0, run - T)
 
 
+def _evening_of(hours_by_day, cfg) -> int:
+    """Late-hour load as occupied hour-slots at or after cfg.evening_from_hour."""
+    return sum(1 for hours in hours_by_day.values()
+               for h in hours if h >= cfg.evening_from_hour)
+
+
+def _bad_load_by_entity(hours_by_day, cfg, prefix: str) -> dict:
+    """Per entity discomfort used by fairness: gaps + long runs + late slots."""
+    pain = defaultdict(int)
+    for (entity, _day), hours in hours_by_day.items():
+        if not hours:
+            continue
+        gap = (max(hours) + 1 - min(hours)) - len(hours) if len(hours) >= 2 else 0
+        evening = sum(1 for h in hours if h >= cfg.evening_from_hour)
+        pain[(prefix, entity)] += gap + _run_excess(hours, cfg.max_consecutive_hours) + evening
+    return pain
+
+
+def _fairness_of(coh_day, instr_day, cfg) -> int:
+    """Squared bad-load concentration over cohorts and instructors."""
+    pain = defaultdict(int)
+    for key, value in _bad_load_by_entity(coh_day, cfg, "cohort").items():
+        pain[key] += value
+    for key, value in _bad_load_by_entity(instr_day, cfg, "instr").items():
+        pain[key] += value
+    return sum(v * v for v in pain.values())
+
+
 def _global_terms(state, cfg) -> dict:
     """Raw counts of the soft terms over the FULL placement. idle/conf over cohorts (all),
     maxrun over cohorts+instructors, instr_days over instructors, room_stable per section,
@@ -87,6 +124,9 @@ def _global_terms(state, cfg) -> dict:
     T = cfg.max_consecutive_hours
     maxrun = (sum(_run_excess(h, T) for h in coh_day.values())
               + sum(_run_excess(h, T) for h in instr_day.values()))
+    evening = _evening_of(coh_day, cfg) + _evening_of(instr_day, cfg)
+    instr_idle = _gap_of(instr_day)
+    fairness = _fairness_of(coh_day, instr_day, cfg)
     years = {str(y) for y in cfg.free_day_year_levels}
     n_days = len(cfg.days())
     free_day = sum(max(0, len(days) - (n_days - 1))
@@ -97,6 +137,10 @@ def _global_terms(state, cfg) -> dict:
         "maxrun": maxrun,
         "instr_days": sum(max(0, len(d) - cfg.max_instr_days)
                           for d in state.instr_active_days.values()),
+        "nonadjacent": sum(_day_span(d) for d in state.instr_active_days.values()),
+        "evening": evening,
+        "instr_idle": instr_idle,
+        "fairness": fairness,
         "room_stable": sum(max(0, len(rs) - 1) for rs in sec_rooms.values()),
         "free_day": free_day,
         "conf": sum(max(0, len(v) - 1) for v in coh_slot.values()),
@@ -104,7 +148,7 @@ def _global_terms(state, cfg) -> dict:
 
 
 def _local_terms(state, cohorts, instrs, rooms, blocks, cfg) -> dict:
-    """Same six terms over only the given entities. Each term is owned by one entity type:
+    """Same terms over only the given entities. Each term is owned by one entity type:
     idle/conf/free_day -> cohort, maxrun -> cohort+instructor, instr_days -> instructor,
     room_stable -> section (derived from blocks). Summing over the full sets == _global_terms."""
     cohort_set, instr_set = set(cohorts), set(instrs)
@@ -130,6 +174,9 @@ def _local_terms(state, cohorts, instrs, rooms, blocks, cfg) -> dict:
     T = cfg.max_consecutive_hours
     maxrun = (sum(_run_excess(h, T) for h in coh_day.values())
               + sum(_run_excess(h, T) for h in instr_day.values()))
+    evening = _evening_of(coh_day, cfg) + _evening_of(instr_day, cfg)
+    instr_idle = _gap_of(instr_day)
+    fairness = _fairness_of(coh_day, instr_day, cfg)
     years = {str(y) for y in cfg.free_day_year_levels}
     n_days = len(cfg.days())
     free_day = sum(max(0, len(days) - (n_days - 1))
@@ -140,6 +187,10 @@ def _local_terms(state, cohorts, instrs, rooms, blocks, cfg) -> dict:
         "maxrun": maxrun,
         "instr_days": sum(max(0, len(state.instr_active_days.get(iid, ())) - cfg.max_instr_days)
                           for iid in instr_set),
+        "nonadjacent": sum(_day_span(state.instr_active_days.get(iid, ())) for iid in instr_set),
+        "evening": evening,
+        "instr_idle": instr_idle,
+        "fairness": fairness,
         "room_stable": sum(max(0, len(rs) - 1) for rs in sec_rooms.values()),
         "free_day": free_day,
         "conf": sum(max(0, len(v) - 1) for v in coh_slot.values()),
@@ -147,12 +198,16 @@ def _local_terms(state, cohorts, instrs, rooms, blocks, cfg) -> dict:
 
 
 def _norm_obj(terms, base, cfg) -> float:
-    """Normalized weighted sum of the five non-guard terms. conf is held separately as a
+    """Normalized weighted sum of the non-guard terms. conf is held separately as a
     no-regress guard (not here). Dividing by base puts terms on a common scale -> weights are
     pure relative preference; at base each term contributes exactly its weight."""
     return (cfg.w_idle * terms["idle"] / max(base["idle"], 1)
             + cfg.w_maxrun * terms["maxrun"] / max(base["maxrun"], 1)
             + cfg.w_instr_days * terms["instr_days"] / max(base["instr_days"], 1)
+            + cfg.w_nonadjacent * terms["nonadjacent"] / max(base["nonadjacent"], 1)
+            + cfg.w_evening * terms["evening"] / max(base["evening"], 1)
+            + cfg.w_instr_idle * terms["instr_idle"] / max(base["instr_idle"], 1)
+            + cfg.w_fairness * terms["fairness"] / max(base["fairness"], 1)
             + cfg.w_room_stable * terms["room_stable"] / max(base["room_stable"], 1)
             + cfg.w_free_day * terms["free_day"] / max(base["free_day"], 1))
 

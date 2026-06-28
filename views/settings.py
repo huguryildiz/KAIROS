@@ -14,9 +14,11 @@ from timetabling.settings import (profile_to_json, profile_from_json, _LEGACY_LE
 from timetabling.ui_input import normalize_name, grad_dept_codes
 
 _LEVELS = ("low", "medium", "high")
+_OPTIONAL_LEVELS = ("off", "low", "medium", "high")
 _QUALITY_LEVELS = ("fast", "balanced", "best")
 _MIDDAY = 13  # hardcoded AM/PM boundary; no longer a user-facing setting
-_WEIGHT_KNOBS = ("maxrun", "instr_days", "room_stable")
+_WEIGHT_KNOBS = ()
+_OPTIONAL_WEIGHT_KNOBS = ("maxrun", "instr_days", "room_stable", "evening", "instr_idle", "fairness", "nonadjacent")
 
 
 def _sync_segmented_key(key: str, options, current):
@@ -179,8 +181,9 @@ def _policy(lang: str, s: dict) -> None:
         st.markdown(f"**{t('set_weights_header', lang)}**")
         st.caption(t("set_weights_desc", lang))
         wc = st.columns(2)
+        weights = s.setdefault("weights", {})
         for i, knob in enumerate(_WEIGHT_KNOBS):
-            cur = _LEGACY_LEVEL.get(s["weights"].get(knob, "medium"), s["weights"].get(knob, "medium"))
+            cur = _LEGACY_LEVEL.get(weights.get(knob, "medium"), weights.get(knob, "medium"))
             cur = cur if cur in _LEVELS else "medium"
             key = f"set_w_{knob}"
             _sync_segmented_key(key, _LEVELS, cur)
@@ -189,7 +192,24 @@ def _policy(lang: str, s: dict) -> None:
                 format_func=lambda lv: t(f"set_w_{lv}", lang), key=key,
                 help=t(f"set_w_{knob}_help", lang))
             if chosen is not None:
-                s["weights"][knob] = chosen
+                weights[knob] = chosen
+        for j, knob in enumerate(_OPTIONAL_WEIGHT_KNOBS, start=len(_WEIGHT_KNOBS)):
+            cur = str(weights.get(knob, "off")).strip().lower()
+            cur = cur if cur in _OPTIONAL_LEVELS else "off"
+            key = f"set_w_{knob}"
+            _sync_segmented_key(key, _OPTIONAL_LEVELS, cur)
+            # instr_days dial is inert when no target is set; grey it out so users
+            # don't think it's active.
+            disabled = (knob == "instr_days"
+                        and int(s.get("instr_days_target", 0) or 0) == 0)
+            help_key = (f"set_w_{knob}_disabled_help" if disabled
+                        else f"set_w_{knob}_help")
+            chosen = wc[j % 2].segmented_control(
+                t(f"set_w_{knob}", lang), _OPTIONAL_LEVELS, default=cur,
+                format_func=lambda lv: t(f"set_w_{lv}", lang), key=key,
+                help=t(help_key, lang), disabled=disabled)
+            if chosen is not None:
+                weights[knob] = chosen
         # instr_days target: companion to the "compact instructor days" priority dial above.
         # "No target" keeps the term off (no headroom); ≤4/≤3/≤2 give the dial something to
         # optimize toward. The priority dial is inert until a target is picked (build_config

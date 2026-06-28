@@ -48,6 +48,7 @@ CLAUDE.md
 AGENTS.md
 
 # Local Claude Code config — kept on disk, not tracked
+.Codex/
 .claude/
 .superpowers/
 bench/_ctx/

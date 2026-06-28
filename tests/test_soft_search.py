@@ -97,6 +97,34 @@ def test_relocate_lowers_normalized_objective_and_keeps_placement():
     assert st.placed["A_01#T"].start == 14
 
 
+def test_relocate_lowers_instructor_idle_gap():
+    from timetabling.soft_search import try_relocate, _global_terms
+    cfg = Config(w_idle=0, w_maxrun=0, w_instr_days=0, w_nonadjacent=0,
+                 w_evening=0, w_instr_idle=20, w_fairness=0,
+                 w_room_stable=0, w_free_day=0)
+    # i1 has a same-day hole: A is Mo 9-11, B is parked Mo 15-17. Moving B to Mo 11-13
+    # closes the instructor idle gap without changing placement or hard feasibility.
+    a = _sec("A_01", "i1", code="ADA 101")
+    b = _sec("B_01", "i1", code="BBB 101")
+    cand = {"B_01#T": [Candidate("B_01#T", "R2", "Mo", 15, 2),
+                       Candidate("B_01#T", "R2", "Mo", 11, 2)]}
+    st = _state(a, b)
+    st.occupy("A_01#T", Candidate("A_01#T", "R1", "Mo", 9, 2))
+    st.occupy("B_01#T", cand["B_01#T"][0])
+    t0 = _global_terms(st, cfg)
+    assert t0["instr_idle"] == 4
+
+    res = try_relocate(st, cand, "B_01#T", random.Random(0), _eval_fn(cfg, t0))
+
+    assert res is not None
+    dobj, dterms, revert = res
+    assert dterms["instr_idle"] == -4
+    assert dobj < 0
+    assert st.placed["B_01#T"].start == 11
+    revert()
+    assert _global_terms(st, cfg)["instr_idle"] == 4
+
+
 def test_swap_lowers_objective_where_relocate_cannot():
     from timetabling.soft_search import try_swap, _global_terms
     cfg = Config(max_instr_days=0)        # threshold 0 -> instr_days term == raw teaching-day count
@@ -367,9 +395,12 @@ def test_global_terms_raw_terms_plus_conf():
     t = _global_terms(st, cfg)
     # idle: ADA-2 Mon {9,10,14,15} -> (16-9)-4 = 3 ; maxrun: runs of 2 -> 0
     # instr_days: i1 {Mo}=1, i2 {Tu}=1 -> 2 ; room_stable: each section 1 room -> 0
+    # evening: C has hour 17 for its cohort and instructor -> 2
+    # instr_idle: i1 has Mo {9,10,14,15} -> 3 ; fairness = cohort/instructor pain squares
     # free_day: no year config -> 0 ; conf: hours 9,10 each 2 courses -> 2
-    assert t == {"idle": 3, "maxrun": 0, "instr_days": 2, "room_stable": 0,
-                 "free_day": 0, "conf": 2}
+    assert t == {"idle": 3, "maxrun": 0, "instr_days": 2, "nonadjacent": 0,
+                 "evening": 2, "instr_idle": 3, "fairness": 20,
+                 "room_stable": 0, "free_day": 0, "conf": 2}
 
 
 def test_local_terms_match_global_over_all_entities():

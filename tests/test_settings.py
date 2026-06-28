@@ -21,6 +21,12 @@ def test_default_settings_build_config_matches_today():
     assert cfg.w_cohort_gap == 10
     assert cfg.w_instr_days == 0      # instr_days default target is "No target" -> dial off
     assert cfg.w_parttime_days == 0
+    assert DEFAULT_SETTINGS["weights"]["evening"] == "off"
+    assert DEFAULT_SETTINGS["weights"]["instr_idle"] == "off"
+    assert DEFAULT_SETTINGS["weights"]["fairness"] == "off"
+    assert cfg.w_evening == 0
+    assert cfg.w_instr_idle == 0
+    assert cfg.w_fairness == 0
     assert cfg.solve_time_limit_s == 3000.0
     assert cfg.repair_time_limit_s == 3000.0
     assert cfg.soft_polish_budget_s == 300.0
@@ -96,7 +102,7 @@ def test_weight_presets_off_and_max():
     off = build_config(dict(DEFAULT_SETTINGS, instr_days_target=3, weights={
         "cohort_gap": "off", "instr_days": "off"}),
         {}, 60.0)
-    assert (off.w_cohort_gap, off.w_instr_days, off.w_parttime_days) == (5, 5, 9)
+    assert (off.w_cohort_gap, off.w_instr_days, off.w_parttime_days) == (5, 0.0, 0.0)
     mx = build_config(dict(DEFAULT_SETTINGS, instr_days_target=3, weights={
         "cohort_gap": "max", "instr_days": "max"}), {}, 60.0)
     assert (mx.w_cohort_gap, mx.w_instr_days, mx.w_parttime_days) == (20, 20, 24)

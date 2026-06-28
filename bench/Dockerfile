@@ -16,11 +16,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src/ ./src/
 COPY bench/benchmark.py ./bench/benchmark.py
+COPY bench/soft_oat.py ./bench/soft_oat.py
 COPY bench/_ctx/ ./data/
 
 # Defaults can be overridden by the Job's container args. Both periods, 3 runs,
 # prod-matching 3000s budget. Classroom inventory comes from defaults.py.
-ENTRYPOINT ["python3", "bench/benchmark.py"]
-CMD ["--case", "data/sample_courses_2025_001.csv:001", \
+ENTRYPOINT ["python3"]
+CMD ["bench/benchmark.py", \
+     "--case", "data/sample_courses_2025_001.csv:001", \
      "--case", "data/sample_courses_2025_002.csv:002", \
      "--runs", "3", "--time-limit", "3000", "--out", "/tmp/benchmark.json"]

@@ -17,7 +17,11 @@ from timetabling.i18n import t
 from views import upload, review, classrooms, settings, solve, results
 
 _ICON = os.path.join(os.path.dirname(__file__), "assets", "icon.svg")
-st.set_page_config(page_title="Kairos | Course Timetabling", page_icon=_ICON, layout="wide")
+st.set_page_config(
+    page_title="KAIROS | Ders Programı Optimizasyonu / Timetable Optimization",
+    page_icon=_ICON,
+    layout="wide",
+)
 
 # Session defaults
 st.session_state.setdefault("courses", [])

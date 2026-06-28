@@ -13,6 +13,15 @@ def test_build_config_maps_soft_dials_and_free_day_years():
     assert cfg.w_idle == 15.0                       # fixed, not from UI
 
 
+def test_build_config_maps_optional_soft_dials():
+    s = dict(DEFAULT_SETTINGS,
+             weights={"evening": "low", "instr_idle": "medium", "fairness": "high"})
+    cfg = build_config(s, {}, 60)
+    assert cfg.w_evening == 5.0
+    assert cfg.w_instr_idle == 10.0
+    assert cfg.w_fairness == 20.0
+
+
 def test_build_config_three_levels_map_to_5_10_20():
     for lvl, expect in (("low", 5.0), ("medium", 10.0), ("high", 20.0)):
         cfg = build_config(dict(DEFAULT_SETTINGS, weights={"maxrun": lvl}), {}, 60)
@@ -65,6 +74,11 @@ def test_legacy_5level_profile_migrates_to_three():
     s, _ = profile_from_json(text)
     cfg = build_config(s, {}, 60)
     assert cfg.w_maxrun == 20.0        # max -> high
-    assert cfg.w_instr_days == 5.0     # off -> low
+    assert cfg.w_instr_days == 0.0     # off -> genuinely off (optional knob)
     assert cfg.w_room_stable == 10.0   # normal -> medium
     assert cfg.w_free_day == 20.0      # high -> high
+
+
+def test_settings_view_exposes_optional_soft_knobs():
+    from views.settings import _OPTIONAL_WEIGHT_KNOBS
+    assert _OPTIONAL_WEIGHT_KNOBS == ("maxrun", "instr_days", "room_stable", "evening", "instr_idle", "fairness", "nonadjacent")

@@ -47,8 +47,12 @@ DEFAULT_SETTINGS: dict = {
     "weights": {              # preset levels, never raw numbers
         "maxrun": "medium",
         "instr_days": "medium",
+        "nonadjacent": "off",
         "room_stable": "medium",
         "free_day": "medium",
+        "evening": "off",
+        "instr_idle": "off",
+        "fairness": "off",
     },
     "free_day_years": [],     # -> Config.free_day_year_levels (cohort years that want a free day)
     # Soft-polish wall-clock cap. Balanced is the interactive default: measured sample data
@@ -122,6 +126,14 @@ def _preset(weights: dict, knob: str) -> float:
     return round(UI_REF * WEIGHT_LEVELS.get(lvl, WEIGHT_LEVELS["medium"]), 1)
 
 
+def _optional_preset(weights: dict, knob: str) -> float:
+    """Optional soft dials are inert until explicitly enabled."""
+    lvl = str(weights.get(knob, "off")).strip().lower()
+    if lvl == "off":
+        return 0.0
+    return _preset(weights, knob)
+
+
 def quality_seconds(mode: str) -> float:
     return QUALITY_MODES.get(str(mode or "").strip().lower(), QUALITY_MODES["balanced"])
 
@@ -185,11 +197,12 @@ def build_config(settings: dict, availability: Dict[str, list],
     target = _int(s.get("instr_days_target"), 0)
     if 2 <= target < week_len:
         max_instr_days = target
-        w_instr = _preset(weights, "instr_days")
+        w_instr = _optional_preset(weights, "instr_days")
     else:
         max_instr_days = week_len
         w_instr = 0.0
     w_parttime = round(w_instr + 4, 1) if w_instr else 0.0
+    w_nonadjacent = _optional_preset(weights, "nonadjacent")
     free_day_years = tuple(int(y) for y in s.get("free_day_years", []) or []
                            if str(y).strip().isdigit())
 
@@ -207,13 +220,17 @@ def build_config(settings: dict, availability: Dict[str, list],
         max_block_len=_int(s.get("max_block_len"), 4),
         blackout=tuple(blackout_rows),
         w_cohort_gap=_preset(weights, "cohort_gap"),
-        w_maxrun=_preset(weights, "maxrun"),
-        w_room_stable=_preset(weights, "room_stable"),
+        w_maxrun=_optional_preset(weights, "maxrun"),
+        w_room_stable=_optional_preset(weights, "room_stable"),
         w_free_day=_preset(weights, "free_day"),
         free_day_year_levels=free_day_years,
         max_instr_days=max_instr_days,
         w_instr_days=w_instr,
         w_parttime_days=w_parttime,
+        w_nonadjacent=w_nonadjacent,
+        w_evening=_optional_preset(weights, "evening"),
+        w_instr_idle=_optional_preset(weights, "instr_idle"),
+        w_fairness=_optional_preset(weights, "fairness"),
         instr_unavailable=closed,
         solve_time_limit_s=float(solve_seconds),
         repair_time_limit_s=float(solve_seconds),

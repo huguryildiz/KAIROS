@@ -1433,9 +1433,9 @@ def eyebrow_html(n, label: str, key: str, sub: bool = False) -> str:
 def appbar_html(lang: str) -> str:
     """Left side of the app bar: brand logo + name."""
     return (
-        f'<div class="tt-appbar"><div class="tt-brand">'
-        f'<div class="glyph">{logo_img_html(32, _ICON_PATH)}</div>'
-        f'<div class="name">{escape(t("app_title", lang))}</div></div>'
+        f'<div class="tt-appbar"><div class="tt-brand" aria-label="Kairos">'
+        f'<div class="wordmark">{logo_img_html(118, _LOGO_PATH)}</div>'
+        f'</div>'
         f'</div>'
     )
 

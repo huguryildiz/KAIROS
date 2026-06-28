@@ -10,6 +10,7 @@ into ONE multi-page PDF, one page per entity, naturally sorted by name.
 from __future__ import annotations
 
 import re
+import struct
 from pathlib import Path
 from typing import List, Tuple
 
@@ -24,12 +25,30 @@ _FONT_REGULAR = _FONT_DIR / "DejaVuSans.ttf"
 _FONT_BOLD = _FONT_DIR / "DejaVuSans-Bold.ttf"
 _LOGO_PATH = Path(__file__).parent.parent.parent / "assets" / "logo.png"
 _LOGO_H = 9.0     # mm — height, matches title row
-_LOGO_W = 28.125  # mm — 1563:500 ≈ 3.125:1 aspect → 9 * (1563/500)
 
 _HOUR_LO, _HOUR_HI = 9, 21          # grid rows = hours 9..20 inclusive
 _TIME_COL_W = 16.0                  # mm
 _HEADER_H = 9.0                     # mm, day-name header row
 _ROW_H = 13.5                       # mm per hour row
+
+
+def _png_dimensions(path: Path) -> Tuple[int, int] | None:
+    try:
+        with path.open("rb") as f:
+            header = f.read(24)
+    except OSError:
+        return None
+    if len(header) < 24 or header[:8] != b"\x89PNG\r\n\x1a\n":
+        return None
+    return struct.unpack(">II", header[16:24])
+
+
+def _logo_width_mm() -> float:
+    dims = _png_dimensions(_LOGO_PATH)
+    if not dims:
+        return 28.125
+    w, h = dims
+    return _LOGO_H * (w / h)
 
 
 def _hex_to_rgb(hex_color: str) -> Tuple[int, int, int]:
@@ -209,16 +228,17 @@ def _draw_grid_page(pdf: FPDF, schedule: dict, title: str,
 
     # Logo PNG — top-right corner, vertically centred on the title row.
     row_y = pdf.get_y()
+    logo_w = _logo_width_mm() if _LOGO_PATH.exists() else 0.0
     if _LOGO_PATH.exists():
-        logo_x = pdf.w - pdf.r_margin - _LOGO_W
+        logo_x = pdf.w - pdf.r_margin - logo_w
         logo_y = row_y + (9 - _LOGO_H) / 2
-        pdf.image(str(_LOGO_PATH), x=logo_x, y=logo_y, w=_LOGO_W, h=_LOGO_H)
+        pdf.image(str(_LOGO_PATH), x=logo_x, y=logo_y, w=logo_w, h=_LOGO_H)
 
     # Title — reset cursor to left margin (logo drawing leaves it mid-page).
     pdf.set_xy(pdf.l_margin, row_y)
     pdf.set_font("DejaVu", "B", 14)
     pdf.set_text_color(20, 20, 20)
-    title_w = pdf.w - pdf.l_margin - pdf.r_margin - (_LOGO_W + 4 if _LOGO_PATH.exists() else 0)
+    title_w = pdf.w - pdf.l_margin - pdf.r_margin - (logo_w + 4 if _LOGO_PATH.exists() else 0)
     pdf.cell(title_w, 9, title, new_x="LMARGIN", new_y="NEXT")
 
     grid_x = pdf.l_margin

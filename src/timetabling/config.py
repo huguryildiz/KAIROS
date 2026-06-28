@@ -25,6 +25,9 @@ class Config:
     w_maxrun: float = 10.0                  # dial: anti-fatigue consecutive runs
     w_room_stable: float = 10.0             # dial: per-section room stability
     w_free_day: float = 10.0                # dial: year-scoped free day
+    w_evening: float = 0.0                  # optional dial: late-hour load
+    w_instr_idle: float = 0.0               # optional dial: instructor same-day idle gaps
+    w_fairness: float = 0.0                 # optional dial: spread bad load across entities
     # blackouts: (day, hour, staff_only) hour-slots that are closed. staff_only=True closes
     # the slot only for sections taught by a full-time instructor (e.g. a faculty seminar);
     # staff_only=False (or a bare 2-tuple) closes it for everyone. Use
@@ -71,7 +74,7 @@ class Config:
     w_englab: int = 1
     eng_lab_days: tuple = ("Th", "Fr")
     eng_department_match: str = "Engineering"
-    w_nonadjacent: int = 0
+    w_nonadjacent: float = 0.0
     w_instr_days: float = 10.0
     w_parttime_days: float = 14.0
     # apply cohort-conflict soft shaping in the repair greedy construction

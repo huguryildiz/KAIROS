@@ -1,20 +1,20 @@
-<svg width="300" height="96" viewBox="0 0 300 96" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Kairos">
+<svg width="320" height="96" viewBox="0 0 320 96" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="KAIROS">
   <defs>
-    <style>@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&amp;display=swap');</style>
+    <style></style>
     <linearGradient id="ct-grad" x1="0" y1="0" x2="72" y2="72" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#4F46E5"/>
       <stop offset="1" stop-color="#06B6D4"/>
     </linearGradient>
-    <linearGradient id="text-grad" x1="100" y1="0" x2="295" y2="0" gradientUnits="userSpaceOnUse">
+    <linearGradient id="text-grad" x1="100" y1="0" x2="315" y2="0" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#4F46E5"/>
       <stop offset="100%" stop-color="#06B6D4"/>
     </linearGradient>
     <clipPath id="kairos-clip">
       <text x="100" y="64"
-            font-family="'Playfair Display', 'Georgia', 'Times New Roman', serif"
+            font-family="'Georgia', 'Times New Roman', serif"
             font-size="48"
             font-weight="700"
-            letter-spacing="1">Kairos</text>
+            letter-spacing="1">KAIROS</text>
     </clipPath>
   </defs>
 
@@ -39,5 +39,5 @@
   </g>
 
   <!-- Wordmark: gradient rect clipped to text shape (reliable cross-browser technique) -->
-  <rect x="98" y="10" width="205" height="68" fill="url(#text-grad)" clip-path="url(#kairos-clip)"/>
+  <rect x="98" y="10" width="222" height="68" fill="url(#text-grad)" clip-path="url(#kairos-clip)"/>
 </svg>

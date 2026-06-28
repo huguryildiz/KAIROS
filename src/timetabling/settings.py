@@ -139,7 +139,9 @@ def quality_seconds(mode: str) -> float:
 
 
 def build_config(settings: dict, availability: Dict[str, list],
-                 solve_seconds: float) -> Config:
+                 solve_seconds: float,
+                 availability_avoid: Dict[str, list] = None,
+                 availability_prefer: Dict[str, list] = None) -> Config:
     """Map a Settings dict + availability into a Config. Never raises on bad input — every
     field falls back to its default and the solve proceeds."""
     s = settings or {}
@@ -208,6 +210,11 @@ def build_config(settings: dict, availability: Dict[str, list],
 
     closed = availability_closed_slots(
         availability, {"day_start": day_start})
+    avoid_closed = availability_closed_slots(
+        availability_avoid or {}, {"day_start": day_start})
+    prefer_slots = availability_closed_slots(
+        availability_prefer or {}, {"day_start": day_start})
+    prefer_ids = frozenset(iid for iid, _d, _h in prefer_slots)
 
     return Config(
         horizon_start=day_start,
@@ -232,21 +239,30 @@ def build_config(settings: dict, availability: Dict[str, list],
         w_instr_idle=_optional_preset(weights, "instr_idle"),
         w_fairness=_optional_preset(weights, "fairness"),
         instr_unavailable=closed,
+        instr_avoid=avoid_closed,
+        instr_preferred=prefer_slots,
+        instr_prefer_ids=prefer_ids,
         solve_time_limit_s=float(solve_seconds),
         repair_time_limit_s=float(solve_seconds),
         soft_polish_budget_s=quality_seconds(s.get("quality_mode", "balanced")),
     )
 
 
-def profile_to_json(settings: dict, availability: Dict[str, list]) -> str:
-    """Serialize a school profile (settings + availability) for download."""
-    return json.dumps({"settings": settings, "availability": availability},
-                      ensure_ascii=False, indent=2)
+def profile_to_json(settings: dict, availability: Dict[str, list],
+                    availability_avoid: Dict[str, list] = None,
+                    availability_prefer: Dict[str, list] = None) -> str:
+    """Serialize a school profile (settings + availability tiers) for download."""
+    return json.dumps({
+        "settings": settings,
+        "availability": availability,
+        "availability_avoid": availability_avoid or {},
+        "availability_prefer": availability_prefer or {},
+    }, ensure_ascii=False, indent=2)
 
 
-def profile_from_json(text: str) -> Tuple[dict, Dict[str, list]]:
+def profile_from_json(text: str) -> Tuple[dict, Dict[str, list], Dict[str, list], Dict[str, list]]:
     """Parse an uploaded profile, merging known keys onto DEFAULT_SETTINGS so a partial or
-    older file is safe. Returns (settings, availability)."""
+    older file is safe. Returns (settings, availability, availability_avoid, availability_prefer)."""
     data = json.loads(text)
     s = default_settings()
     incoming = data.get("settings", {}) if isinstance(data, dict) else {}
@@ -259,4 +275,10 @@ def profile_from_json(text: str) -> Tuple[dict, Dict[str, list]]:
     avail = data.get("availability", {}) if isinstance(data, dict) else {}
     if not isinstance(avail, dict):
         avail = {}
-    return s, avail
+    avail_avoid = data.get("availability_avoid", {}) if isinstance(data, dict) else {}
+    if not isinstance(avail_avoid, dict):
+        avail_avoid = {}
+    avail_prefer = data.get("availability_prefer", {}) if isinstance(data, dict) else {}
+    if not isinstance(avail_prefer, dict):
+        avail_prefer = {}
+    return s, avail, avail_avoid, avail_prefer

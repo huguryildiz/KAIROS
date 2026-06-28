@@ -71,7 +71,7 @@ def test_legacy_5level_profile_migrates_to_three():
     # off/low -> low(5), normal -> medium(10), high/max -> high(20)
     text = ('{"settings": {"instr_days_target": 3, "weights": '
             '{"maxrun": "max", "instr_days": "off", "room_stable": "normal", "free_day": "high"}}}')
-    s, _ = profile_from_json(text)
+    s, *_ = profile_from_json(text)
     cfg = build_config(s, {}, 60)
     assert cfg.w_maxrun == 20.0        # max -> high
     assert cfg.w_instr_days == 0.0     # off -> genuinely off (optional knob)

@@ -26,7 +26,8 @@ def test_global_terms_keys_and_room_stable():
     state.occupy("A#T", Candidate("A#T", "R1", "Mo", 9, 2))
     t = _global_terms(state, Config(max_instr_days=0))   # threshold 0 -> term == raw teaching-day count
     assert set(t) == {"idle", "maxrun", "instr_days", "nonadjacent", "evening",
-                      "instr_idle", "fairness", "room_stable", "free_day", "room_util", "conf"}
+                      "instr_idle", "fairness", "room_stable", "free_day", "room_util", "conf",
+                      "instr_avoid_viol", "instr_prefer_miss"}
     assert t["room_stable"] == 0          # one section, one room
     assert t["instr_days"] == 1           # i1 teaches 1 day, excess over 0 = 1
     assert t["evening"] == 0
@@ -68,7 +69,8 @@ def test_local_terms_consistency_with_global():
 def test_norm_obj_weights_and_normalization():
     base = {"idle": 10, "maxrun": 5, "instr_days": 20, "nonadjacent": 3,
             "evening": 2, "instr_idle": 4, "fairness": 8,
-            "room_stable": 4, "free_day": 2, "room_util": 6, "conf": 0}
+            "room_stable": 4, "free_day": 2, "room_util": 6, "conf": 0,
+            "instr_avoid_viol": 0, "instr_prefer_miss": 0}
     cfg = Config(w_idle=15, w_maxrun=10, w_instr_days=10, w_nonadjacent=10,
                  w_evening=10, w_instr_idle=10, w_fairness=10,
                  w_room_stable=10, w_free_day=10, w_room_util=1)

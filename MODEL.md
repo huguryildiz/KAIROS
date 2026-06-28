@@ -49,9 +49,15 @@ A placement that breaks one of these is never even generated, so it cannot occur
   staff instructor — e.g. a faculty seminar). Common examples: a Friday 13:00–14:00
   congregational-prayer hour (everyone), or a Thursday 14:00–16:00 staff seminar
   (full-time only).
-- **Instructor availability** — a block is never placed in any hour slot an instructor marked
-  unavailable; every co-instructor's unavailability applies (a per-instructor blackout, set
-  in the School Settings step). The availability grid is hourly.
+- **Instructor availability (hard — unavailable)** — a block is never placed in any hour slot
+  an instructor marked **unavailable**; every co-instructor's unavailability applies (a
+  per-instructor blackout, set in the School Settings step). The availability grid is hourly.
+- **Instructor avoid (soft)** — hours marked **avoid** incur a soft penalty (`w_instr_avoid`
+  per overlapping hour) but do not block the placement. Applied in both the CP-SAT monolith
+  objective and the repair soft polish.
+- **Instructor preferred (soft miss-penalty)** — for instructors who have declared **preferred**
+  hours, a block not landing in any of those hours incurs a soft miss-penalty (`w_instr_prefer`)
+  per such instructor. Applied in both paths.
 - **Fixed session** — if a section declares a fixed slot, its **first block** is pinned to
   exactly that `(day, start-hour)` (its remaining blocks schedule freely).
 - **Room type** — rooms carry a categorical type (`normal / lab / pc / studio`). When a section
@@ -194,7 +200,11 @@ disabled in the UI (§8.5).
 | — | graduate window | 18:00–21:00 | `grad_start` (tunable); `grad_end=21` fixed — not a settings field (`_HORIZON_END=21` in `settings.py`) |
 | — | blackout slots (universal / full-time-only) | none | `blackout` (School Settings) |
 | — | AM/PM boundary (legacy half-day availability) | 13:00 (hardcoded in `settings.py`) | — (`Config.midday_split_hour` exists but is not read by `build_config`; vestigial field) |
-| — | per-instructor unavailable slots | — | `instr_unavailable` (School Settings) |
+| — | per-instructor unavailable slots (hard) | — | `instr_unavailable` (School Settings) |
+| — | per-instructor avoid slots (soft penalty) | — | `instr_avoid` (School Settings) |
+| — | per-instructor preferred slots (soft miss-penalty) | — | `instr_preferred` / `instr_prefer_ids` (School Settings) |
+| $w_{\text{avoid}}$ | avoid-slot penalty per hour | 3.0 | `w_instr_avoid` |
+| $w_{\text{prefer}}$ | prefer miss-penalty per instructor | 2.0 | `w_instr_prefer` |
 
 ---
 
@@ -458,7 +468,36 @@ $$
 - Virtual rooms (cap = 0) are exempt via the `c.cap > 0` guard.
 - CP-SAT monolith uses integer-scaled form `100 × (cap_r − n_s) // cap_r` (percentage, 0–99); repair `_cand_soft` and the move-based polish (`_global_terms` / `_norm_obj`) use the float fraction directly.
 
-### 5.13 Cohort-conflict — $w_{\text{coh}}=50$
+### 5.13 S-InstrAvoid — $w_{\text{avoid}}=3.0$ (both paths)
+
+$$
+\mathrm{pen}_{\text{avoid}} \;=\; \sum_{b,r,d,h} x_{b,r,d,h} \sum_{i \in I_b} \sum_{h' \in [h, h+\ell_b)} \mathbf{1}[(i,d,h') \in \mathrm{avoid}]
+$$
+
+- Penalizes each instructor-hour that falls in an **avoid** slot. A 2-hour block by an
+  instructor with hour $h$ in avoid contributes `w_instr_avoid` per overlapping hour.
+- Avoid slots do **not** prune candidates — the block can still be placed there at a cost.
+- In the CP-SAT monolith, coefficients are integer-rounded: `int(round(w_instr_avoid))`.
+- In the repair soft polish, tracked as the `instr_avoid_viol` term in `_global_terms` /
+  `_local_terms` / `_norm_obj`.
+
+### 5.14 S-InstrPrefer — $w_{\text{prefer}}=2.0$ (both paths)
+
+$$
+\mathrm{pen}_{\text{prefer}} \;=\; \sum_{b} x_{b,\cdot,d,h}
+  \sum_{\substack{i \in I_b \\ i \in \mathrm{prefer\_ids}}}
+  \mathbf{1}\!\left[\nexists\, h' \in [h,h+\ell_b): (i,d,h') \in \mathrm{preferred}\right]
+$$
+
+- For each instructor who has declared **preferred** hours, penalizes placements where the
+  block does **not** land in any of the instructor's preferred slots (a miss-penalty, not a
+  bonus). Only instructors with at least one preferred slot (`instr_prefer_ids`) contribute,
+  so absent-preference instructors are free.
+- A miss-penalty keeps all costs non-negative (vs. a bonus that could dominate the objective).
+- In the repair soft polish, tracked as the `instr_prefer_miss` term in `_global_terms` /
+  `_local_terms` / `_norm_obj`.
+
+### 5.15 Cohort-conflict — $w_{\text{coh}}=50$
 
 $$
 \mathrm{excess}_{k,d,h} \;\ge\; \Big(\textstyle\sum_{c} \mathrm{busy}_{k,c,d,h}\Big) - 1,
@@ -475,7 +514,7 @@ $$
   incidentally reduces `conf`, it may rise again as long as it stays ≤ the baseline.
 - Reported as `cohort_conflicts`; **never** a `Violation` in `validate`.
 
-### 5.14 Non-adjacent split — $w_{\text{nonadjacent}}$ (CP-SAT monolith only)
+### 5.16 Non-adjacent split — $w_{\text{nonadjacent}}$ (CP-SAT monolith only)
 
 - In the CP-SAT monolith (≤50 sections path) `w_nonadjacent` penalizes a section's split
   blocks sharing the same day — a narrower, block-level meaning distinct from §5.4.
@@ -510,7 +549,8 @@ Both solvers share the same candidate generation and constraints.
 3. **Move-based soft polish** (`soft_search.anneal_soft`) — once placement converges,
    re-seat already-placed blocks to lower the normalized non-guard objective
    (idle / maxrun / instr_days / nonadjacent / evening / instr_idle / fairness /
-   room_stable / free_day) under a `conf` no-regress guard.
+   room_stable / free_day / instr_avoid_viol / instr_prefer_miss) under a `conf`
+   no-regress guard.
    Moves: relocate, chain, swap, consolidate_instr, free_cohort_day. Acceptor: Great Deluge
    (default). Bounded by the `repair_time_limit_s` deadline; the placement count never
    decreases (hard placement guard + accept guard).

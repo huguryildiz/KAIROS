@@ -390,11 +390,9 @@ def _availability(lang: str) -> None:
         if not labels:
             st.caption(t("set_avail_none_instr", lang))
             return
-        avail = st.session_state["availability"]
         s = st.session_state["settings"]
         dl = DAY_LABELS.get(lang, DAY_LABELS["en"])
         rev = st.session_state.get("set_rev", 0)
-        st.caption(t("set_avail_hint", lang))
         st.markdown("<style>.st-key-av_who_wrap{max-width:400px;}</style>", unsafe_allow_html=True)
         with st.container(key="av_who_wrap"):
             selected_label = st.selectbox(t("set_avail_pick", lang), labels, key=f"av_who_{rev}")
@@ -404,54 +402,73 @@ def _availability(lang: str) -> None:
         day_start, day_end = _win(s)
         midday = _MIDDAY
         hours = list(range(day_start, day_end))
-        by_day = _slots_to_hours(avail.get(who, []), day_start, day_end, midday)
-        cur = {(d, h) for d, hs in by_day.items() for h in hs}
-        st.markdown(
-            "<div class='hm-leg'>"
-            f"<span><i class='av'></i>{escape(t('set_avail_free', lang))}</span>"
-            f"<span><i class='bl'></i>{escape(t('set_avail_blocked', lang))}</span>"
-            f"<span>{escape(t('set_avail_count', lang, n=len(cur)))}</span>"
-            "</div>",
-            unsafe_allow_html=True,
-        )
-
-        picked = []
         ncol = len(days) + 1
-        with st.container(key="av_hm"):
-            head = st.columns(ncol)
-            head[0].markdown("<div class='hm-dh'></div>", unsafe_allow_html=True)
-            for i, d in enumerate(days):
-                head[i + 1].markdown(f"<div class='hm-dh'>{escape(dl.get(d, d))}</div>",
-                                     unsafe_allow_html=True)
-            for h in hours:
-                if h == midday and day_start < midday < day_end:
-                    st.markdown("<div class='hm-mid'></div>", unsafe_allow_html=True)
-                row = st.columns(ncol)
-                row[0].markdown(f"<div class='hm-tl'>{h:02d}:00</div>", unsafe_allow_html=True)
+
+        def _tier_grid(state_key, hint_key, count_key, save_msg_key, tab_pfx):
+            avail = st.session_state[state_key]
+            st.caption(t(hint_key, lang))
+            by_day = _slots_to_hours(avail.get(who, []), day_start, day_end, midday)
+            cur = {(d, h) for d, hs in by_day.items() for h in hs}
+            st.markdown(
+                "<div class='hm-leg'>"
+                f"<span><i class='av'></i>{escape(t('set_avail_free', lang))}</span>"
+                f"<span><i class='bl'></i>{escape(t('set_avail_blocked', lang))}</span>"
+                f"<span>{escape(t(count_key, lang, n=len(cur)))}</span>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+            picked = []
+            with st.container(key=f"{tab_pfx}_hm"):
+                head = st.columns(ncol)
+                head[0].markdown("<div class='hm-dh'></div>", unsafe_allow_html=True)
                 for i, d in enumerate(days):
-                    on = row[i + 1].checkbox(
-                        f"{dl.get(d, d)} {h:02d}:00", value=(d, h) in cur,
-                        label_visibility="collapsed", key=f"av_{who}_{d}_{h}_{rev}")
-                    if on:
-                        picked.append([d, h])
-
-        bcols = st.columns([1, 2, 3])
-        if bcols[0].button(t("set_avail_save", lang), type="primary",
-                           icon=":material/check_circle:",
-                           key=f"av_save_{rev}"):
-            if picked:
-                avail[who] = picked
-            else:
+                    head[i + 1].markdown(f"<div class='hm-dh'>{escape(dl.get(d, d))}</div>",
+                                         unsafe_allow_html=True)
+                for h in hours:
+                    if h == midday and day_start < midday < day_end:
+                        st.markdown("<div class='hm-mid'></div>", unsafe_allow_html=True)
+                    row = st.columns(ncol)
+                    row[0].markdown(f"<div class='hm-tl'>{h:02d}:00</div>", unsafe_allow_html=True)
+                    for i, d in enumerate(days):
+                        on = row[i + 1].checkbox(
+                            f"{dl.get(d, d)} {h:02d}:00", value=(d, h) in cur,
+                            label_visibility="collapsed",
+                            key=f"{tab_pfx}_{who}_{d}_{h}_{rev}")
+                        if on:
+                            picked.append([d, h])
+            bcols = st.columns([1, 2, 3])
+            if bcols[0].button(t("set_avail_save", lang), type="primary",
+                               icon=":material/check_circle:",
+                               key=f"{tab_pfx}_save_{rev}"):
+                if picked:
+                    avail[who] = picked
+                else:
+                    avail.pop(who, None)
+                _bump()
+                st.success(t(save_msg_key, lang, who=who))
+                st.rerun()
+            if cur and bcols[1].button(t("set_avail_clear", lang), icon=":material/delete_sweep:",
+                                       key=f"{tab_pfx}_clr_{rev}"):
                 avail.pop(who, None)
-            _bump()
-            st.success(t("set_avail_saved", lang, who=who))
-            st.rerun()
-        if cur and bcols[1].button(t("set_avail_clear", lang), icon=":material/delete_sweep:",
-                                   key=f"av_clr_{rev}"):
-            avail.pop(who, None)
-            _bump()
-            st.rerun()
+                _bump()
+                st.rerun()
 
+        tab_u, tab_av, tab_pr = st.tabs([
+            t("set_avail_tab_unavail", lang),
+            t("set_avail_tab_avoid", lang),
+            t("set_avail_tab_prefer", lang),
+        ])
+        with tab_u:
+            _tier_grid("availability", "set_avail_hint", "set_avail_count",
+                       "set_avail_saved", "av_u")
+        with tab_av:
+            _tier_grid("availability_avoid", "set_avail_hint_avoid", "set_avail_count_avoid",
+                       "set_avail_saved_avoid", "av_a")
+        with tab_pr:
+            _tier_grid("availability_prefer", "set_avail_hint_prefer", "set_avail_count_prefer",
+                       "set_avail_saved_prefer", "av_p")
+
+        avail = st.session_state["availability"]
         restricted = {k: v for k, v in avail.items() if v}
         if restricted:
             st.caption(t("set_avail_summary", lang, n=len(restricted)))
@@ -489,18 +506,23 @@ def _profile(lang: str) -> None:
     with st.expander(t("set_profile_header", lang), icon=":material/badge:"):
         s = st.session_state["settings"]
         a = st.session_state["availability"]
-        st.download_button(t("set_profile_download", lang), data=profile_to_json(s, a),
+        a_av = st.session_state.get("availability_avoid", {})
+        a_pr = st.session_state.get("availability_prefer", {})
+        st.download_button(t("set_profile_download", lang),
+                           data=profile_to_json(s, a, a_av, a_pr),
                            file_name="kairos_school_profile.json", mime="application/json",
                            key="prof_dl")
         up = st.file_uploader(t("set_profile_upload", lang), type=["json"], key="prof_up")
         if up is not None:
             try:
-                new_s, new_a = profile_from_json(up.getvalue().decode("utf-8"))
+                new_s, new_a, new_av, new_pr = profile_from_json(up.getvalue().decode("utf-8"))
             except Exception:
                 st.error(t("set_profile_error", lang))
             else:
                 st.session_state["settings"] = new_s
                 st.session_state["availability"] = new_a
+                st.session_state["availability_avoid"] = new_av
+                st.session_state["availability_prefer"] = new_pr
                 _bump()
                 st.success(t("set_profile_loaded", lang))
                 st.rerun()

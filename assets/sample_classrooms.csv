@@ -18,7 +18,7 @@ B146,25,normal,
 B148,28,normal,
 B150,25,normal,
 B152,25,normal,
-B252-PSY-L,22,lab,Department of Psychology
+B252-PSY-L,22,lab,Department of Psychology;Graduate School
 B346,25,normal,
 B350,25,normal,
 B352,25,normal,
@@ -29,7 +29,7 @@ D026,80,normal,
 D028,80,normal,
 D030,80,normal,
 D032,82,normal,
-D126-EF-L,40,lab,Department of Educational Sciences;Management in Educational Institutions;Mathematics Education;Primary Education
+D126-EF-L,40,lab,Department of Educational Sciences;Management in Educational Institutions;Mathematics Education;Primary Education;Graduate School
 D128-MTF,71,normal,
 D130-MTF,80,normal,
 D226-Y,60,normal,
@@ -46,8 +46,8 @@ E310-MTF,100,normal,
 E312-MTF,100,normal,
 E314-MTF,100,normal,
 F104-PSCG-L,20,lab,Guidance and Psychological Counselling;Department of Educational Sciences
-F106-PSCG-L,20,lab,Guidance and Psychological Counselling;Department of Educational Sciences
-F112-PSCG-L,20,lab,Guidance and Psychological Counselling;Department of Educational Sciences
+F106-PSCG-L,20,lab,Guidance and Psychological Counselling;Department of Educational Sciences;Graduate School
+F112-PSCG-L,20,lab,Guidance and Psychological Counselling;Department of Educational Sciences;Graduate School
 F114-PSCG-L,20,lab,Guidance and Psychological Counselling;Department of Educational Sciences
 F115,27,normal,
 F117,27,normal,
@@ -91,7 +91,7 @@ G310-MTF,60,normal,
 GB05,42,normal,
 GB07-PC-L,80,pc,
 GB10-PECE-L,45,lab,Early Childhood Education
-GB13-PC-L,80,pc,Department of Software Engineering;Dept.of Electric&Electronics Engineering
+GB13-PC-L,80,pc,Department of Software Engineering;Dept.of Electric&Electronics Engineering;Faculty of Econ. and Administ. Sciences
 H007/009-PC,80,pc,
 H203-MTF,40,normal,
 H205-MTF,40,normal,
@@ -102,7 +102,7 @@ K084,96,normal,
 K085,96,normal,
 K183,75,normal,
 K184,75,normal,
-ARCH-STD1,60,studio,
-ARCH-STD2,60,studio,
-INT-STD1,45,studio,
-DES-STD1,35,studio,
+ARCH-STD1,60,studio,Department of Architecture
+ARCH-STD2,60,studio,Department of Architecture
+INT-STD1,45,studio,Dept. of Interior Arch. and Env. Design
+DES-STD1,35,studio,Department of Industrial Design;Dept. of Visual Communication Design

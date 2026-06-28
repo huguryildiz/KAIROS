@@ -1,6 +1,6 @@
 # KAIROS — Input Data Schema
 
-The two tables a user provides to the Kairos timetabling UI, and how the solver
+The two tables a user provides to the KAIROS timetabling UI, and how the solver
 derives everything else from them. This is the **input contract**: the importer
 (`csv_import.py`), the section/room builders (`ui_input.py`), and the data
 classes (`model.py`) all conform to it. The optimization model itself is

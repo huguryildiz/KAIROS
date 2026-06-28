@@ -27,15 +27,15 @@
 
 ## Overview
 
-**Kairos** turns a university's raw course and room data into coherent **day + time + room** assignments — a weekly timetable whose placed blocks are provably free of resource conflicts under one consistent rule set.
+**KAIROS** turns a university's raw course and room data into coherent **day + time + room** assignments — a weekly timetable whose placed blocks are provably free of resource conflicts under one consistent rule set.
 
-Section, instructor, size, and the T–P–L hour split are **fixed inputs**. The engine reasons over the only two degrees of freedom that matter — **time and room** — and never produces an illegal placement: a room is never double-booked, an instructor is never in two places at once, capacity is never exceeded, and every undergraduate block lands inside the teaching window.
+Section, instructor, size, and the T–P–L (Theory–Practice–Lab) hour split are **fixed inputs**. The engine reasons over the only two degrees of freedom that matter — **time and room** — and never produces an illegal placement: a room is never double-booked, an instructor is never in two places at once, capacity is never exceeded, and every undergraduate block lands inside the teaching window.
 
 It runs two ways: a **command-line solver** for batch runs and benchmarking, and a **bilingual web app** (Streamlit) where a non-technical user uploads a course list, edits classrooms, presses **Solve**, and reads the result on a Mon–Fri grid. The optimization core is OR-Tools **CP-SAT**; the math, rules, and design rationale are documented in [`MODEL.md`](MODEL.md).
 
 ---
 
-## Why Kairos
+## Why KAIROS
 
 Hand-building a university timetable means juggling hundreds of sections against a handful of rooms, dozens of instructors, and a tangle of rules — and a single missed clash propagates into the term. The hard part isn't *drawing* the grid; it's guaranteeing nothing collides.
 
@@ -44,7 +44,7 @@ Hand-building a university timetable means juggling hundreds of sections against
 - **Independently verified.** A validator re-derives the core hard-resource violations from the final assignment list, decoupled from the solver, so an encoding bug in those rules cannot pass silently.
 - **Honest about its limits.** Placement and any residual tail are reported with the numbers, not hidden — and the scaling study shows exactly where a single solve stops being practical.
 - **Two front doors.** A scriptable CLI for operators and a zero-friction web app for everyone else, sharing one solve path.
-- **Privacy-first deployment.** No PII in the image; runs IAM-gated on the institution's own EU cloud, scale-to-zero.
+- **Privacy-first deployment.** No PII (Personally Identifiable Information — instructor names, e-mails, staff IDs) in the image; `.dockerignore` keeps `data/` out of the container so sensitive institutional CSVs are never baked in. Course and classroom data are supplied by the user at runtime. Runs IAM-gated on the institution's own EU cloud, scale-to-zero.
 
 ---
 
@@ -157,7 +157,7 @@ The pipeline is a chain of small, single-purpose modules. A course list becomes 
 | --- | --- |
 | Solver core | OR-Tools **CP-SAT** (pure Python) |
 | Data pipeline | pandas · dataclasses · `src/timetabling/` |
-| Full-period solver | Warm-started small-neighbourhood **repair** (`repair.py`) |
+| Full-period solver | Warm-started small-neighbourhood **repair** + **great deluge** soft polish (`repair.py`, `soft_search.py`) |
 | Validation | Solver-independent re-derivation (`validate.py`) |
 | Web app | **Streamlit** ≥ 1.40 — one container, no separate frontend build |
 | i18n / theming | Bilingual TR/EN · light/dark CSS design tokens |
@@ -324,7 +324,7 @@ ECON 101,Principles of Economics,Faculty of Econ.,ECON 101_01,John Smith,john.sm
 
 ## Deployment
 
-Kairos ships as a single Docker image — Streamlit and OR-Tools CP-SAT — on **Google Cloud Run**, in the institution's own GCP project, **`europe-west1`**, **scale-to-zero**. Access is locked to named Google accounts via IAM; the live service is mapped to `kairos.huguryildiz.com`. No PII enters the image — `.dockerignore` keeps `data/` out; classroom and course data are supplied by the user at runtime.
+KAIROS ships as a single Docker image — Streamlit and OR-Tools CP-SAT — on **Google Cloud Run**, in the institution's own GCP project, **`europe-west1`**, **scale-to-zero**. Access is locked to named Google accounts via IAM; the live service is mapped to `kairos.huguryildiz.com`. No PII enters the image — `.dockerignore` keeps `data/` out; classroom and course data are supplied by the user at runtime.
 
 **Continuous deploy.** Every push to `main` triggers [`cloudbuild.yaml`](cloudbuild.yaml), which deploys the `kairos` service to `europe-west1` with the resources below. To deploy by hand (same flags, so manual and CI stay in sync):
 
@@ -360,6 +360,6 @@ gcloud run services proxy kairos --region europe-west1 --port 8080   # then open
 ---
 
 <p align="center">
-  <strong>Kairos</strong> · Course Timetabling<br>
+  <strong>KAIROS</strong> · Course Timetabling<br>
   <sub>🗓️ Every section, placed on a conflict-free weekly grid.</sub>
 </p>

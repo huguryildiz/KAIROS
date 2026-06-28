@@ -80,7 +80,7 @@ A placement that breaks one of these is never even generated, so it cannot occur
 
 Listed by default weight magnitude where that comparison is meaningful; weights live in
 `config.py`, but `settings.build_config()` may zero or remap some UI-controlled terms at solve
-time. The CP-SAT monolith (§7a) and the repair soft polish (§7b) use separate objectives — see
+time. The CP-SAT monolith (§6a) and the repair soft polish (§6b) use separate objectives — see
 §5 for which terms belong to which path.
 
 - **Cohort course-conflict** (`w_cohort_conflict=50`) — penalize each extra distinct course a
@@ -129,8 +129,8 @@ included in the UI; there is no graduate on/off checkbox. Optional course-list c
 (`Year`, `Part-time`, `Room Type`, `Fixed`) override the string-derived cohort / part-time /
 room demand / pin. Unconfigured settings reproduce the UI defaults documented here exactly.
 The pure profile JSON functions remain in `settings.py`, but the profile expander is currently
-disabled in the UI (§9.5).
-**§9 is the exhaustive control-by-control list of what the UI exposes.**
+disabled in the UI (§8.5).
+**§8 is the exhaustive control-by-control list of what the UI exposes.**
 
 ---
 
@@ -285,7 +285,7 @@ $$
 
 ## 5. Soft objective
 
-The CP-SAT monolith (§7a) and the repair soft polish (§7b) minimize different weighted-sum
+The CP-SAT monolith (§6a) and the repair soft polish (§6b) minimize different weighted-sum
 objectives. Weights live in `config.py`. The two paths share the weight fields
 `w_instr_days` / `w_parttime_days` (but with different semantics — see §5.1). The repair
 polish has terms absent from the monolith (`w_idle`, `w_maxrun`, `w_room_stable`,
@@ -389,7 +389,9 @@ $$
 - A *soft* proxy: $(\text{dept},\text{year})$ over-counts conflict because students split
   across electives, so a hard rule was infeasible. High weight (50) but not prohibitive.
 - In the CP-SAT monolith this enters the objective directly; in the repair solver it is a
-  **no-regress guard** (`conf`): soft-polish moves are rejected if `conf` would increase.
+  **no-regress guard** (`conf`): soft-polish moves are rejected if `conf` would exceed the
+  polish-start baseline (`base["conf"]`), not the running current value — so if polish
+  incidentally reduces `conf`, it may rise again as long as it stays ≤ the baseline.
 - Reported as `cohort_conflicts`; **never** a `Violation` in `validate`.
 
 ### 5.9 Non-adjacent split — $w_{\text{nonadj}}=0$ (disabled)
@@ -399,7 +401,7 @@ $$
 
 ---
 
-## 7. Solution methods
+## 6. Solution methods
 
 Both solvers share the same candidate generation and constraints.
 
@@ -429,43 +431,6 @@ Both solvers share the same candidate generation and constraints.
    Moves: relocate, chain, swap, consolidate_instr, free_cohort_day. Acceptor: Great Deluge
    (default). Bounded by the `repair_time_limit_s` deadline; the placement count never
    decreases (hard placement guard + accept guard).
-
-**Repair solver — top-level flow**
-
-```mermaid
-flowchart TD
-    A([Start]) --> B[gen_candidates\nfor every block]
-    B --> C[Sort all blocks\nfewest candidates first\nthen largest section]
-    C --> D[Greedy construction\nplace each block in lowest\nsoft-score feasible candidate]
-    D --> E{Unplaced\nblocks?}
-    E -- No --> P
-    E -- Yes --> F[Sort unplaced\nby candidate count]
-    F --> G[Next batch of 30\nunplaced blocks]
-    G --> H[repair_round\nsee detail below]
-    H --> I{More\nbatches?}
-    I -- Yes --> G
-    I -- No --> J{gained > 0\nAND sweep < 25?}
-    J -- Yes --> E
-    J -- No --> P[Soft polish\nanneal_soft · deluge\nidle/maxrun/instr_days/room_stable/free_day]
-    P --> R([Done\nassignments + stats])
-```
-
-**repair\_round — neighbourhood sub-solver**
-
-```mermaid
-flowchart TD
-    A([batch: unplaced blocks]) --> B[competitors\nroom / instructor / section conflicts\nup to MAX_FREE=240 total]
-    B --> C[Build mini CP-SAT model\nsoft H1: placed OR unplaced var\nH2 room · H3 instr · H_self · H_day]
-    C --> D[Add warm-start hints\ncurrent placement → hint=1\nunplaced → hint=1 on unplaced var]
-    D --> E[Solve\n12 s · 8 workers]
-    E --> F{OPTIMAL or\nFEASIBLE?}
-    F -- No --> Z([return 0])
-    F -- Yes --> G{new_placed\n≥ old_placed?}
-    G -- No → accept guard --> Z
-    G -- Yes --> H[Release free set\nfrom state]
-    H --> I[Occupy new assignments\ninto state]
-    I --> J([return gained])
-```
 
 **Pseudocode — `solve_repair`**
 
@@ -523,7 +488,9 @@ solve_repair(sections, rooms, cfg, progress_cb=None):
 
   # ── Phase 4: move-based soft polish ───────────────────────────────────────
   IF cfg.soft_polish_in_repair:
-      budget = min(SOFT_POLISH_BUDGET_S, max(30.0, 0.75 × |placed|), remaining_deadline)
+      budget = min(cfg.soft_polish_budget_s, max(30.0, 0.75 × |placed|), remaining_deadline)
+      # cfg.soft_polish_budget_s = 300 s (balanced) / 180 s (fast) / 600 s (best) via settings.build_config;
+      # the module constant SOFT_POLISH_BUDGET_S=600 in repair.py is a getattr fallback only.
       # anneal_soft: deluge acceptor; moves = relocate / chain / swap /
       #              consolidate_instr / free_cohort_day
       # objective: normalized(idle + maxrun + instr_days + room_stable + free_day)
@@ -608,7 +575,7 @@ repair_round(state, batch, cand_by_block, tl=12s):
 
 ---
 
-## 8. Validation (independent)
+## 7. Validation (independent)
 
 `validate.py` re-derives the core hard-resource violations directly from the assignment list,
 importing no solver internals, so model/encoding bugs in those checked rules cannot pass
@@ -619,34 +586,19 @@ availability), H_self, and **split_day** (theory different-day). Cohort conflict
 metric**, not a `Violation` — reported in `mode_b_<period>.json` / `unmet_soft`, never failing
 validation.
 
-### 8.1 Independent verification run (2026-06-23)
+### 7.1 Independent verification run (2026-06-23)
 
 Running `validate.py` over the preserved full-roster benchmark (`out/benchmark_real.json`)
 returns **0 genuine resource conflicts** on both sample datasets. The remaining validator
 violations are `placement` violations for the reported unplaced tail:
 
-| | Fall (`001`) | Spring (`002`) |
-| --- | --- | --- |
-| placed blocks | 1924 / 1981 (97.1 %) | 1863 / 2011 (92.6 %) |
-| placement violations (unplaced tail) | 57 | 148 |
-| capacity · lab_room · room_type | 0 · 0 · 0 | 0 · 0 · 0 |
-| fixed · window · blackout | 0 · 0 · 0 | 0 · 0 · 0 |
-| instructor_unavailable | 0 | 0 |
-| room · instructor · self (no-overlap) | 0 · 0 · 0 | 0 · 0 · 0 |
-| split_day | 0 | 0 |
-| **genuine resource conflicts** | **0** | **0** |
-| soft (minimized): idle / maxrun / room_stable | 128 / 1079 / 517 | 107 / 1105 / 484 |
-| soft: instr_days / free_day / conf | 0 / 0 / 229 | 0 / 0 / 230 |
-
-`instr_days = 0` and `free_day = 0` because their UI controls are off by default (No target /
-no year scope, §5.1 / §5.5); `conf` is the **soft** cohort-conflict proxy (§5.8), not a hard
-violation. `repair` is not solver-free: after greedy construction, each `repair_round` builds a
-mini CP-SAT model over a bounded neighbourhood (§7b). Those rounds may leave a block unplaced
+`repair` is not solver-free: after greedy construction, each `repair_round` builds a
+mini CP-SAT model over a bounded neighbourhood (§6b). Those rounds may leave a block unplaced
 under a time budget, but they do not introduce illegal resource placements.
 
 ---
 
-## 9. UI-adjustable parameters (School Settings)
+## 8. UI-adjustable parameters (School Settings)
 
 Everything in §§2–6 is a `Config` default tuned to our own institution. The UI's **Step 2 —
 School Settings** (`views/settings.py`) lets another school override a curated subset *without
@@ -657,7 +609,7 @@ a `Config` at solve time. The mapping is **backward-compatible by construction**
 UI-default behavior documented above. `build_config` **never raises**:
 every bad field falls back to its default and the solve proceeds.
 
-### 9.1 Policy & block structure (the "Policy" expander)
+### 8.1 Policy & block structure (the "Policy" expander)
 
 | UI control | Range | `Config` field | Effect |
 |---|---|---|---|
@@ -675,7 +627,7 @@ The day window is guarded (`0 ≤ day_start < day_end ≤ 21`); out-of-order val
 revert to `9 / 18`. The AM/PM boundary for legacy half-day availability is no longer a
 user-facing control — it is fixed at 13:00.
 
-### 9.2 Preference weights (low / medium / high presets)
+### 8.2 Preference weights (low / medium / high presets)
 
 Schools pick a **plain-language level**, never a raw number. Presets: `UI_REF=20.0` ×
 `WEIGHT_LEVELS` → low=5.0, medium=10.0, high=20.0 (uniform across all dials).
@@ -688,22 +640,38 @@ Schools pick a **plain-language level**, never a raw number. Presets: `UI_REF=20
 
 `free_day` (§5.5) has a fixed `Config` weight of 10.0 and is not exposed as a dial — only its
 year scope (multiselect) is configurable. With no selected years it is inert. `w_cohort_gap=10.0`
-is fixed at medium and not exposed.
+is not exposed as a dial — `settings.build_config` reads it via the preset fallback
+(`_preset(weights, "cohort_gap")`), but since no UI control writes "cohort_gap" into the
+weights dict it always resolves to the medium preset (10.0).
 
 ¹ Only active when `instr_days_target` is set. With "No target", `build_config()` forces
 `w_instr_days = 0.0` and `w_parttime_days = 0.0`; when active,
 `w_parttime_days = w_instr_days + 4.0`.
 
-### 9.3 Blackouts (add/remove list)
+### 8.3 Solve quality (Fast / Balanced / Best)
+
+A segmented button in the Settings step that controls how long `anneal_soft` (§6b) runs after
+placement converges. Stored as `"quality_mode"` in the Settings dict;
+`settings.quality_seconds(mode)` maps it to `cfg.soft_polish_budget_s` inside `build_config`.
+
+| Mode | `soft_polish_budget_s` | Notes |
+| --- | --- | --- |
+| Fast | 180 s | Quick polish; useful when iterating on settings. |
+| Balanced | 300 s **(default)** | Recommended for most schools. |
+| Best | 600 s | Longest polish; best room-stability and anti-fatigue results. |
+
+The actual polish time is `min(soft_polish_budget_s, max(30, 0.75 × placed_count), remaining_deadline)` — see §6b pseudocode. Hard constraints are never affected; only soft-objective metrics (idle, maxrun, room_stable, free_day) can improve.
+
+### 8.4 Blackouts (add/remove list)
 
 Each row is `[day, hour, staff_only]` → a `Config.blackout` triple. `staff_only = false` → a
 **universal** blackout (closed for everyone); `staff_only = true` → a **full-time-only**
 blackout (closed only when a section has a full-time staff instructor — e.g. a faculty seminar).
-**Empty by default** (no blackout slots). The *lunch break* toggle (§9.1) adds its own universal
+**Empty by default** (no blackout slots). The *lunch break* toggle (§8.1) adds its own universal
 slots over `[lunch_start, lunch_end)` for every active day. All are enforced by candidate
 pruning (§3).
 
-### 9.4 Instructor availability (the "Availability" expander)
+### 8.5 Instructor availability (the "Availability" expander)
 
 Per-instructor (keyed by the **email-or-name identity** from the uploaded course list — email
 when present, else the normalized display name) a **per-hour grid** (one checkbox per teaching
@@ -714,7 +682,7 @@ closed over the block's span (hard, §3). Legacy half-day codes (`AM = [day_star
 `PM = [13, 21)`) are still decoded on load so older saved data keeps working; the AM/PM boundary
 is fixed at 13:00.
 
-### 9.5 School profile (the "Profile" expander) — *currently disabled in the UI*
+### 8.6 School profile (the "Profile" expander) — *currently disabled in the UI*
 
 The profile import/export (`profile_to_json` / `profile_from_json`, `views/settings._profile`)
 would download the current Settings + availability as `kairos_school_profile.json` and restore
@@ -723,7 +691,7 @@ partial or older file stays safe). The render call is **commented out** for now 
 JSON upload can crash the parser — so the expander is not shown; the pure functions remain for
 when the upload path validates the schema defensively.
 
-### 9.6 Adjacent but *not* in the Settings step
+### 8.7 Adjacent but *not* in the Settings step
 
 - **Solve budget** (`solve_time_limit_s` / `repair_time_limit_s`) comes from the **Solve** step,
   not Settings; it is the `solve_seconds` argument to `build_config`.
@@ -733,5 +701,5 @@ when the upload path validates the schema defensively.
 - **Fixed at `config.py` defaults — deliberately not exposed:** the cohort-conflict weight
   (`w_cohort_conflict=50`, §5.8), the always-on idle weight (`w_idle=15.0`, §5.2),
   cohort-compactness (`w_cohort_gap=10.0`, §5.2), level-ordering (`w_order`, §5.6),
-  Engineering-lab preference (`w_englab`, §5.7), and the repair soft-shaping toggle (§7b).
+  Engineering-lab preference (`w_englab`, §5.7), and the repair soft-shaping toggle (§6b).
   These are calibrated globals, not per-school policy.

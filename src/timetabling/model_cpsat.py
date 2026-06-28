@@ -98,7 +98,7 @@ def gen_candidates(block: Block, section: Section, instructors: List[Instructor]
                 if unavail and any((iid, d, hh) in unavail
                                    for iid in sec_iids for hh in span):
                     continue
-                cands.append(Candidate(block.block_id, r.room, d, h, block.length))
+                cands.append(Candidate(block.block_id, r.room, d, h, block.length, r.cap))
     return cands
 
 
@@ -114,6 +114,7 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
     default_instr = Instructor("", "", False, "")
     order_terms = []
     englab_terms = []
+    room_util_terms = []
     sbd = defaultdict(list)  # (section_id, block_id, day) -> vars (multi-block sections)
 
     room_occ = defaultdict(list)          # (room, day, hour) -> vars
@@ -154,6 +155,10 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
             if (cfg.eng_department_match in s.department and b.needs_lab
                     and c.day not in cfg.eng_lab_days):
                 englab_terms.append(cfg.w_englab * v)
+            if cfg.w_room_util and not s.is_virtual:
+                waste = c.cap - s.students
+                if waste > 0:
+                    room_util_terms.append(cfg.w_room_util * waste * v)
             if len(s.blocks) >= 2:
                 sbd[(s.section_id, b.block_id, c.day)].append(v)
             for hh in range(c.start, c.start + c.length):
@@ -252,6 +257,7 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
     obj += englab_terms
     obj += [cfg.w_nonadjacent * t for t in nonadj_terms]
     obj += [cfg.w_cohort_conflict * t for t in cohort_conflict_terms]
+    obj += room_util_terms
     if obj:
         model.Minimize(sum(obj))
 

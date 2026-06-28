@@ -31,7 +31,7 @@ It runs two ways: a **web app** for non-technical users and a **command-line sol
 ## What it does
 
 - **Conflict-free by construction.** Placement-legality rules are enforced during candidate generation, while cross-block resource conflicts are enforced in the solver; room capacity, lab pinning, time-window, blackout, room-overlap, and instructor-overlap violations cannot appear in the output.
-- **Optimized, not just valid.** After placement, a soft polish phase minimizes idle gaps, compacts instructor days, reduces late-hour load, and keeps each section in a stable room — all tunable from the UI. The solver also prefers right-sized rooms: assigning a small class to a very large auditorium is penalized by the waste *fraction* `(cap − students) / cap`, so the nudge is room-size-independent rather than proportional to raw seat count. Hard capacity is never relaxed.
+- **Optimized, not just valid.** After placement, a soft polish phase minimizes idle gaps, compacts instructor days, reduces late-hour load, keeps each section in a stable room, can honor per-section minimum-day targets, can optionally coordinate parallel sections by course code, and penalizes user-defined avoid-conflict course pairs (courses that should not overlap). The solver also prefers right-sized rooms: assigning a small class to a very large auditorium is penalized by the waste *fraction* `(cap − students) / cap`, so the nudge is room-size-independent rather than proportional to raw seat count. Hard capacity is never relaxed.
 - **Graded instructor time preferences.** The availability editor supports four tiers per instructor: **unavailable** (hard — never placed in that slot), **avoid** (soft penalty per overlapping hour), **preferred** (soft miss-penalty when a block misses all preferred hours), and **neutral** (default, no cost). Active in both the CP-SAT monolith and the repair soft polish.
 - **Works with what you have.** A course list and a classroom inventory are the only required inputs. Cohorts, teaching blocks, and instructor identities are derived automatically.
 - **Verified independently.** A validator re-checks every core constraint from the raw assignment list, decoupled from the solver, so an encoding bug cannot pass silently.
@@ -96,6 +96,31 @@ gcloud run deploy kairos --source . --region europe-west1 \
 ```
 
 > Keep `--memory 8Gi`. A CP-SAT solve needs at least 4 GiB; the Cloud Run default of 512 MiB kills the container mid-solve.
+
+Optional result archiving can be enabled with Cloud Storage. Create a regional bucket in
+`europe-west1`, grant the Cloud Run service account permission to create and list objects
+(for example, object creator + object viewer on the bucket, or a custom role with
+`storage.objects.create` and `storage.objects.list`), and set:
+
+```bash
+gcloud run services update kairos --region europe-west1 \
+  --set-env-vars KAIROS_GCS_BUCKET=<bucket>,KAIROS_GCS_PREFIX=schedule-outputs
+```
+
+When configured, each solve still writes local `out/` files and also uploads the generated
+JSON/CSV schedule outputs to `gs://<bucket>/<prefix>/`.
+
+---
+
+## Roadmap
+
+High-value improvements that need richer input data:
+
+- **Weighted conflict graph.** Replace the current cohort proxy with enrollment-based conflict weights between course pairs.
+- **Separate optimization profiles.** Split the objective into student-focused and instructor-focused components, with balanced presets in the UI.
+- **Building and room transition cost.** Penalize back-to-back moves across distant buildings using room-to-building metadata.
+- **Minimum perturbation.** Prefer schedules close to an uploaded reference timetable for update and rescheduling scenarios.
+- **Course relationship rules.** Support user-defined pairwise rules such as before/after, same day, different day, same room, or consecutive slots.
 
 ---
 

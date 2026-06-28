@@ -27,6 +27,8 @@ def test_default_settings_build_config_matches_today():
     assert cfg.w_evening == 0
     assert cfg.w_instr_idle == 0
     assert cfg.w_fairness == 0
+    assert cfg.parallel_policies == ()
+    assert cfg.w_parallel_coord == 10.0
     assert cfg.solve_time_limit_s == 3000.0
     assert cfg.repair_time_limit_s == 3000.0
     assert cfg.soft_polish_budget_s == 300.0
@@ -143,6 +145,20 @@ def test_build_config_avoid_prefer():
     assert ("dr@x", "We", 10) in cfg.instr_preferred
     assert "dr@x" in cfg.instr_prefer_ids
     assert ("dr@x", "Mo", 9) not in cfg.instr_preferred
+
+
+def test_build_config_parallel_policies_sanitizes_rows():
+    s = dict(DEFAULT_SETTINGS, parallel_policies=[
+        ["X 101", "same time"],
+        ["Y 101", "spread"],
+        ["Z 101", "bogus"],
+        ["", "lab-after-theory"],
+    ])
+    cfg = build_config(s, {}, 60.0)
+    assert cfg.parallel_policies == (
+        ("X 101", "same-time"),
+        ("Y 101", "spread"),
+    )
 
 
 # --- Block 8: profile JSON --------------------------------------------------

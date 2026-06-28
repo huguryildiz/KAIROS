@@ -82,3 +82,8 @@ def test_legacy_5level_profile_migrates_to_three():
 def test_settings_view_exposes_optional_soft_knobs():
     from views.settings import _OPTIONAL_WEIGHT_KNOBS
     assert _OPTIONAL_WEIGHT_KNOBS == ("maxrun", "instr_days", "room_stable", "evening", "instr_idle", "fairness", "nonadjacent")
+
+
+def test_settings_view_exposes_parallel_policy_options():
+    from views.settings import _PARALLEL_POLICIES
+    assert _PARALLEL_POLICIES == ("same-time", "spread", "lab-after-theory")

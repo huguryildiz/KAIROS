@@ -117,6 +117,7 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
     room_util_terms = []
     avoid_terms = []
     prefer_miss_terms = []
+    code_day_hour_vars = defaultdict(list)  # (code, day, hour) -> vars (for avoid_pairs)
     sbd = defaultdict(list)  # (section_id, block_id, day) -> vars (multi-block sections)
 
     room_occ = defaultdict(list)          # (room, day, hour) -> vars
@@ -125,9 +126,11 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
     cohort_hour_occ = defaultdict(list)   # (cohort, day, hour) -> vars (compact cohorts only)
     section_occ = defaultdict(list)       # (section_id, day, hour) -> vars
     instr_day_vars = defaultdict(list)            # (instr_id, day) -> vars
+    section_day_vars = defaultdict(list)           # (section_id, day) -> vars
 
     compact_years = {str(y) for y in cfg.compact_cohort_years}
     virtual_names = {r.room for r in rooms if r.is_virtual}
+    _avoid_pair_codes = {code for pair in cfg.avoid_pairs for code in pair}
 
     for b, s in blocks:
         ins_list = _instructors_of(s, instructors)
@@ -161,6 +164,9 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
                 waste = c.cap - s.students
                 if waste > 0:
                     room_util_terms.append(cfg.w_room_util * (100 * waste // c.cap) * v)
+            if s.code in _avoid_pair_codes:
+                for hh in range(c.start, c.start + c.length):
+                    code_day_hour_vars[(s.code, c.day, hh)].append(v)
             for iid in s.instructor_ids:
                 if cfg.instr_avoid:
                     for hh in range(c.start, c.start + c.length):
@@ -183,6 +189,8 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
                 section_occ[(s.section_id, c.day, hh)].append(v)
             for iid in s.instructor_ids:
                 instr_day_vars[(iid, c.day)].append(v)
+            if s.min_working_days > 0:
+                section_day_vars[(s.section_id, c.day)].append(v)
         model.AddExactlyOne(bvars)   # H1
 
     # H2/H3/H_self: at most one occupant per resource-slot
@@ -263,6 +271,21 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
         ins = instructors.get(iid, default_instr)
         w = cfg.w_instr_days if ins.is_staff else cfg.w_parttime_days
         obj.append(w * d)
+    section_day = {}
+    for (sid, day), vs in section_day_vars.items():
+        d = model.NewBoolVar(f"sday|{sid}|{day}")
+        model.AddMaxEquality(d, vs)
+        section_day[(sid, day)] = d
+    for s in sections:
+        if s.min_working_days <= 0:
+            continue
+        days = [section_day[(s.section_id, day)]
+                for day in cfg.days() if (s.section_id, day) in section_day]
+        if not days:
+            continue
+        missing = model.NewIntVar(0, s.min_working_days, f"minwd|{s.section_id}")
+        model.Add(missing >= s.min_working_days - sum(days))
+        obj.append(cfg.w_min_working_days * missing)
     obj += [cfg.w_cohort_gap * g for g in gap_terms]
     obj += order_terms
     obj += englab_terms
@@ -271,6 +294,27 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
     obj += room_util_terms
     obj += avoid_terms
     obj += prefer_miss_terms
+    if cfg.avoid_pairs and cfg.w_avoid_pairs:
+        code_busy = {}
+        for (code, day, hh), vs in code_day_hour_vars.items():
+            b_var = model.NewBoolVar(f"cbusy|{code}|{day}|{hh}")
+            model.AddMaxEquality(b_var, vs)
+            code_busy[(code, day, hh)] = b_var
+        for pair in cfg.avoid_pairs:
+            cl = list(pair)
+            if len(cl) != 2:
+                continue
+            ca, cb = cl[0], cl[1]
+            for (code, day, hh) in list(code_day_hour_vars):
+                if code != ca:
+                    continue
+                ba = code_busy.get((ca, day, hh))
+                bb = code_busy.get((cb, day, hh))
+                if ba is None or bb is None:
+                    continue
+                overlap = model.NewBoolVar(f"avp|{ca}|{cb}|{day}|{hh}")
+                model.Add(overlap >= ba + bb - 1)
+                obj.append(int(round(cfg.w_avoid_pairs)) * overlap)
     if obj:
         model.Minimize(sum(obj))
 

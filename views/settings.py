@@ -12,10 +12,12 @@ from timetabling.i18n import t, DAY_LABELS, DAY_LABELS_FULL
 from timetabling.settings import (profile_to_json, profile_from_json, _LEGACY_LEVEL,
                                   QUALITY_MODES)
 from timetabling.ui_input import normalize_name, grad_dept_codes
+from timetabling.config import PARALLEL_POLICIES
 
 _LEVELS = ("low", "medium", "high")
 _OPTIONAL_LEVELS = ("off", "low", "medium", "high")
 _QUALITY_LEVELS = ("fast", "balanced", "best")
+_PARALLEL_POLICIES = PARALLEL_POLICIES
 _MIDDAY = 13  # hardcoded AM/PM boundary; no longer a user-facing setting
 _WEIGHT_KNOBS = ()
 _OPTIONAL_WEIGHT_KNOBS = ("maxrun", "instr_days", "room_stable", "evening", "instr_idle", "fairness", "nonadjacent")
@@ -115,6 +117,8 @@ def render(lang: str) -> None:
     s = st.session_state["settings"]
     _policy(lang, s)
     _availability(lang)
+    _avoid_pairs(lang, s)
+    _parallel_policies(lang, s)
     # School-profile import/export is disabled: an out-of-spec JSON upload can crash
     # profile_from_json, and the feature has no clear use yet. Re-enable once the
     # upload path validates the schema defensively. Keep _profile() for that.
@@ -122,126 +126,125 @@ def render(lang: str) -> None:
 
 
 def _policy(lang: str, s: dict) -> None:
-    with st.expander(t("set_policy_header", lang), expanded=True, icon=":material/tune:"):
-        st.caption(t("set_policy_desc", lang))
-        # Cap the hour dropdowns to the stepper width; responsive (shrinks on
-        # narrow viewports, never overflows — see CLAUDE.md mobile-portrait rule).
-        st.markdown(
-            "<style>.st-key-set_day_start,.st-key-set_day_end,"
-            ".st-key-set_grad_start{max-width:260px;}</style>",
-            unsafe_allow_html=True,
-        )
-        # Graduate courses are always scheduled; grad_start sits beside the undergrad
-        # end-time as a third time-window control (no toggle).
-        s["include_grad"] = True
-        c1, c2, c3 = st.columns(3)
-        s["day_start"] = _hour_select(c1, t("set_day_start", lang), 6, 12,
-                                      s["day_start"], "set_day_start",
-                                      help=t("set_day_start_help", lang))
-        s["day_end"] = _hour_select(c2, t("set_day_end", lang), 13, 21,
-                                    s["day_end"], "set_day_end",
-                                    help=t("set_day_end_help", lang))
-        s["grad_start"] = _hour_select(c3, t("set_grad_start", lang), 6, 20,
-                                       s.get("grad_start", 18), "set_grad_start",
-                                       help=t("set_grad_start_help", lang))
-        c4, c5, _ = st.columns(3)
-        s["max_theory_session"] = c4.number_input(t("set_max_theory", lang), min_value=1,
-                                                  max_value=6, value=int(s["max_theory_session"]),
-                                                  step=1, help=t("set_max_theory_help", lang),
-                                                  key="set_maxtheory")
-        s["max_block_len"] = c5.number_input(t("set_max_block", lang), min_value=1, max_value=8,
-                                             value=int(s["max_block_len"]), step=1,
-                                             help=t("set_max_block_help", lang), key="set_maxblock")
-        s["saturday"] = st.toggle(t("set_saturday", lang), value=bool(s["saturday"]),
-                                  help=t("set_saturday_help", lang), key="set_sat")
-        _grad_by_dept(lang, s)
+    st.caption(t("set_policy_desc", lang))
+    # Cap the hour dropdowns to the stepper width; responsive (shrinks on
+    # narrow viewports, never overflows — see CLAUDE.md mobile-portrait rule).
+    st.markdown(
+        "<style>.st-key-set_day_start,.st-key-set_day_end,"
+        ".st-key-set_grad_start{max-width:260px;}</style>",
+        unsafe_allow_html=True,
+    )
+    # Graduate courses are always scheduled; grad_start sits beside the undergrad
+    # end-time as a third time-window control (no toggle).
+    s["include_grad"] = True
+    c1, c2, c3 = st.columns(3)
+    s["day_start"] = _hour_select(c1, t("set_day_start", lang), 6, 12,
+                                  s["day_start"], "set_day_start",
+                                  help=t("set_day_start_help", lang))
+    s["day_end"] = _hour_select(c2, t("set_day_end", lang), 13, 21,
+                                s["day_end"], "set_day_end",
+                                help=t("set_day_end_help", lang))
+    s["grad_start"] = _hour_select(c3, t("set_grad_start", lang), 6, 20,
+                                   s.get("grad_start", 18), "set_grad_start",
+                                   help=t("set_grad_start_help", lang))
+    c4, c5, _ = st.columns(3)
+    s["max_theory_session"] = c4.number_input(t("set_max_theory", lang), min_value=1,
+                                              max_value=6, value=int(s["max_theory_session"]),
+                                              step=1, help=t("set_max_theory_help", lang),
+                                              key="set_maxtheory")
+    s["max_block_len"] = c5.number_input(t("set_max_block", lang), min_value=1, max_value=8,
+                                         value=int(s["max_block_len"]), step=1,
+                                         help=t("set_max_block_help", lang), key="set_maxblock")
+    s["saturday"] = st.toggle(t("set_saturday", lang), value=bool(s["saturday"]),
+                              help=t("set_saturday_help", lang), key="set_sat")
+    _grad_by_dept(lang, s)
 
-        # blackouts are a hard constraint -> keep them contiguous with the time-window/grad
-        # block, above the preference-weights divider.
-        st.divider()
-        _blackouts(lang, s)
+    # blackouts are a hard constraint -> keep them contiguous with the time-window/grad
+    # block, above the preference-weights divider.
+    st.divider()
+    _blackouts(lang, s)
 
-        st.divider()
-        st.markdown(f"**{t('set_quality_header', lang)}**")
-        st.caption(t("set_quality_desc", lang))
-        cur_q = str(s.get("quality_mode", "balanced"))
-        cur_q = cur_q if cur_q in _QUALITY_LEVELS else "balanced"
-        _sync_segmented_key("set_quality_mode", _QUALITY_LEVELS, cur_q)
-        chosen_q = st.segmented_control(
-            t("set_quality_mode", lang), _QUALITY_LEVELS, default=cur_q,
-            format_func=lambda lv: t(f"set_quality_{lv}", lang),
-            key="set_quality_mode", help=t("set_quality_mode_help", lang),
-        )
-        if chosen_q is not None:
-            s["quality_mode"] = chosen_q
-        st.caption(t("set_quality_budget", lang,
-                     n=int(QUALITY_MODES.get(s.get("quality_mode", "balanced"), 300))))
+    st.divider()
+    st.markdown(f"**{t('set_quality_header', lang)}**")
+    st.caption(t("set_quality_desc", lang))
+    cur_q = str(s.get("quality_mode", "balanced"))
+    cur_q = cur_q if cur_q in _QUALITY_LEVELS else "balanced"
+    _sync_segmented_key("set_quality_mode", _QUALITY_LEVELS, cur_q)
+    chosen_q = st.segmented_control(
+        t("set_quality_mode", lang), _QUALITY_LEVELS, default=cur_q,
+        format_func=lambda lv: t(f"set_quality_{lv}", lang),
+        key="set_quality_mode", help=t("set_quality_mode_help", lang),
+    )
+    if chosen_q is not None:
+        s["quality_mode"] = chosen_q
+    st.caption(t("set_quality_budget", lang,
+                 n=int(QUALITY_MODES.get(s.get("quality_mode", "balanced"), 300))))
 
-        st.divider()
-        st.markdown(f"**{t('set_weights_header', lang)}**")
-        st.caption(t("set_weights_desc", lang))
-        wc = st.columns(2)
-        weights = s.setdefault("weights", {})
-        for i, knob in enumerate(_WEIGHT_KNOBS):
-            cur = _LEGACY_LEVEL.get(weights.get(knob, "medium"), weights.get(knob, "medium"))
-            cur = cur if cur in _LEVELS else "medium"
-            key = f"set_w_{knob}"
-            _sync_segmented_key(key, _LEVELS, cur)
-            chosen = wc[i % 2].segmented_control(
-                t(f"set_w_{knob}", lang), _LEVELS, default=cur,
-                format_func=lambda lv: t(f"set_w_{lv}", lang), key=key,
-                help=t(f"set_w_{knob}_help", lang))
-            if chosen is not None:
-                weights[knob] = chosen
-        for j, knob in enumerate(_OPTIONAL_WEIGHT_KNOBS, start=len(_WEIGHT_KNOBS)):
-            cur = str(weights.get(knob, "off")).strip().lower()
-            cur = cur if cur in _OPTIONAL_LEVELS else "off"
-            key = f"set_w_{knob}"
-            _sync_segmented_key(key, _OPTIONAL_LEVELS, cur)
-            # instr_days dial is inert when no target is set; grey it out so users
-            # don't think it's active.
-            disabled = (knob == "instr_days"
-                        and int(s.get("instr_days_target", 0) or 0) == 0)
-            help_key = (f"set_w_{knob}_disabled_help" if disabled
-                        else f"set_w_{knob}_help")
-            chosen = wc[j % 2].segmented_control(
-                t(f"set_w_{knob}", lang), _OPTIONAL_LEVELS, default=cur,
-                format_func=lambda lv: t(f"set_w_{lv}", lang), key=key,
-                help=t(help_key, lang), disabled=disabled)
-            if chosen is not None:
-                weights[knob] = chosen
-        # instr_days target: companion to the "compact instructor days" priority dial above.
-        # "No target" keeps the term off (no headroom); ≤4/≤3/≤2 give the dial something to
-        # optimize toward. The priority dial is inert until a target is picked (build_config
-        # forces w_instr_days=0 at "No target").
-        _t_opts = (0, 4, 3, 2)
-        try:
-            cur_t = int(s.get("instr_days_target", 0) or 0)
-        except (TypeError, ValueError):
-            cur_t = 0
-        cur_t = cur_t if cur_t in _t_opts else 0
-        _sync_segmented_key("set_instr_days_target", _t_opts, cur_t)
-        chosen_t = wc[1].segmented_control(
-            t("set_instr_days_target", lang), _t_opts, default=cur_t,
-            format_func=lambda v: t("set_instr_days_no_target", lang) if v == 0
-            else t("set_instr_days_at_most", lang, n=v),
-            key="set_instr_days_target", help=t("set_instr_days_target_help", lang))
-        if chosen_t is not None:
-            s["instr_days_target"] = chosen_t
-        # free_day: controlled by which cohort year-levels want a free day (the gate showed a
-        # strength slider can't steer it; the year selection IS its on/off control).
-        cur_years = [int(y) for y in s.get("free_day_years", []) if str(y).strip().isdigit()]
-        st.markdown(
-            "<style>.st-key-set_free_day_years{max-width:320px;}</style>",
-            unsafe_allow_html=True,
-        )
-        picked = st.multiselect(t("set_free_day_years", lang), [1, 2, 3, 4, 5, 6],
-                                default=[y for y in cur_years if 1 <= y <= 6],
-                                format_func=lambda y: t(f"set_year_{y}", lang),
-                                placeholder=t("set_free_day_years_placeholder", lang),
-                                help=t("set_free_day_years_help", lang),
-                                key="set_free_day_years")
-        s["free_day_years"] = list(picked)
+    st.divider()
+    st.markdown(f"**{t('set_weights_header', lang)}**")
+    st.caption(t("set_weights_desc", lang))
+    wc = st.columns(2)
+    weights = s.setdefault("weights", {})
+    for i, knob in enumerate(_WEIGHT_KNOBS):
+        cur = _LEGACY_LEVEL.get(weights.get(knob, "medium"), weights.get(knob, "medium"))
+        cur = cur if cur in _LEVELS else "medium"
+        key = f"set_w_{knob}"
+        _sync_segmented_key(key, _LEVELS, cur)
+        chosen = wc[i % 2].segmented_control(
+            t(f"set_w_{knob}", lang), _LEVELS, default=cur,
+            format_func=lambda lv: t(f"set_w_{lv}", lang), key=key,
+            help=t(f"set_w_{knob}_help", lang))
+        if chosen is not None:
+            weights[knob] = chosen
+    for j, knob in enumerate(_OPTIONAL_WEIGHT_KNOBS, start=len(_WEIGHT_KNOBS)):
+        cur = str(weights.get(knob, "off")).strip().lower()
+        cur = cur if cur in _OPTIONAL_LEVELS else "off"
+        key = f"set_w_{knob}"
+        _sync_segmented_key(key, _OPTIONAL_LEVELS, cur)
+        # instr_days dial is inert when no target is set; grey it out so users
+        # don't think it's active.
+        disabled = (knob == "instr_days"
+                    and int(s.get("instr_days_target", 0) or 0) == 0)
+        help_key = (f"set_w_{knob}_disabled_help" if disabled
+                    else f"set_w_{knob}_help")
+        chosen = wc[j % 2].segmented_control(
+            t(f"set_w_{knob}", lang), _OPTIONAL_LEVELS, default=cur,
+            format_func=lambda lv: t(f"set_w_{lv}", lang), key=key,
+            help=t(help_key, lang), disabled=disabled)
+        if chosen is not None:
+            weights[knob] = chosen
+    # instr_days target: companion to the "compact instructor days" priority dial above.
+    # "No target" keeps the term off (no headroom); ≤4/≤3/≤2 give the dial something to
+    # optimize toward. The priority dial is inert until a target is picked (build_config
+    # forces w_instr_days=0 at "No target").
+    _t_opts = (0, 4, 3, 2)
+    try:
+        cur_t = int(s.get("instr_days_target", 0) or 0)
+    except (TypeError, ValueError):
+        cur_t = 0
+    cur_t = cur_t if cur_t in _t_opts else 0
+    _sync_segmented_key("set_instr_days_target", _t_opts, cur_t)
+    chosen_t = wc[1].segmented_control(
+        t("set_instr_days_target", lang), _t_opts, default=cur_t,
+        format_func=lambda v: t("set_instr_days_no_target", lang) if v == 0
+        else t("set_instr_days_at_most", lang, n=v),
+        key="set_instr_days_target", help=t("set_instr_days_target_help", lang))
+    if chosen_t is not None:
+        s["instr_days_target"] = chosen_t
+    # free_day: controlled by which cohort year-levels want a free day (the gate showed a
+    # strength slider can't steer it; the year selection IS its on/off control).
+    cur_years = [int(y) for y in s.get("free_day_years", []) if str(y).strip().isdigit()]
+    st.markdown(
+        "<style>.st-key-set_free_day_years{max-width:320px;}</style>",
+        unsafe_allow_html=True,
+    )
+    picked = st.multiselect(t("set_free_day_years", lang), [1, 2, 3, 4, 5, 6],
+                            default=[y for y in cur_years if 1 <= y <= 6],
+                            format_func=lambda y: t(f"set_year_{y}", lang),
+                            placeholder=t("set_free_day_years_placeholder", lang),
+                            help=t("set_free_day_years_help", lang),
+                            key="set_free_day_years")
+    s["free_day_years"] = list(picked)
 
 
 def _grad_by_dept(lang: str, s: dict) -> None:
@@ -385,121 +388,244 @@ def _fmt_ranges(hours) -> list:
 
 
 def _availability(lang: str) -> None:
-    with st.expander(t("set_avail_header", lang), icon=":material/event_available:", expanded=True):
-        labels, label_to_email, email_to_name = _email_labels(st.session_state.get("courses", []))
-        if not labels:
-            st.caption(t("set_avail_none_instr", lang))
-            return
-        s = st.session_state["settings"]
-        dl = DAY_LABELS.get(lang, DAY_LABELS["en"])
-        rev = st.session_state.get("set_rev", 0)
-        st.markdown("<style>.st-key-av_who_wrap{max-width:400px;}</style>", unsafe_allow_html=True)
-        with st.container(key="av_who_wrap"):
-            selected_label = st.selectbox(t("set_avail_pick", lang), labels, key=f"av_who_{rev}")
-        who = label_to_email[selected_label]
+    labels, label_to_email, email_to_name = _email_labels(st.session_state.get("courses", []))
+    if not labels:
+        st.caption(t("set_avail_none_instr", lang))
+        return
+    s = st.session_state["settings"]
+    dl = DAY_LABELS.get(lang, DAY_LABELS["en"])
+    rev = st.session_state.get("set_rev", 0)
+    _TIER_EMOJI = [
+        ("availability",        "⛔"),
+        ("availability_avoid",  "🟡"),
+        ("availability_prefer", "🟢"),
+    ]
 
-        days = _work_days(s)
-        day_start, day_end = _win(s)
-        midday = _MIDDAY
-        hours = list(range(day_start, day_end))
-        ncol = len(days) + 1
+    def _pref_label(lbl):
+        email = label_to_email[lbl]
+        parts = [em for k, em in _TIER_EMOJI if st.session_state.get(k, {}).get(email)]
+        return f"{''.join(parts)} {lbl}" if parts else lbl
 
-        def _tier_grid(state_key, hint_key, count_key, save_msg_key, tab_pfx):
-            avail = st.session_state[state_key]
-            st.caption(t(hint_key, lang))
-            by_day = _slots_to_hours(avail.get(who, []), day_start, day_end, midday)
-            cur = {(d, h) for d, hs in by_day.items() for h in hs}
-            st.markdown(
-                "<div class='hm-leg'>"
-                f"<span><i class='av'></i>{escape(t('set_avail_free', lang))}</span>"
-                f"<span><i class='bl'></i>{escape(t('set_avail_blocked', lang))}</span>"
-                f"<span>{escape(t(count_key, lang, n=len(cur)))}</span>"
-                "</div>",
-                unsafe_allow_html=True,
-            )
-            picked = []
-            with st.container(key=f"{tab_pfx}_hm"):
-                head = st.columns(ncol)
-                head[0].markdown("<div class='hm-dh'></div>", unsafe_allow_html=True)
+    st.markdown("<style>.st-key-av_who_wrap{max-width:400px;}</style>", unsafe_allow_html=True)
+    with st.container(key="av_who_wrap"):
+        selected_label = st.selectbox(
+            t("set_avail_pick", lang),
+            labels,
+            key=f"av_who_{rev}",
+            format_func=_pref_label,
+        )
+    who = label_to_email[selected_label]
+
+    days = _work_days(s)
+    day_start, day_end = _win(s)
+    midday = _MIDDAY
+    hours = list(range(day_start, day_end))
+    ncol = len(days) + 1
+
+    _TIER_BL_CLS = {"av_u": "bl", "av_a": "bl-a", "av_p": "bl-p"}
+    _TIER_BL_LBL = {
+        "av_u": "set_avail_tab_unavail",
+        "av_a": "set_avail_tab_avoid",
+        "av_p": "set_avail_tab_prefer",
+    }
+
+    def _tier_grid(state_key, hint_key, count_key, tab_pfx):
+        avail = st.session_state[state_key]
+        st.caption(t(hint_key, lang))
+        by_day = _slots_to_hours(avail.get(who, []), day_start, day_end, midday)
+        cur = {(d, h) for d, hs in by_day.items() for h in hs}
+        bl_cls = _TIER_BL_CLS.get(tab_pfx, "bl")
+        bl_lbl = t(_TIER_BL_LBL.get(tab_pfx, "set_avail_blocked"), lang)
+        st.markdown(
+            "<div class='hm-leg'>"
+            f"<span><i class='av'></i>{escape(t('set_avail_free', lang))}</span>"
+            f"<span><i class='{bl_cls}'></i>{escape(bl_lbl)}</span>"
+            f"<span>{escape(t(count_key, lang, n=len(cur)))}</span>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        picked = []
+        with st.container(key=f"av_hm_{tab_pfx}"):
+            head = st.columns(ncol)
+            head[0].markdown("<div class='hm-dh'></div>", unsafe_allow_html=True)
+            for i, d in enumerate(days):
+                head[i + 1].markdown(f"<div class='hm-dh'>{escape(dl.get(d, d))}</div>",
+                                     unsafe_allow_html=True)
+            for h in hours:
+                if h == midday and day_start < midday < day_end:
+                    st.markdown("<div class='hm-mid'></div>", unsafe_allow_html=True)
+                row = st.columns(ncol)
+                row[0].markdown(f"<div class='hm-tl'>{h:02d}:00</div>", unsafe_allow_html=True)
                 for i, d in enumerate(days):
-                    head[i + 1].markdown(f"<div class='hm-dh'>{escape(dl.get(d, d))}</div>",
-                                         unsafe_allow_html=True)
-                for h in hours:
-                    if h == midday and day_start < midday < day_end:
-                        st.markdown("<div class='hm-mid'></div>", unsafe_allow_html=True)
-                    row = st.columns(ncol)
-                    row[0].markdown(f"<div class='hm-tl'>{h:02d}:00</div>", unsafe_allow_html=True)
-                    for i, d in enumerate(days):
-                        on = row[i + 1].checkbox(
-                            f"{dl.get(d, d)} {h:02d}:00", value=(d, h) in cur,
-                            label_visibility="collapsed",
-                            key=f"{tab_pfx}_{who}_{d}_{h}_{rev}")
-                        if on:
-                            picked.append([d, h])
-            bcols = st.columns([1, 2, 3])
-            if bcols[0].button(t("set_avail_save", lang), type="primary",
-                               icon=":material/check_circle:",
-                               key=f"{tab_pfx}_save_{rev}"):
-                if picked:
-                    avail[who] = picked
-                else:
-                    avail.pop(who, None)
-                _bump()
-                st.success(t(save_msg_key, lang, who=who))
-                st.rerun()
-            if cur and bcols[1].button(t("set_avail_clear", lang), icon=":material/delete_sweep:",
-                                       key=f"{tab_pfx}_clr_{rev}"):
+                    on = row[i + 1].checkbox(
+                        f"{dl.get(d, d)} {h:02d}:00", value=(d, h) in cur,
+                        label_visibility="collapsed",
+                        key=f"{tab_pfx}_{who}_{d}_{h}_{rev}")
+                    if on:
+                        picked.append([d, h])
+        # Autosave — sync checkbox state to session on every render
+        new_set = {(str(e[0]), int(e[1])) for e in picked}
+        cur_set = {(str(e[0]), int(e[1])) for e in avail.get(who, [])}
+        if new_set != cur_set:
+            if new_set:
+                avail[who] = [[d, h] for d, h in sorted(new_set)]
+            else:
                 avail.pop(who, None)
+        if cur and st.button(t("set_avail_clear", lang), icon=":material/delete_sweep:",
+                             key=f"{tab_pfx}_clr_{rev}"):
+            avail.pop(who, None)
+            _bump()
+            st.rerun()
+
+    tab_u, tab_av, tab_pr = st.tabs([
+        t("set_avail_tab_unavail", lang),
+        t("set_avail_tab_avoid", lang),
+        t("set_avail_tab_prefer", lang),
+    ])
+    with tab_u:
+        _tier_grid("availability", "set_avail_hint", "set_avail_count", "av_u")
+    with tab_av:
+        _tier_grid("availability_avoid", "set_avail_hint_avoid", "set_avail_count_avoid", "av_a")
+    with tab_pr:
+        _tier_grid("availability_prefer", "set_avail_hint_prefer", "set_avail_count_prefer", "av_p")
+
+    _TIER_ROWS = [
+        ("availability",        "set_avail_tab_unavail", "u"),
+        ("availability_avoid",  "set_avail_tab_avoid",   "a"),
+        ("availability_prefer", "set_avail_tab_prefer",  "p"),
+    ]
+    for state_key, label_key, tier_sfx in _TIER_ROWS:
+        av_tier = st.session_state.get(state_key, {})
+        who_slots = av_tier.get(who, [])
+        if not who_slots:
+            continue
+        by_day = _slots_to_hours(who_slots, day_start, day_end, _MIDDAY)
+        tier_label = t(label_key, lang)
+        st.markdown(
+            f"<div class='av-tier-lbl av-tier-{tier_sfx}'>{escape(tier_label)}</div>",
+            unsafe_allow_html=True,
+        )
+        with st.container(key=f"av_row_{tier_sfx}_{rev}"):
+            for d in days:
+                if d not in by_day:
+                    continue
+                hs = sorted(by_day[d])
+                ri = 0
+                while ri < len(hs):
+                    rj = ri
+                    while rj + 1 < len(hs) and hs[rj + 1] == hs[rj] + 1:
+                        rj += 1
+                    range_hours = set(hs[ri:rj + 1])
+                    chip_label = f"{dl.get(d, d)} {hs[ri]:02d}:00–{hs[rj] + 1:02d}:00"
+                    if st.button(chip_label, key=f"av_rm_{tier_sfx}_{d}_{hs[ri]}_{rev}"):
+                        new_slots = [e for e in (av_tier.get(who) or [])
+                                     if not (e[0] == d and int(e[1]) in range_hours)]
+                        if new_slots:
+                            av_tier[who] = new_slots
+                        else:
+                            av_tier.pop(who, None)
+                        _bump()
+                        st.rerun()
+                    ri = rj + 1
+
+
+def _avoid_pairs(lang: str, s: dict) -> None:
+    st.caption(t("set_avoid_pairs_desc", lang))
+    courses = st.session_state.get("courses", [])
+    codes = sorted({str(r.get("Course Code", "")).strip()
+                    for r in courses if str(r.get("Course Code", "")).strip()})
+    if not codes:
+        st.caption(t("set_avoid_pairs_no_courses", lang))
+        return
+    code_to_name: dict[str, str] = {}
+    for r in courses:
+        code = str(r.get("Course Code", "")).strip()
+        name = str(r.get("Course Name", "")).strip()
+        if code and name and code not in code_to_name:
+            code_to_name[code] = name
+
+    def _fmt(c: str) -> str:
+        return f"{c} – {code_to_name[c]}" if c in code_to_name else c
+
+    rev = st.session_state.get("set_rev", 0)
+    pairs = s.setdefault("avoid_pairs", [])
+    c1, c2, c3 = st.columns([2, 2, 1], vertical_alignment="bottom")
+    ca = c1.selectbox(t("set_avoid_pairs_a", lang), codes, format_func=_fmt, key=f"ap_a_{rev}")
+    cb = c2.selectbox(t("set_avoid_pairs_b", lang), codes, format_func=_fmt, key=f"ap_b_{rev}")
+    if c3.button(t("set_avoid_pairs_add", lang), key=f"ap_add_{rev}",
+                 icon=":material/add:"):
+        if ca == cb:
+            st.warning(t("set_avoid_pairs_same", lang))
+        elif [ca, cb] not in pairs and [cb, ca] not in pairs:
+            pairs.append([ca, cb])
+            _bump()
+            st.rerun()
+    if not pairs:
+        st.caption(t("set_avoid_pairs_empty", lang))
+    else:
+        st.markdown(
+            "<style>.st-key-ap_list [data-testid='stIconMaterial']"
+            "{color:#e53e3e!important;}</style>",
+            unsafe_allow_html=True,
+        )
+        with st.container(key="ap_list"):
+            for i, pair in enumerate(list(pairs)):
+                chip_label = f"{pair[0]} ⚡ {pair[1]}"
+                if st.button(chip_label, key=f"ap_rm_{i}_{rev}", icon=":material/close:"):
+                    pairs.pop(i)
                 _bump()
                 st.rerun()
 
-        tab_u, tab_av, tab_pr = st.tabs([
-            t("set_avail_tab_unavail", lang),
-            t("set_avail_tab_avoid", lang),
-            t("set_avail_tab_prefer", lang),
-        ])
-        with tab_u:
-            _tier_grid("availability", "set_avail_hint", "set_avail_count",
-                       "set_avail_saved", "av_u")
-        with tab_av:
-            _tier_grid("availability_avoid", "set_avail_hint_avoid", "set_avail_count_avoid",
-                       "set_avail_saved_avoid", "av_a")
-        with tab_pr:
-            _tier_grid("availability_prefer", "set_avail_hint_prefer", "set_avail_count_prefer",
-                       "set_avail_saved_prefer", "av_p")
 
-        avail = st.session_state["availability"]
-        restricted = {k: v for k, v in avail.items() if v}
-        if restricted:
-            st.caption(t("set_avail_summary", lang, n=len(restricted)))
-            for i_em, (em, slots) in enumerate(restricted.items()):
-                em_days = _slots_to_hours(slots, day_start, day_end, _MIDDAY)
-                name = email_to_name.get(em, "")
-                display = f"{name} ({em})" if (name and name.lower() != em) else em
-                with st.container(key=f"av_row_{i_em}_{rev}"):
-                    st.markdown(f"<span class='av-sum-who'>{escape(display)}</span>",
-                                unsafe_allow_html=True)
-                    for d in days:
-                        if d not in em_days:
-                            continue
-                        hs = sorted(em_days[d])
-                        ri = 0
-                        while ri < len(hs):
-                            rj = ri
-                            while rj + 1 < len(hs) and hs[rj + 1] == hs[rj] + 1:
-                                rj += 1
-                            range_hours = set(hs[ri:rj + 1])
-                            chip_label = f"{dl.get(d, d)} {hs[ri]:02d}:00–{hs[rj] + 1:02d}:00"
-                            if st.button(chip_label, key=f"av_rm_{i_em}_{d}_{hs[ri]}_{rev}"):
-                                new_slots = [e for e in (avail.get(em) or [])
-                                             if not (e[0] == d and int(e[1]) in range_hours)]
-                                if new_slots:
-                                    avail[em] = new_slots
-                                else:
-                                    avail.pop(em, None)
-                                _bump()
-                                st.rerun()
-                            ri = rj + 1
+def _parallel_policies(lang: str, s: dict) -> None:
+    st.caption(t("set_parallel_desc", lang))
+    courses = st.session_state.get("courses", [])
+    codes = sorted({str(r.get("Course Code", "")).strip()
+                    for r in courses if str(r.get("Course Code", "")).strip()})
+    if not codes:
+        st.caption(t("set_parallel_no_courses", lang))
+        return
+    code_to_name: dict[str, str] = {}
+    for r in courses:
+        c = str(r.get("Course Code", "")).strip()
+        n = str(r.get("Course Name", "")).strip()
+        if c and n and c not in code_to_name:
+            code_to_name[c] = n
+
+    def _fmt(c: str) -> str:
+        return f"{c} – {code_to_name[c]}" if c in code_to_name else c
+
+    rev = st.session_state.get("set_rev", 0)
+    policies = s.setdefault("parallel_policies", [])
+    c1, c2, c3 = st.columns([2, 2, 1], vertical_alignment="bottom")
+    code = c1.selectbox(t("set_parallel_course", lang), codes, format_func=_fmt, key=f"pp_code_{rev}")
+    policy = c2.selectbox(
+        t("set_parallel_policy", lang), _PARALLEL_POLICIES,
+        key=f"pp_policy_{rev}",
+        format_func=lambda p: t(f"set_parallel_policy_{p.replace('-', '_')}", lang),
+    )
+    if c3.button(t("set_parallel_add", lang), key=f"pp_add_{rev}",
+                 icon=":material/add:"):
+        policies[:] = [row for row in policies
+                       if not (isinstance(row, (list, tuple)) and row
+                               and str(row[0]).strip() == code)]
+        policies.append([code, policy])
+        _bump()
+        st.rerun()
+    if not policies:
+        st.caption(t("set_parallel_empty", lang))
+    else:
+        labels = {p: t(f"set_parallel_policy_{p.replace('-', '_')}", lang)
+                  for p in _PARALLEL_POLICIES}
+        for i, row in enumerate(list(policies)):
+            if not isinstance(row, (list, tuple)) or len(row) != 2:
+                continue
+            code_i, policy_i = str(row[0]).strip(), str(row[1]).strip()
+            chip_label = f"{code_i} · {labels.get(policy_i, policy_i)}"
+            if st.button(chip_label, key=f"pp_rm_{i}_{rev}", icon=":material/close:"):
+                policies.pop(i)
+                _bump()
+                st.rerun()
 
 
 def _profile(lang: str) -> None:

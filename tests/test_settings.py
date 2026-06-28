@@ -208,3 +208,27 @@ def test_availability_labels_keyed_by_email_or_name():
     ids = set(label_to_id.values())
     assert "a@x.edu" in ids                 # email identity when present
     assert "mustafa yuksel" in ids          # normalized-name identity when no email
+
+
+def test_build_config_ref_schedule_default_is_empty():
+    import copy
+    cfg = build_config(copy.deepcopy(DEFAULT_SETTINGS), {}, 60.0)
+    assert cfg.ref_schedule == {}
+    assert cfg.w_perturbation == 0.0
+
+
+def test_build_config_ref_schedule_passed_through():
+    import copy
+    ref = {"A#T": ("Mo", 9, "R1")}
+    s = copy.deepcopy(DEFAULT_SETTINGS)
+    s["weights"]["perturbation"] = "medium"
+    cfg = build_config(s, {}, 60.0, ref_schedule=ref)
+    assert cfg.ref_schedule == ref
+    assert cfg.w_perturbation > 0
+
+
+def test_build_config_perturbation_off_by_default():
+    import copy
+    s = copy.deepcopy(DEFAULT_SETTINGS)
+    cfg = build_config(s, {}, 60.0)
+    assert cfg.w_perturbation == 0.0

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 DAYS = ["Mo", "Tu", "We", "Th", "Fr"]
 SATURDAY = "Sa"
@@ -7,6 +7,23 @@ SATURDAY = "Sa"
 LAB_SUFFIXES = ("-PC-L", "-PSY-L", "-PSCG-L", "-PECE-L", "-EF-L", "-PC", "-L")
 
 PARALLEL_POLICIES = ("same-time", "spread", "lab-after-theory")
+
+_BUILDINGS = frozenset("ABCDEFGHK")
+
+
+def building_of(room: str):
+    """Return the single-letter building code for a room, or None for virtual/unknown rooms.
+    XB... prefix means the bodrum (basement) of building X — same building, so XB→X."""
+    if not room:
+        return None
+    r = room.upper()
+    if r == "ONLINE":
+        return None
+    if len(r) >= 2 and r[0] in _BUILDINGS and r[1] == "B":
+        return r[0]
+    if r[0] in _BUILDINGS:
+        return r[0]
+    return None
 
 
 def normalize_parallel_policy(value: str) -> str:
@@ -47,6 +64,7 @@ class Config:
     w_evening: float = 0.0                  # optional dial: late-hour load
     w_instr_idle: float = 0.0               # optional dial: instructor same-day idle gaps
     w_fairness: float = 0.0                 # optional dial: spread bad load across entities
+    w_building_change: float = 0.0          # optional dial: instructor building transitions
     # blackouts: (day, hour, staff_only) hour-slots that are closed. staff_only=True closes
     # the slot only for sections taught by a full-time instructor (e.g. a faculty seminar);
     # staff_only=False (or a bare 2-tuple) closes it for everyone. Use
@@ -64,6 +82,8 @@ class Config:
     w_instr_avoid: float = 3.0              # penalty per hour in avoid slot
     avoid_pairs: tuple = ()                  # tuple of frozenset({code_a, code_b})
     w_avoid_pairs: float = 1.0              # penalty per overlapping hour-slot
+    ref_schedule: dict = field(default_factory=dict)  # {block_id: (day, start, room)}; empty = off
+    w_perturbation: float = 0.0             # optional dial: penalize deviation from ref_schedule
     parallel_policies: tuple = ()            # ((course_code, policy), ...)
     w_parallel_coord: float = 10.0           # soft parallel-section coordination weight
     # AM/PM boundary hour for half-day instructor availability (UI setting)

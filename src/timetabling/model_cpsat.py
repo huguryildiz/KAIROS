@@ -315,6 +315,39 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
                 overlap = model.NewBoolVar(f"avp|{ca}|{cb}|{day}|{hh}")
                 model.Add(overlap >= ba + bb - 1)
                 obj.append(int(round(cfg.w_avoid_pairs)) * overlap)
+    if cfg.w_building_change:
+        from .config import building_of as _bldg_of
+        w_bc = int(round(cfg.w_building_change)) or 1
+        ib_cands = defaultdict(list)   # (iid, day, hh, bldg) -> [vars]
+        for b_obj, s in blocks:
+            for c in cand_by_block.get(b_obj.block_id, []):
+                v = x.get((b_obj.block_id, c.room, c.day, c.start))
+                if v is None:
+                    continue
+                bldg = _bldg_of(c.room)
+                if bldg is None:
+                    continue
+                for iid in s.instructor_ids:
+                    for hh in range(c.start, c.start + c.length):
+                        ib_cands[(iid, c.day, hh, bldg)].append(v)
+        iid_day_hh_bldgs = defaultdict(list)
+        for (iid, day, hh, bldg), vs in ib_cands.items():
+            iid_day_hh_bldgs[(iid, day, hh)].append((bldg, vs))
+        t_idx = 0
+        for (iid, day, hh), bldg_vs_h in iid_day_hh_bldgs.items():
+            bldg_vs_h1 = iid_day_hh_bldgs.get((iid, day, hh + 1), [])
+            if not bldg_vs_h1:
+                continue
+            for b1, vs1 in bldg_vs_h:
+                for b2, vs2 in bldg_vs_h1:
+                    if b1 == b2:
+                        continue
+                    for v1 in vs1:
+                        for v2 in vs2:
+                            t = model.NewBoolVar(f"bc_{t_idx}")
+                            t_idx += 1
+                            model.Add(t >= v1 + v2 - 1)
+                            obj.append(w_bc * t)
     if obj:
         model.Minimize(sum(obj))
 

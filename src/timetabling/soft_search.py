@@ -6,7 +6,7 @@ from __future__ import annotations
 from collections import defaultdict
 from time import perf_counter
 
-from .config import Config
+from .config import Config, building_of
 from .repair import (
     _cand_soft, _soft_total, _min_working_days_missing, _avoid_pairs_viol,
     _parallel_coord_viol,
@@ -148,6 +148,21 @@ def _global_terms(state, cfg) -> dict:
     room_util = sum(max(0, (c.cap - state.sec_of[bid].students) / c.cap)
                     for bid, c in state.placed.items()
                     if not state.sec_of[bid].is_virtual and c.cap > 0)
+    building_change = 0
+    if cfg.w_building_change:
+        instr_hour_bldg = {}
+        for bid, c in state.placed.items():
+            s = state.sec_of[bid]
+            bldg = building_of(c.room)
+            if bldg is None:
+                continue
+            for iid in state.sec_instr.get(s.section_id, []):
+                for hh in range(c.start, c.start + c.length):
+                    instr_hour_bldg[(iid, c.day, hh)] = bldg
+        building_change = sum(
+            1 for (iid, day, hh), b1 in instr_hour_bldg.items()
+            if instr_hour_bldg.get((iid, day, hh + 1), b1) != b1
+        )
     return {
         "idle": _gap_of(coh_day),
         "maxrun": maxrun,
@@ -167,6 +182,7 @@ def _global_terms(state, cfg) -> dict:
         "instr_prefer_miss": instr_prefer_miss,
         "conf": sum(max(0, len(v) - 1) for v in coh_slot.values()),
         "avoid_pairs_viol": _avoid_pairs_viol(state.placed, state.sec_of, cfg.avoid_pairs),
+        "building_change": building_change,
     }
 
 
@@ -215,6 +231,21 @@ def _local_terms(state, cohorts, instrs, rooms, blocks, cfg) -> dict:
     free_day = sum(max(0, len(days) - (n_days - 1))
                    for cohort, days in coh_days_used.items()
                    if cohort.rsplit("-", 1)[-1] in years) if years else 0
+    local_instr_hour_bldg = {}
+    if cfg.w_building_change:
+        for bid, c in state.placed.items():
+            s = state.sec_of[bid]
+            bldg = building_of(c.room)
+            if bldg is None:
+                continue
+            for iid in state.sec_instr.get(s.section_id, []):
+                if iid in instr_set:
+                    for hh in range(c.start, c.start + c.length):
+                        local_instr_hour_bldg[(iid, c.day, hh)] = bldg
+    local_building_change = sum(
+        1 for (iid, day, hh), b1 in local_instr_hour_bldg.items()
+        if local_instr_hour_bldg.get((iid, day, hh + 1), b1) != b1
+    )
     return {
         "idle": _gap_of(coh_day),
         "maxrun": maxrun,
@@ -241,6 +272,7 @@ def _local_terms(state, cohorts, instrs, rooms, blocks, cfg) -> dict:
             [p for p in cfg.avoid_pairs
              if p & {state.sec_of[bid].code for bid in blocks if bid in state.sec_of}]
             if cfg.avoid_pairs else []),
+        "building_change": local_building_change,
     }
 
 
@@ -262,7 +294,8 @@ def _norm_obj(terms, base, cfg) -> float:
             + cfg.w_parallel_coord * terms["parallel_coord"] / max(base["parallel_coord"], 1)
             + cfg.w_instr_avoid * terms["instr_avoid_viol"] / max(base["instr_avoid_viol"], 1)
             + cfg.w_instr_prefer * terms["instr_prefer_miss"] / max(base["instr_prefer_miss"], 1)
-            + cfg.w_avoid_pairs * terms["avoid_pairs_viol"] / max(base["avoid_pairs_viol"], 1))
+            + cfg.w_avoid_pairs * terms["avoid_pairs_viol"] / max(base["avoid_pairs_viol"], 1)
+            + cfg.w_building_change * terms["building_change"] / max(base["building_change"], 1))
 
 
 def _slot(c):

@@ -307,6 +307,22 @@ def _soft_total(state, cfg, staff_ids=frozenset()) -> int:
     total += cfg.w_avoid_pairs * _avoid_pairs_viol(state.placed, state.sec_of, cfg.avoid_pairs)
     total += cfg.w_parallel_coord * _parallel_coord_viol(
         state.placed, state.sec_of, cfg.parallel_policies)
+    if cfg.w_building_change:
+        from .config import building_of
+        instr_hour_bldg = {}
+        for bid, c in state.placed.items():
+            s = state.sec_of[bid]
+            bldg = building_of(c.room)
+            if bldg is None:
+                continue
+            for iid in state.sec_instr.get(s.section_id, []):
+                for hh in range(c.start, c.start + c.length):
+                    instr_hour_bldg[(iid, c.day, hh)] = bldg
+        bldg_change = sum(
+            1 for (iid, day, hh), b1 in instr_hour_bldg.items()
+            if instr_hour_bldg.get((iid, day, hh + 1), b1) != b1
+        )
+        total += cfg.w_building_change * bldg_change
     return total
 
 

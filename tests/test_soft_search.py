@@ -402,7 +402,8 @@ def test_global_terms_raw_terms_plus_conf():
                  "evening": 2, "instr_idle": 3, "fairness": 20,
                  "room_stable": 0, "free_day": 0, "room_util": 0,
                  "min_working_days": 0, "parallel_coord": 0, "conf": 2,
-                 "instr_avoid_viol": 0, "instr_prefer_miss": 0, "avoid_pairs_viol": 0}
+                 "instr_avoid_viol": 0, "instr_prefer_miss": 0, "avoid_pairs_viol": 0,
+                 "building_change": 0}
 
 
 def test_local_terms_match_global_over_all_entities():

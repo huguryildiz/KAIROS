@@ -127,12 +127,7 @@ def render(lang: str) -> None:
 
 
     st.write("")
-    # Downloads — JSON / CSV / PDF on one row. The PDF merges every entity of
-    # the current view dimension (e.g. all cohorts) into one multi-page file,
-    # sorted naturally (EE-1, EE-2, …, EE-10) so it reads in order.
-    dim_label = t(VIEW_KEY[view_field], lang)
-    pdf_data, pdf_name, pdf_mime = _bundle(
-        sched, view_field, tuple(entities), dim_label, lang)
+    # Downloads — JSON / CSV on one row, then per-dimension PDF buttons.
     with st.container(horizontal=True, horizontal_alignment="center",
                       gap="small"):
         st.download_button(t("res_dl_json", lang),
@@ -143,8 +138,30 @@ def render(lang: str) -> None:
                            pd.DataFrame(sched["assignments"], columns=CSV_FIELDS).to_csv(index=False).encode("utf-8-sig"),
                            file_name="schedule.csv",
                            key="dl_csv")
-        st.download_button(t("res_dl_pdf", lang), pdf_data,
-                           file_name=pdf_name, mime=pdf_mime, key="dl_pdf")
+
+    # Per-dimension PDF downloads — one button per view dimension.
+    _PDF_DIMS = [
+        ("cohort",          "res_dl_pdf_cohort"),
+        ("instructor_name", "res_dl_pdf_instructor"),
+        ("room",            "res_dl_pdf_room"),
+        ("department",      "res_dl_pdf_dept"),
+        ("course_code",     "res_dl_pdf_course"),
+    ]
+    st.caption(t("res_dl_pdfs_title", lang))
+    with st.container(horizontal=True, horizontal_alignment="center",
+                      gap="small"):
+        for dim_field, label_key in _PDF_DIMS:
+            dim_entities = distinct_values(sched, dim_field)
+            if not dim_entities:
+                continue
+            dim_label = t(VIEW_KEY[dim_field], lang)
+            pdf_data, pdf_name, pdf_mime = _bundle(
+                sched, dim_field, tuple(dim_entities), dim_label, lang)
+            st.download_button(
+                t(label_key, lang), pdf_data,
+                file_name=pdf_name, mime=pdf_mime,
+                key=f"dl_pdf_{dim_field}"
+            )
 
     _render_archive_log(lang)
 

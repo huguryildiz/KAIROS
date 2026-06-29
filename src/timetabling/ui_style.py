@@ -1,6 +1,6 @@
 """Pure (Streamlit-free) styling + HTML builders for the premium single-flow UI.
 
-Visual language ported from the approved mockup (docs/ui-mockup.html): a calm
+Visual language ported from the approved mockup artifact: a calm
 navy theme on a soft canvas with light + dark variants. The full token-driven
 stylesheet is emitted by `brand_css(theme)`; every component rule reads CSS
 variables, so switching theme is a pure token swap. Kept import-light so the

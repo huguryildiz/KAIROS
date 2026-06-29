@@ -37,6 +37,10 @@ htmlcov/
 # Generated solver output
 out/
 
+# Local analysis scripts and benchmark outputs — not tracked
+scripts/
+bench/
+
 # Source data — contains PII (lecturer names, staff IDs, student grade stats); not tracked
 data/
 

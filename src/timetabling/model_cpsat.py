@@ -268,15 +268,6 @@ def build_and_solve(sections: List[Section], rooms: List[Room],
             model.Add(extra >= sum(sbd_bool[(sid, b, day)] for b in bids) - 1)
             nonadj_terms.append(extra)
 
-    # HARD: a section's theory sessions land on different days (T:3 -> 2+1, two days)
-    theory_sd = defaultdict(list)
-    for (sid, bid, day), z in sbd_bool.items():
-        if "#L" not in bid:
-            theory_sd[(sid, day)].append(z)
-    for (sid, day), zs in theory_sd.items():
-        if len(zs) >= 2:
-            model.Add(sum(zs) <= 1)
-
     # soft: instructor-day indicators (heavier weight for part-time)
     instr_day = {}
     for (iid, day), vs in instr_day_vars.items():

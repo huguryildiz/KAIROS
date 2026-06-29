@@ -30,6 +30,7 @@ _HOUR_LO, _HOUR_HI = 9, 21          # grid rows = hours 9..20 inclusive
 _TIME_COL_W = 16.0                  # mm
 _HEADER_H = 9.0                     # mm, day-name header row
 _ROW_H = 13.5                       # mm per hour row
+_MAX_LANES_PER_PAGE = 2             # keep dense exports readable
 
 
 def _png_dimensions(path: Path) -> Tuple[int, int] | None:
@@ -91,6 +92,29 @@ def _fit(pdf: FPDF, text: str, max_w: float) -> str:
     return (text + ell) if text else ""
 
 
+def _course_code_label(a: dict) -> str:
+    """Readable block title for dense PDF grids.
+
+    Department exports can be lane-packed into narrow cards; section ids such as
+    "ENG 101_01" are often clipped. The course code is the information readers
+    scan for first, so prefer it and fall back to section_id for older schedules.
+    """
+    return str(a.get("course_code") or a.get("section_id") or "")
+
+
+def _section_title_label(a: dict) -> str:
+    """Compact title with course code plus section information.
+
+    Example: course_code='ENG 101', section_id='ENG 101_02' -> 'ENG 101_02'.
+    If an older schedule lacks course_code, section_id is still shown.
+    """
+    course = str(a.get("course_code") or "").strip()
+    section = str(a.get("section_id") or "").strip()
+    if course and section.startswith(course):
+        return section
+    return section or course
+
+
 def _layout_day(blocks: list) -> list:
     """Pack a day's blocks into lanes so overlapping sessions sit side by side.
 
@@ -131,6 +155,45 @@ def _layout_day(blocks: list) -> list:
     return out
 
 
+def _assignment_hours(a: dict) -> list[tuple[str, int]]:
+    day = a.get("day")
+    if day not in DAYS_ORDER:
+        return []
+    start = int(a.get("start", _HOUR_LO))
+    end = int(a.get("end", start + 1))
+    return [(day, h) for h in range(max(start, _HOUR_LO), min(end, _HOUR_HI))]
+
+
+def _paginate_for_readability(schedule: dict,
+                              max_lanes: int = _MAX_LANES_PER_PAGE) -> list[dict]:
+    """Split dense filtered schedules so one time slot never becomes too narrow."""
+    assignments = list(schedule.get("assignments", []))
+    if not assignments:
+        return [{**schedule, "assignments": []}]
+
+    pages: list[dict] = []
+    page_loads: list[dict[tuple[str, int], int]] = []
+    items = sorted(assignments, key=lambda a: (
+        DAYS_ORDER.index(a.get("day")) if a.get("day") in DAYS_ORDER else 99,
+        int(a.get("start", 0)),
+        int(a.get("end", 0)),
+        str(a.get("section_id") or a.get("course_code") or ""),
+    ))
+
+    for a in items:
+        hours = _assignment_hours(a)
+        for page, load in zip(pages, page_loads):
+            if all(load.get(slot, 0) < max_lanes for slot in hours):
+                page["assignments"].append(a)
+                for slot in hours:
+                    load[slot] = load.get(slot, 0) + 1
+                break
+        else:
+            pages.append({**schedule, "assignments": [a]})
+            page_loads.append({slot: 1 for slot in hours})
+    return pages
+
+
 def _draw_block(pdf: FPDF, a: dict, x: float, y: float, w: float, h: float,
                 show_instructor: bool, cont: bool = False) -> None:
     color = block_color(a)
@@ -159,39 +222,50 @@ def _draw_block(pdf: FPDF, a: dict, x: float, y: float, w: float, h: float,
         pdf.set_dash_pattern()                 # reset to solid
 
     tag = _block_tag(a)
-    section = str(a.get("section_id") or a.get("course_code", ""))
-    lines = [(section, tag, 7.2, True, code_rgb)]
+    title = _section_title_label(a)
+    lines = [(title, "", 7.4, True, code_rgb, True, "text")]
     room = str(a.get("room", "") or "")
     if room:
-        lines.append((room, "", 6.0, False, _blend(accent, (70, 74, 86), 0.6)))
+        lines.append((room, "", 5.1, False, _blend(accent, (70, 74, 86), 0.6), False, "text"))
     if show_instructor:
         name = str(a.get("instructor_name", "") or "")
         iid = str(a.get("instructor_id", "") or "")
         if name:
-            lines.append((name, "", 6.0, False, (96, 100, 112)))
-        # Email on its own line below the name — kept separate (not parenthesised
-        # inline) so a long address can't crowd out the name via ellipsis.
-        if iid and "@" in iid:
-            lines.append((iid, "", 5.6, False, (130, 134, 146)))
+            lines.append((name, "", 5.1, False, (96, 100, 112), False, "text"))
         elif iid and not name:
-            lines.append((iid, "", 6.0, False, (96, 100, 112)))
+            lines.append((iid, "", 5.1, False, (96, 100, 112), False, "text"))
+    if tag:
+        lines.append((tag, "", 4.4, True, _hex_to_rgb("#b45309") if tag == "PRAT" else (90, 95, 110), False, "tag"))
 
-    pad_l, pad_t = 4.0, 1.6
+    pad_l, pad_t = 4.0, 1.1
     tw = w - pad_l - 1.8
     with pdf.rect_clip(x, y, w, h):
         cy = y + pad_t
-        for txt, tg, size, bold, rgb in lines:
-            lh = size * 0.46
+        for txt, tg, size, bold, rgb, is_code, kind in lines:
+            avail = tw
+            if is_code:
+                while size > 4.8:
+                    pdf.set_font("DejaVu", "B" if bold else "", size)
+                    if pdf.get_string_width(str(txt)) <= avail:
+                        break
+                    size -= 0.4
+            lh = size * 0.43
             if cy + lh > y + h:
                 break
             pdf.set_font("DejaVu", "B" if bold else "", size)
             pdf.set_text_color(*rgb)
             pdf.set_xy(x + pad_l, cy)
-            shown = _fit(pdf, txt, tw - (9.0 if tg else 0))
-            pdf.cell(pdf.get_string_width(shown) + 0.5, lh, shown)
-            if tg:                              # small bordered tag pill (amber for PRAT)
-                _draw_tag(pdf, tg)
-            cy += lh + 0.6
+            if kind == "tag":
+                tag_w = min(tw, pdf.get_string_width(str(txt)) + 3.0)
+                pdf.set_draw_color(*rgb)
+                pdf.set_line_width(0.18)
+                pdf.rect(x + pad_l, cy + 0.2, tag_w, lh + 1.0,
+                         style="D", round_corners=True, corner_radius=0.6)
+                pdf.cell(tag_w, lh + 1.0, str(txt), align="C")
+            else:
+                shown = _fit(pdf, txt, avail)
+                pdf.cell(pdf.get_string_width(shown) + 0.5, lh, shown)
+            cy += lh + 0.35
     pdf.set_text_color(0, 0, 0)
 
 
@@ -359,7 +433,10 @@ def build_pdf_bundle(schedule: dict, view_field: str, entities: List[str],
     for ent in ents:
         view = filter_assignments(schedule, view_field, ent)
         ent_label = f"{ent} ({name_to_email[ent]})" if ent in name_to_email else ent
-        _draw_grid_page(pdf, view, f"{dim_label}: {ent_label}", lang, True)
+        pages = _paginate_for_readability(view)
+        for idx, page in enumerate(pages, start=1):
+            suffix = f" ({idx}/{len(pages)})" if len(pages) > 1 else ""
+            _draw_grid_page(pdf, page, f"{dim_label}: {ent_label}{suffix}", lang, True)
     data = bytes(pdf.output())
     fname = (_sanitize_filename(ents[0]) if len(ents) == 1
              else f"schedule_{view_field}")

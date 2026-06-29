@@ -177,12 +177,115 @@ def greedy_construct(state: State, order: List[str], cand_by_block,
 BATCH = 30
 REPAIR_TL = 12.0
 MAX_FREE = 240
-# Repair needs maneuvering room: small neighborhoods place far better with a wide
-# best-fit room set. Measured: 12 rooms -> ~82% placed, 24 rooms -> ~95%.
-REPAIR_MAX_ROOMS = 24
+# Wide rescue profiles are intentionally disabled by default. On the Spring 2026
+# benchmark they added several minutes and reduced placement; keep the hook for
+# targeted experiments without changing the production repair path.
+RESCUE_PROFILES = ()
+# Per-block best-fit room pool for the repair path. The cap lives in feasible_rooms_for
+# (the K smallest fitting rooms). At 24 the many tiny seminars (e.g. 4th-year "Graduation
+# Paper" sections, 2-5 students) all contended for the same ~24 smallest rooms, which
+# saturated while larger rooms sat unoffered -> the greedy build alone left 146 Spring-2026
+# blocks unplaced, all room-blocked (142k/142.6k candidate rejections were room-occupied,
+# only 166 instructor). Measured: 12 rooms -> ~82% placed, 24 -> ~95%, 40 -> ~99.9%.
+# A fixed K is fragile across schools (the right K is the contention degree, not an absolute
+# count), so _repair_room_cap offers EVERY physical room instead; REPAIR_MAX_ROOMS is only a
+# floor for tiny inventories. room_util stays low because feasible_rooms_for still orders
+# best-fit (smallest fitting room first), so greedy reaches for big rooms only when needed.
+REPAIR_MAX_ROOMS = 48
 
 
-def competitors(state: State, batch, cand_by_block) -> set:
+def _repair_room_cap(rooms, cfg) -> int:
+    """Repair-path room-pool size: at least every physical (non-virtual) room, so a section
+    is never starved of rooms by an undersized cap, on any school's room mix. feasible_rooms_for
+    re-caps to the rooms that actually fit each block, so this is a ceiling, not a demand."""
+    n_phys = sum(1 for r in rooms if not r.is_virtual)
+    return max(cfg.max_rooms_per_block, REPAIR_MAX_ROOMS, n_phys)
+
+
+def _add_competitor_counts(state: State, seeds, cand_by_block, counts: Counter, weight=1) -> None:
+    seed_set = set(seeds)
+    for bid in seeds:
+        if bid not in state.sec_of:
+            continue
+        s = state.sec_of[bid]; iids = state.sec_instr.get(s.section_id, [])
+        for c in cand_by_block.get(bid, ()):
+            if c.room in state.virtual:
+                continue
+            seen_for_candidate = set()
+            for hh in range(c.start, c.start + c.length):
+                owner = state.room_owner.get((c.room, c.day, hh))
+                if owner and owner not in seed_set:
+                    seen_for_candidate.add(owner)
+            for owner in seen_for_candidate:
+                counts[owner] += weight
+        for iid in iids:
+            for owner in state.instr_blocks.get(iid, set()):
+                if owner not in seed_set:
+                    counts[owner] += weight
+        for owner in state.sect_blocks.get(s.section_id, set()):
+            if owner not in seed_set:
+                counts[owner] += weight
+
+
+def competitors(state: State, batch, cand_by_block, depth=1) -> list:
+    """Return placed blocks most relevant to the unplaced batch, ranked deterministically.
+
+    Dense repair neighborhoods are truncated by MAX_FREE, so an unordered set can drop the
+    block that actually unlocks placement. Ranking by how often a placed block blocks the
+    batch's candidates makes tight neighborhoods stable and lets rescue passes widen from
+    the most promising frontier first.
+    """
+    batch_set = set(batch)
+    counts = Counter()
+    _add_competitor_counts(state, batch, cand_by_block, counts, weight=2)
+    frontier = [bid for bid, _ in counts.most_common()]
+    seen = set(batch_set) | set(frontier)
+    for _ in range(max(0, int(depth) - 1)):
+        if not frontier:
+            break
+        extra = Counter()
+        _add_competitor_counts(state, frontier, cand_by_block, extra, weight=1)
+        new_frontier = []
+        for bid, score in extra.items():
+            if bid in seen:
+                continue
+            counts[bid] += score
+            seen.add(bid)
+            new_frontier.append(bid)
+        frontier = new_frontier
+
+    def rank_key(bid):
+        s = state.sec_of.get(bid)
+        return (-counts[bid], len(cand_by_block.get(bid, ())),
+                -getattr(s, "students", 0), bid)
+
+    return sorted((bid for bid in counts if bid not in batch_set), key=rank_key)
+
+
+def _run_repair_batches(state: State, unplaced, cand_by_block, cfg, staff_ids, *,
+                        batch_size=BATCH, max_free=MAX_FREE, tl=REPAIR_TL,
+                        competitor_depth=1, deadline=float("inf"), t0=0.0) -> int:
+    gained = 0
+    for i in range(0, len(unplaced), batch_size):
+        if perf_counter() - t0 >= deadline:
+            break
+        batch = [bid for bid in unplaced[i:i + batch_size] if bid not in state.placed]
+        if batch:
+            gained += repair_round(
+                state, batch, cand_by_block, cfg, tl=tl, staff_ids=staff_ids,
+                max_free=max_free, competitor_depth=competitor_depth)
+    return gained
+
+
+def _same_course_unplaced_batches(unplaced, sec_of) -> list[list[str]]:
+    by_course = defaultdict(list)
+    for bid in unplaced:
+        by_course[sec_of[bid].code].append(bid)
+    return [bids for _course, bids in sorted(
+        by_course.items(), key=lambda item: (-len(item[1]), item[0])) if len(bids) >= 2]
+
+
+def _legacy_competitors(state: State, batch, cand_by_block) -> set:
     comp = set()
     for bid in batch:
         s = state.sec_of[bid]; iids = state.sec_instr.get(s.section_id, [])
@@ -497,9 +600,13 @@ def add_soft_objective(m, x, free, cand_by_block, state, free_set, cfg,
 
 
 def repair_round(state: State, batch, cand_by_block, cfg=None,
-                 tl=REPAIR_TL, staff_ids=frozenset()) -> int:
-    comp = competitors(state, batch, cand_by_block)
-    free = list(dict.fromkeys(list(batch) + list(comp)))[:MAX_FREE]
+                 tl=REPAIR_TL, staff_ids=frozenset(), *,
+                 max_free=MAX_FREE, competitor_depth=1) -> int:
+    if max_free == MAX_FREE and competitor_depth == 1:
+        comp = list(_legacy_competitors(state, batch, cand_by_block))
+    else:
+        comp = competitors(state, batch, cand_by_block, depth=competitor_depth)
+    free = list(dict.fromkeys(list(batch) + list(comp)))[:max_free]
     free_set = set(free)
 
     reserved_room, reserved_instr = set(), set()
@@ -638,8 +745,8 @@ def _cohort_gap_now(state, block_ids, cfg) -> int:
 
 def solve_repair(sections, rooms, instructors, cfg, progress_cb=None):
     _pb = progress_cb or (lambda _: None)
-    cfg = replace(cfg, max_rooms_per_block=max(cfg.max_rooms_per_block, REPAIR_MAX_ROOMS))
     room_list = list(rooms.values())
+    cfg = replace(cfg, max_rooms_per_block=_repair_room_cap(room_list, cfg))
     virtual_names = {r.room for r in room_list if r.is_virtual}
     blocks = [(b, s) for s in sections for b in s.blocks]
     total = len(blocks)
@@ -665,21 +772,42 @@ def solve_repair(sections, rooms, instructors, cfg, progress_cb=None):
     greedy_construct(state, order, cand_by_block, cfg)
 
     sweep = 0
+    rescue_rounds = 0
     while perf_counter() - t0 < deadline:
         sweep += 1
-        unplaced = [bid for bid, _ in [(b.block_id, s) for b, s in blocks]
-                    if bid not in state.placed]
+        unplaced = [b.block_id for b, _s in blocks if b.block_id not in state.placed]
         if not unplaced:
             break
         _pb(("repair_sweep", sweep, len(unplaced)))
         unplaced.sort(key=lambda bid: (len(cand_by_block[bid]), -sec_of[bid].students))
-        gained = 0
-        for i in range(0, len(unplaced), BATCH):
-            if perf_counter() - t0 >= deadline:
-                break
-            batch = [bid for bid in unplaced[i:i + BATCH] if bid not in state.placed]
-            if batch:
-                gained += repair_round(state, batch, cand_by_block)
+        gained = _run_repair_batches(
+            state, unplaced, cand_by_block, None, frozenset(),
+            batch_size=BATCH, max_free=MAX_FREE, tl=REPAIR_TL,
+            competitor_depth=1, deadline=deadline, t0=t0)
+        if gained == 0 and RESCUE_PROFILES:
+            for profile in RESCUE_PROFILES:
+                remaining = [bid for bid in unplaced if bid not in state.placed]
+                if not remaining or perf_counter() - t0 >= deadline:
+                    break
+                _pb(("repair_rescue", rescue_rounds + 1, len(remaining)))
+                rescue_rounds += 1
+                gained += _run_repair_batches(
+                    state, remaining, cand_by_block, None, frozenset(),
+                    deadline=deadline, t0=t0, **profile)
+                if gained:
+                    break
+            if gained == 0:
+                for batch in _same_course_unplaced_batches(
+                        [bid for bid in unplaced if bid not in state.placed], sec_of):
+                    if perf_counter() - t0 >= deadline:
+                        break
+                    _pb(("repair_course_rescue", rescue_rounds + 1, len(batch)))
+                    rescue_rounds += 1
+                    gained += repair_round(
+                        state, batch, cand_by_block, None, tl=12.0,
+                        max_free=360, competitor_depth=2)
+                    if gained:
+                        break
         if gained == 0 or sweep >= 25:
             break
 
@@ -718,6 +846,7 @@ def solve_repair(sections, rooms, instructors, cfg, progress_cb=None):
         "unplaced": unplaced_ids,
         "wall_time": round(perf_counter() - t0, 1),
         "sweeps": sweep,
+        "rescue_rounds": rescue_rounds,
         "soft_polish_rounds": soft_polish_rounds,
         "soft_pre": soft_pre,
         "soft_post": soft_post,

@@ -77,13 +77,6 @@ A placement that breaks one of these is never even generated, so it cannot occur
 - **Instructor no-overlap** — no instructor is double-booked in any hour; every co-instructor
   of a team-taught section counts.
 - **Section self no-overlap** — two blocks of the same section never overlap in time.
-- **Theory different-day** — a section's theory sessions each fall on a **different day** in
-  CP-SAT (hard). In the repair solver this is a **soft penalty** (`_W_SAME_DAY = 50`): same-day
-  siblings are penalised in greedy construction and mini CP-SAT but not blocked.
-  For undergraduate sections the number of sessions depends on `max_theory_session`
-  (default 2 h); e.g. `T=3 → 2+1` across two days. Graduate theory is split at ≤ 3 h per
-  session regardless. Lab blocks are exempt.
-
 ### Soft preferences — penalized in the objective (never block a schedule)
 
 Listed by default weight magnitude where that comparison is meaningful; weights live in
@@ -109,6 +102,8 @@ time. The CP-SAT monolith (§6a) and the repair soft polish (§6b) use separate 
 - **Section minimum working days** (`w_min_working_days=10.0`) — penalize each missing
   distinct day below a section's optional `Min Working Days` CSV target. The target is soft:
   unmet days are reported in `unmet_soft`, not as validation failures.
+- **Theory different-day** — split theory sessions prefer different days, but may share a day
+  as a fallback. CP-SAT uses `w_nonadjacent`; repair uses `_W_SAME_DAY = 50`.
 - **Parallel section coordination** (`w_parallel_coord=10.0`) — optional course-code scoped
   repair-polish term. `same-time` nudges parallel theory sections toward the same
   `(day,start)`, `spread` penalizes parallel theory sections sharing a `(day,start)`, and
@@ -185,7 +180,7 @@ blackouts, room/instructor/self no-overlap, and the School-Settings hard rules �
 **room-type** (lab requirement), **fixed** (pinned first block), and
 **instructor-unavailable**. In benchmark summaries, "0 resource conflicts" excludes
 `placement` violations caused by an unplaced tail; those are reported separately. Cohort
-conflict and theory different-day in repair are **soft metrics**, never hard violations.
+conflict and theory different-day are **soft metrics**, never hard violations.
 
 ### Per-school configuration (School Settings)
 
@@ -224,8 +219,8 @@ disabled in the UI (§8.5).
 **Blocks** are derived from a section's T/P/L hours:
 
 - Undergraduate theory hours $T+P$ split into sessions of at most `max_theory_session` h
-  (default 2 h; e.g. $T{=}3 \to 2+1$), placed on different days (hard in CP-SAT,
-  soft penalty `_W_SAME_DAY=50` in repair). Graduate theory splits at **3 h** max per
+  (default 2 h; e.g. $T{=}3 \to 2+1$). Different-day placement is a soft preference.
+  Graduate theory splits at **3 h** max per
   session: $T{+}P \le 3$ → single block unchanged; $T{+}P = 4$ → 2+2; $T{+}P = 6$ → 3+3
   (fits the 18:00–21:00 evening window).
 - One lab block of $L$ hours, split at `max_block_len` h (default 4 h), pinned to the
@@ -265,7 +260,7 @@ disabled in the UI (§8.5).
 
 - A variable is created **only for legal candidates** $(r,d,h)\in\mathcal{C}(b)$ — see the
   pruning note below. The full index product is never materialized.
-- Auxiliary variables used by the objective and the different-day rule are derived from
+- Auxiliary variables used by the objective and soft day-spread terms are derived from
   $x$: day-activity $z_{s,b,d}=\max_{r,h}x_{b,r,d,h}$, room-used, instructor-day indicators,
   and cohort slot-busy / first / last.
 
@@ -289,6 +284,12 @@ $(r,d,h)$ only when it already satisfies:
   (`pc`/`studio`/`lab` exactly, or any lab-family room for a generic lab demand).
 
 Best-fit additionally caps each block to the `max_rooms_per_block` smallest fitting rooms.
+The CP-SAT monolith uses the default cap (12). The repair path widens it to **every physical
+room** (`repair._repair_room_cap`): a fixed small cap starves tiny sections — e.g. dozens of
+2–5-student 4th-year seminars all contend for the same handful of smallest rooms, which
+saturate while larger rooms sit unoffered — so the cap is sized to the room inventory rather
+than a constant. Best-fit *ordering* still tries the smallest fitting room first, so room
+utilisation is unaffected; only the reachable set grows.
 
 ---
 
@@ -341,26 +342,29 @@ $$
   attend both).
 - Same shape as H3 but grouped by section instead of instructor.
 
-### H_day — theory different-day
+### S_day — theory different-day soft preference
 
 $$
-\sum_{b \,\in\, B_s^{\text{theory}}} z_{s,b,d} \;\le\; 1
+\operatorname{extra}_{s,d}
+\;\ge\;
+\sum_{b \,\in\, B_s} z_{s,b,d} - 1
 \qquad \forall\, s \in S,\; d \in D,
 \qquad z_{s,b,d} = \max_{r,h} x_{b,r,d,h}
 $$
 
-- A section's theory sessions each fall on a **different day** (e.g. a $2+1$ split occupies
-  two days, not one).
-- Hard in `model_cpsat`; **soft penalty** in `repair` (`_W_SAME_DAY = 50` in both greedy
-  construction `_soft_score` and mini CP-SAT `repair_round` excess var). NOT a `Violation`;
-  do not add to `validate.py`.
-- Lab blocks are excluded (the rule keys on $b\in B_s^{\text{theory}}$).
+- A section's split sessions prefer different days (e.g. a $2+1$ split prefers two days, not
+  one), but the solver may use same-day placement when capacity is tight.
+- Soft in both paths: `model_cpsat` uses `w_nonadjacent`; `repair` uses `_W_SAME_DAY = 50`
+  in greedy construction `_soft_score`, mini CP-SAT `repair_round`, and soft polish. NOT a
+  `Violation`; do not add to `validate.py`.
+- Lab blocks may also contribute to the generic CP-SAT split-day soft term; the repair
+  `_W_SAME_DAY` term applies to theory siblings.
 
-> **Cohort overlap and theory different-day in repair are deliberately not hard constraints.**
-> A hard cohort rule was proven infeasible at scale (soft term §5.12). Different-day in repair
-> was softened to allow last-resort same-day packing when capacity is tight. "0 resource conflicts"
+> **Cohort overlap and theory different-day are deliberately not hard constraints.**
+> A hard cohort rule was proven infeasible at scale (soft term §5.12). Different-day was
+> softened to allow last-resort same-day packing when capacity is tight. "0 resource conflicts"
 > therefore means H2, H3, H_self plus the pruned rules (capacity, lab-room, window, blackout)
-> all hold for placed blocks; H_day holds in CP-SAT but is a soft preference in repair.
+> all hold for placed blocks; theory day-spread is a soft preference in both solver paths.
 > Unplaced tails are tracked separately as placement violations.
 
 ---
@@ -646,8 +650,8 @@ $$
 
 - In the CP-SAT monolith (≤50 sections path) `w_nonadjacent` penalizes a section's split
   blocks sharing the same day — a narrower, block-level meaning distinct from §5.4.
-  Superseded for theory in CP-SAT by H_day (hard); in repair, H_day is a soft penalty so
-  this term has marginal effect on theory blocks there.
+  This is now the CP-SAT theory day-spread mechanism; repair has its own `_W_SAME_DAY`
+  soft penalty for the same preference.
 
 ### 5.17 S-AvoidPairs — $w_{\text{avoid\_pairs}}=1.0$ (both paths)
 
@@ -864,7 +868,7 @@ importing no solver internals, so model/encoding bugs in those checked rules can
 silently. It checks: room,
 instructor, capacity, **lab_room**, **room_type** (categorical room demand), **fixed** (pinned
 first block), window ($h + \ell_b \le \texttt{cfg.undergrad\_end}$, default 18:00), blackout, **instructor_unavailable** (per-instructor
-availability), H_self. Cohort conflict and theory different-day (repair) are **soft metrics**,
+availability), H_self. Cohort conflict and theory different-day are **soft metrics**,
 not `Violation`s — never failing validation.
 
 ### 7.1 Independent verification run (2026-06-23)

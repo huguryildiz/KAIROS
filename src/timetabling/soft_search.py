@@ -9,7 +9,7 @@ from time import perf_counter
 from .config import Config, building_of
 from .repair import (
     _cand_soft, _soft_total, _min_working_days_missing, _avoid_pairs_viol,
-    _parallel_coord_viol,
+    _parallel_coord_viol, _W_SAME_DAY,
 )
 
 CHAIN_MAX_DEPTH = 4   # bounded ejection-chain length in anneal_soft
@@ -184,6 +184,19 @@ def _session_gap_penalty(placed, min_gap: int, sections=None) -> int:
     return penalty
 
 
+def _same_day_theory_excess(placed, sections=None) -> int:
+    section_filter = set(sections) if sections is not None else None
+    by_section_day = defaultdict(int)
+    for bid, c in placed.items():
+        if "#L" in bid:
+            continue
+        sec_id = bid.split("#")[0]
+        if section_filter is not None and sec_id not in section_filter:
+            continue
+        by_section_day[(sec_id, c.day)] += 1
+    return sum(max(0, count - 1) for count in by_section_day.values())
+
+
 def _global_terms(state, cfg) -> dict:
     """Raw counts of the soft terms over the FULL placement. idle/conf over cohorts (all),
     maxrun over cohorts+instructors, instr_days over instructors, room_stable and
@@ -268,6 +281,7 @@ def _global_terms(state, cfg) -> dict:
             and (c.day, c.start, c.room) != cfg.ref_schedule[bid]
         ) if cfg.ref_schedule else 0,
         "session_gap": _session_gap_penalty(state.placed, cfg.min_session_gap_days),
+        "same_day_theory": _same_day_theory_excess(state.placed),
     }
 
 
@@ -373,6 +387,7 @@ def _local_terms(state, cohorts, instrs, rooms, blocks, cfg) -> dict:
             != cfg.ref_schedule[bid]
         ) if cfg.ref_schedule else 0,
         "session_gap": _session_gap_penalty(state.placed, cfg.min_session_gap_days, sections),
+        "same_day_theory": _same_day_theory_excess(state.placed, sections),
     }
 
 
@@ -399,7 +414,8 @@ def _norm_obj(terms, base, cfg) -> float:
             + cfg.w_dept_compact * terms["dept_compactness"] / max(base["dept_compactness"], 1)
             + cfg.w_dept_fairness * terms["dept_fairness"] / max(base["dept_fairness"], 1)
             + cfg.w_perturbation * terms["perturbation"] / max(base["perturbation"], 1)
-            + cfg.w_session_gap * terms["session_gap"] / max(base["session_gap"], 1))
+            + cfg.w_session_gap * terms["session_gap"] / max(base["session_gap"], 1)
+            + _W_SAME_DAY * terms["same_day_theory"] / max(base["same_day_theory"], 1))
 
 
 def _slot(c):
@@ -444,17 +460,15 @@ def try_relocate(state, cand_by_block, bid, rng, eval_fn):
 
 
 def _feasible_ignoring_room(state, c, sid, iids):
-    """True if candidate c is free on instructor / section / theory-different-day (room
-    conflicts are handled separately by the chain via ejection)."""
+    """True if candidate c is free on instructor / section time. Same-day theory siblings
+    are allowed here and discouraged by the polish objective; room conflicts are handled
+    separately by the chain via ejection."""
     for hh in range(c.start, c.start + c.length):
         for iid in iids:
             if state.instr_slot.get((iid, c.day, hh)):
                 return False
         if state.sect_slot.get((sid, c.day, hh)):
             return False
-    if "#L" not in c.block_id and any(b != c.block_id
-            for b in state.sect_theory_day.get((sid, c.day), ())):
-        return False
     return True
 
 
@@ -474,7 +488,7 @@ def try_chain(state, cand_by_block, bid, rng, eval_fn, max_depth=4):
     """Bounded ejection (Kempe-style) chain. Move bid to a candidate slot; if that slot's
     room is held by a single other block, eject it and recurse (it seeks its own slot), up
     to max_depth, until some block lands in a fully free slot. Each hop stays
-    instructor/section/theory-day feasible; only single-block ROOM conflicts are ejected.
+    instructor/section feasible; only single-block ROOM conflicts are ejected.
     Leaves state in the chained config; returns (dobj, dterms, revert) or None. Unlocks
     moves that relocate/swap cannot in dense (100%-room) regions."""
     old = {}                                  # bid -> original candidate (restore target)

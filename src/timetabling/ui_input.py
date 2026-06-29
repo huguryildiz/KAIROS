@@ -4,7 +4,7 @@ from typing import List, Dict, Tuple
 
 from .config import Config, normalize_parallel_policy
 from .model import Section, Room, Instructor
-from .derive import course_level, blocks_from_tpl
+from .derive import course_level, blocks_from_tpl, theory_session_cap_for_level
 from .textnorm import parse_int
 from .csv_import import normalize_room_type
 
@@ -35,7 +35,34 @@ def grad_dept_codes(courses: List[Dict]) -> List[str]:
     """Sorted distinct dept codes among graduate (level > 4) sections — the candidates for a
     per-department earliest-start override in the Settings panel."""
     return sorted({dept_code_for(r) for r in courses
-                   if course_level(r.get("Course Code", "")) > 4})
+                   if effective_course_level(r) > 4})
+
+
+def grad_dept_labels(courses: List[Dict]) -> Dict[str, str]:
+    """Display labels for graduate department override options, keyed by dept code."""
+    names: Dict[str, str] = {}
+    for row in courses:
+        if effective_course_level(row) <= 4:
+            continue
+        code = dept_code_for(row)
+        name = str(row.get("Dept", "") or "").strip()
+        if code not in names:
+            names[code] = name
+        elif not names[code] and name:
+            names[code] = name
+    labels: Dict[str, str] = {}
+    for code in sorted(names):
+        name = names[code]
+        labels[code] = f"{code} · {name}" if name and name.upper() != code else code
+    return labels
+
+
+def effective_course_level(row: Dict) -> int:
+    """Course level after applying the optional uploaded Year override."""
+    yr = parse_int(row.get("Year"), 0)
+    if 1 <= yr <= 6:
+        return yr
+    return course_level(row.get("Course Code", ""))
 
 
 def is_part_time(instructor_name: str) -> bool:
@@ -137,7 +164,7 @@ def build_sections_from_courselist(rows: List[Dict], period: str,
         department = str(r.get("Dept", "")).strip()
         dept = dept_code_for(r)                              # code prefix, UNK -> DEPT fallback
         yr = parse_int(r.get("Year"), 0)        # optional Year column overrides cohort year (1-6 only)
-        eff_year = yr if 1 <= yr <= 6 else year
+        eff_year = str(yr) if 1 <= yr <= 6 else year
         cohort = f"{dept}-{eff_year}"
         T = parse_int(r.get("T"), 0); P = parse_int(r.get("P"), 0)
         L = parse_int(r.get("L"), 0)
@@ -157,14 +184,16 @@ def build_sections_from_courselist(rows: List[Dict], period: str,
         fixed_day, fixed_start = parse_fixed(r.get("Fixed"))
         min_days = parse_int(r.get("Min Working Days"), 0)
         min_days = min(max(min_days, 0), len(cfg.days()))
+        level = effective_course_level(r)
         sections.append(Section(
             section_id=sid, period=period, code=code,
             name=str(r.get("Course Name", "")).strip(),
-            level=course_level(code), dept_code=dept, department=department,
+            level=level, dept_code=dept, department=department,
             cohort_key=cohort, instructor_ids=instructor_ids, students=students,
             T=T, P=P, L=L, Cr=(T + P + L), category="",
             blocks=blocks_from_tpl(sid, T, P, L, T + P + L,
-                                   cfg.max_block_len, cfg.max_theory_session),
+                                   cfg.max_block_len,
+                                   theory_session_cap_for_level(T, P, T + P + L, level, cfg)),
             plan_room="",
             requires_lab_room=(rtype in ("lab", "pc", "studio")),
             required_room_type=rtype,

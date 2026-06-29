@@ -59,6 +59,7 @@ def test_brand_css_light_vs_dark_tokens():
     assert ".tt-blk" in light and ".tt-blk" in dark            # component CSS in both
     assert 'data-testid="stHeader"' in light                   # hides native chrome
     assert brand_css() == light                                # default is light
+    assert '[class*="st-key-dl_pdf_"]' in light                 # all per-view PDF buttons are red
 
 
 def test_stepper_marks_status_classes():

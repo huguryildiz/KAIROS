@@ -1,4 +1,4 @@
-from timetabling.ui_input import dept_code_for, grad_dept_codes
+from timetabling.ui_input import dept_code_for, grad_dept_codes, grad_dept_labels
 from timetabling.settings import build_config, DEFAULT_SETTINGS
 from timetabling.config import Config
 from timetabling.model import Section, Block, Instructor, Room
@@ -13,6 +13,23 @@ def test_dept_code_for_normal_and_unk_fallback():
 def test_grad_dept_codes_only_graduate_sorted():
     rows = [{"Course Code": "PSY501"}, {"Course Code": "PSY101"}, {"Course Code": "CS502"}]
     assert grad_dept_codes(rows) == ["CS", "PSY"]
+
+
+def test_grad_dept_codes_respects_year_override():
+    rows = [
+        {"Course Code": "PSY101", "Dept": "Psychology", "Year": "5"},
+        {"Course Code": "CS102", "Dept": "Computer Science", "Year": "2"},
+    ]
+    assert grad_dept_codes(rows) == ["PSY"]
+
+
+def test_grad_dept_labels_include_department_names():
+    rows = [
+        {"Course Code": "PSY501", "Dept": "Psychology"},
+        {"Course Code": "CS502", "Dept": ""},
+        {"Course Code": "PSY502", "Dept": "Ignored duplicate"},
+    ]
+    assert grad_dept_labels(rows) == {"CS": "CS", "PSY": "PSY · Psychology"}
 
 
 def test_build_config_maps_grad_overrides_uppercased_and_validated():

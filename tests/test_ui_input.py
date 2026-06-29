@@ -46,6 +46,20 @@ def test_build_sections_from_courselist():
     assert rep["missing_email"] == 1                    # MATH row has blank email
 
 
+def test_courselist_max_theory_session_only_splits_undergrad():
+    rows = [
+        {"Course Code": "PSY 303", "Section No": "01", "T": "3", "P": "0", "L": "0",
+         "Instructor Email": "u@x.edu", "Section Capacity": "30"},
+        {"Course Code": "PSY 503", "Section No": "01", "T": "3", "P": "0", "L": "0",
+         "Instructor Email": "g@x.edu", "Section Capacity": "15"},
+    ]
+    secs, _ = build_sections_from_courselist(rows, "001", Config(max_theory_session=2))
+    by_id = {s.section_id: s for s in secs}
+
+    assert sorted(b.length for b in by_id["PSY 303_01"].blocks) == [1, 2]
+    assert [b.length for b in by_id["PSY 503_01"].blocks] == [3]
+
+
 def test_build_instructors_part_time():
     instr = build_instructors_from_courselist(_ROWS)
     assert instr["a@x.edu"].is_staff is True
@@ -129,6 +143,15 @@ def test_year_column_overrides_cohort_year():
              "L": "0", "Instructor Email": "a@x.edu", "~Students": "10", "Year": "2"}]
     secs, _ = build_sections_from_courselist(rows, "001", Config())
     assert secs[0].cohort_key == "CMPE-2"   # code parses year 1; Year column wins
+    assert secs[0].level == 2
+
+
+def test_year_column_marks_uploaded_course_as_graduate():
+    rows = [{"Course Code": "PSY 101", "Section No": "01", "T": "3", "P": "0",
+             "L": "0", "Instructor Email": "a@x.edu", "~Students": "10", "Year": "5"}]
+    secs, _ = build_sections_from_courselist(rows, "001", Config())
+    assert secs[0].cohort_key == "PSY-5"
+    assert secs[0].level == 5
 
 
 def test_year_column_absent_falls_back_to_code():

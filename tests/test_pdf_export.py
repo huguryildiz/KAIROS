@@ -89,6 +89,27 @@ def test_build_pdf_bundle_sanitizes_filename():
     assert _sanitize_filename("Şükrü Çağ") == "Şükrü_Çağ"
 
 
+def test_dense_pdf_views_are_paginated_for_readability():
+    from timetabling.pdf_export import _assignment_hours, _paginate_for_readability
+
+    sched = {"assignments": [
+        {"section_id": f"ELT 40{i}_01", "day": "Mo", "start": 9, "end": 11,
+         "room": f"A10{i}", "instructor_name": f"Instructor {i}",
+         "department": "English Language Education"}
+        for i in range(3)
+    ]}
+    pages = _paginate_for_readability(sched)
+
+    assert len(pages) == 2
+    assert sum(len(p["assignments"]) for p in pages) == 3
+    for page in pages:
+        slot_counts = {}
+        for assignment in page["assignments"]:
+            for slot in _assignment_hours(assignment):
+                slot_counts[slot] = slot_counts.get(slot, 0) + 1
+        assert max(slot_counts.values()) <= 2
+
+
 def test_pdf_i18n_keys_exist():
     from timetabling.i18n import t
     assert t("res_dl_pdf", "tr") == "PDF indir"

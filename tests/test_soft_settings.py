@@ -65,8 +65,10 @@ def test_instr_days_no_target_with_saturday_is_six():
 
 
 def test_default_settings_instr_days_target():
+    # Default ships "No target": instr_days is opt-in, so the dial is inert until the
+    # admin picks ≤4/≤3/≤2.
     cfg = build_config(DEFAULT_SETTINGS, {}, 60)
-    assert cfg.max_instr_days == 3 and cfg.w_instr_days == 10.0
+    assert cfg.max_instr_days == 5 and cfg.w_instr_days == 0.0
 
 
 def test_legacy_5level_profile_migrates_to_three():

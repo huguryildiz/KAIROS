@@ -19,8 +19,8 @@ def test_default_settings_build_config_matches_today():
     # uniform 0-1 UI scale: every "medium" toggle -> 0.5 x UI_REF(20) = 10
     assert cfg.w_cohort_conflict == 50
     assert cfg.w_cohort_gap == 10
-    assert cfg.w_instr_days == 10     # target=3 active -> medium dial applies
-    assert cfg.w_parttime_days == 14  # medium w_instr_days -> parttime scaled
+    assert cfg.w_instr_days == 0      # default "No target" -> instr_days dial inert (opt-in)
+    assert cfg.w_parttime_days == 0   # inert when instr_days target is off
     assert DEFAULT_SETTINGS["weights"]["evening"] == "medium"
     assert DEFAULT_SETTINGS["weights"]["instr_idle"] == "medium"
     assert DEFAULT_SETTINGS["weights"]["fairness"] == "medium"

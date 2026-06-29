@@ -42,8 +42,10 @@ DEFAULT_SETTINGS: dict = {
     # instructor-days target -> Config.max_instr_days. The instr_days priority dial only
     # bites when this target creates headroom below the active week length; 0 = "No target"
     # (term off: max_instr_days = week length, w_instr_days = 0). Active values: 4 / 3 / 2.
-    # Default 3 (≤3 days): medium weight applies for an untouched Settings step.
-    "instr_days_target": 3,
+    # Default 0 (No target): instr_days is the most opinionated lever — forcing instructors
+    # onto few days conflicts with session_gap / free_day — so it ships opt-in. The admin
+    # activates it consciously by picking ≤4/≤3/≤2.
+    "instr_days_target": 0,
     "weights": {              # preset levels, never raw numbers
         "maxrun": "medium",
         "instr_days": "medium",

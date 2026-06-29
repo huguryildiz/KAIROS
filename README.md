@@ -39,7 +39,8 @@ It runs two ways: a **web app** for non-technical users and a **command-line sol
   - theory sessions of the same course prefer different days, but may share a day as a soft fallback
   - instructor unavailability slots strictly blocked
 - **Optimized, not just valid.** The soft polish phase steers the schedule toward comfort after placement — never at the cost of hard constraints:
-  - minimizes cohort idle gaps, compacts instructor weeks, reduces late-hour load
+  - minimizes cohort idle gaps and reduces late-hour load
+  - compacts instructor teaching weeks into fewer days (opt-in)
   - keeps each section in a stable room across its blocks
   - honors per-section minimum spread targets and coordinates parallel sections
   - penalizes user-defined avoid-conflict course pairs

@@ -94,9 +94,9 @@ time. The CP-SAT monolith (§6a) and the repair soft polish (§6b) use separate 
 - **Compress instructor weeks** (`w_instr_days=10.0` full-time, `w_parttime_days=14.0`
   part-time when an instructor-days target is active; repair polish uses `w_instr_days` only) —
   CP-SAT monolith penalizes every teaching day; repair polish penalizes days beyond
-  `max_instr_days`. UI default is **≤3 days** (target active, medium weight applies); choosing
-  No target forces both weights to 0.0; ≤4/≤3/≤2 sets the target and maps the priority preset
-  to 5.0/10.0/20.0, with part-time set to `w_instr_days + 4.0`.
+  `max_instr_days`. UI default is **No target** (opt-in: both weights forced to 0.0, since
+  forcing few teaching days conflicts with session-gap / free-day spread); ≤4/≤3/≤2 sets the
+  target and maps the priority preset to 5.0/10.0/20.0, with part-time set to `w_instr_days + 4.0`.
 - **Room stability** (`w_room_stable=10.0`) — penalize each section that uses more than one
   room across its blocks (repair polish).
 - **Section minimum working days** (`w_min_working_days=10.0`) — penalize each missing
@@ -400,14 +400,14 @@ $$
 day; in the repair soft polish it applies to days **beyond the target** $T = $ `max_instr_days`
 ($\max(0,\ \text{days}_i - T)$). In the School-Settings/UI path, `build_config` forces
 `w_instr_days = w_parttime_days = 0` when `instr_days_target` is "No target",
-making the term inert. UI default is **≤3 days** (target active, medium weight). Raw `Config()` still carries the
+making the term inert. UI default is **No target** (opt-in; the term is inert). Raw `Config()` still carries the
 legacy nonzero weights used by CLI/model tests unless a Settings dict is built.
 
 **Target lever (`instr_days_target` → `max_instr_days`).** The School-Settings control maps
 **No target → $T = $ week length** (5, or 6 with Saturday) which is the term's **off state**
 (no headroom ⇒ inert ⇒ the build forces $w_{\text{instr}} = w_{\text{pt}} = 0$), and **≤4 /
-≤3 / ≤2 → $T = 4/3/2$**, which creates headroom so the priority dial steers. Default is **≤3
-days** (target active, medium weight; an untouched settings step activates the term). The consolidation
+≤3 / ≤2 → $T = 4/3/2$**, which creates headroom so the priority dial steers. Default is **No
+target** (opt-in; an untouched settings step leaves the term inert). The consolidation
 move in the soft polish (`soft_search`) is gated on $T < $ week length, so a weight alone
 cannot steer this term — *the target must create headroom first*.
 
@@ -902,7 +902,7 @@ every bad field falls back to its default and the solve proceeds.
 | Day end | 13–21 | `undergrad_end` | undergrad end-of-day window (default 18:00) |
 | Max theory session | 1–6 | `max_theory_session` | longest single undergraduate theory session before splitting (default 2 h); graduate theory is capped at 3 h per session regardless of this setting (T+P ≤ 3 → single block; T+P > 3 → split at 3 h max) |
 | Max block length | 1–8 | `max_block_len` | longest lab block before splitting (default 4 h) |
-| Instructor-days target | No target / ≤4 / ≤3 / ≤2 | `max_instr_days` + `w_instr_days` | No target → term off (weight forced 0); ≤4/≤3/≤2 sets target and activates the instr_days soft term; **≤3 is the default**. See §5.1. |
+| Instructor-days target | No target / ≤4 / ≤3 / ≤2 | `max_instr_days` + `w_instr_days` | No target → term off (weight forced 0); ≤4/≤3/≤2 sets target and activates the instr_days soft term; **No target is the default** (opt-in). See §5.1. |
 | Saturday | checkbox | `saturday_enabled` | add Sa to the teaching week |
 | Graduate | (always True — not a UI control; hardcoded `s["include_grad"] = True` in `views/settings.py`) | `include_grad` | graduate courses are always scheduled; the field exists in `Config` and `DEFAULT_SETTINGS` but no checkbox is rendered. |
 | Graduate earliest start | 6–20 | `grad_start` | earliest hour a graduate block may start (default 18:00). Lower it to allow daytime graduate classes; guarded to `day_start ≤ grad_start < 21`, else reverts to 18. |

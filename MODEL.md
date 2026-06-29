@@ -361,7 +361,7 @@ $$
   `_W_SAME_DAY` term applies to theory siblings.
 
 > **Cohort overlap and theory different-day are deliberately not hard constraints.**
-> A hard cohort rule was proven infeasible at scale (soft term §5.12). Different-day was
+> A hard cohort rule was proven infeasible at scale (soft term §5.15). Different-day was
 > softened to allow last-resort same-day packing when capacity is tight. "0 resource conflicts"
 > therefore means H2, H3, H_self plus the pruned rules (capacity, lab-room, window, blackout)
 > all hold for placed blocks; theory day-spread is a soft preference in both solver paths.
@@ -376,7 +376,7 @@ objectives. Weights live in `config.py`. The two paths share the weight fields
 `w_instr_days` / `w_parttime_days` (but with different semantics — see §5.1). The repair
 polish has terms absent from the monolith (`w_idle`, `w_maxrun`, `w_room_stable`,
 `w_free_day`, `w_nonadjacent`, `w_evening`, `w_instr_idle`, `w_fairness`,
-`w_dept_compact`). Both paths share `w_dept_fairness`, `w_building_change`, `w_room_util`,
+`w_dept_compact`, `w_session_gap`). Both paths share `w_dept_fairness`, `w_building_change`, `w_room_util`,
 `w_avoid_pairs`, and the per-section `w_min_working_days` target when a row supplies it. The
 monolith has terms not in the polish objective (`w_cohort_gap`, `w_order`, `w_englab`).
 `w_cohort_conflict` appears in both but as an objective term in the monolith and as a
@@ -430,7 +430,7 @@ $$
 
 - Penalizes cumulative consecutive teaching hours beyond `max_consecutive_hours`=3, over both
   cohorts and instructors.
-- Repair soft polish term only. UI dial: low / medium / high (default medium = 10.0).
+- Repair soft polish term only. UI dial: off / low / medium / high (default medium).
 
 ### 5.4 Compact teaching days — $w_{\text{nonadjacent}}=10.0$ (repair polish)
 
@@ -482,7 +482,7 @@ $$
 
 - Penalizes each section that uses more than one distinct physical room across its blocks
   ($\max(0,\lvert\text{rooms}(s)\rvert - 1)$).
-- Repair soft polish term only. UI dial: low / medium / high (default medium = 10.0).
+- Repair soft polish term only. UI dial: off / low / medium / high (default medium).
 
 ### 5.9 Free day — $w_{\text{free\_day}}=10.0$ (repair polish, year-scoped)
 
@@ -706,9 +706,10 @@ Both solvers share the same candidate generation and constraints.
 3. **Move-based soft polish** (`soft_search.anneal_soft`) — once placement converges,
    re-seat already-placed blocks to lower the normalized non-guard objective
    (idle / maxrun / instr_days / nonadjacent / evening / instr_idle / fairness /
-   room_stable / free_day / min_working_days / instr_avoid_viol / instr_prefer_miss /
-   avoid_pairs_viol / dept_compactness / dept_fairness) under a `conf`
-   no-regress guard.
+   room_stable / free_day / room_util / min_working_days / parallel_coord /
+   instr_avoid_viol / instr_prefer_miss / avoid_pairs_viol / building_change /
+   dept_compactness / dept_fairness / perturbation / session_gap / same_day_theory)
+   under a `conf` no-regress guard.
    Moves: relocate, chain, swap, consolidate_instr, free_cohort_day. Acceptor: Great Deluge
    (default). Bounded by the `repair_time_limit_s` deadline; the placement count never
    decreases (hard placement guard + accept guard).
@@ -770,13 +771,15 @@ solve_repair(sections, rooms, cfg, progress_cb=None):
   # ── Phase 4: move-based soft polish ───────────────────────────────────────
   IF cfg.soft_polish_in_repair:
       budget = min(cfg.soft_polish_budget_s, max(30.0, 0.75 × |placed|), remaining_deadline)
-      # cfg.soft_polish_budget_s = 300 s (balanced) / 180 s (fast) / 600 s (best) via settings.build_config;
-      # the module constant SOFT_POLISH_BUDGET_S=600 in repair.py is a getattr fallback only.
+      # cfg.soft_polish_budget_s = 300 s (balanced) / 180 s (fast) / 600 s (best) via settings.build_config.
       # anneal_soft: deluge acceptor; moves = relocate / chain / swap /
       #              consolidate_instr / free_cohort_day
-      # objective: normalized(idle + maxrun + instr_days + nonadjacent +
-      #                       evening + instr_idle + fairness + room_stable +
-      #                       free_day + min_working_days + dept_compactness)
+      # objective: normalized(idle + maxrun + instr_days + nonadjacent + evening +
+      #                       instr_idle + fairness + room_stable + free_day + room_util +
+      #                       min_working_days + parallel_coord + instr_avoid_viol +
+      #                       instr_prefer_miss + avoid_pairs_viol + building_change +
+      #                       dept_compactness + dept_fairness + perturbation +
+      #                       session_gap + same_day_theory)
       # guard: conf (cohort-conflict) must not increase
       anneal_soft(state, cand_by_block, cfg, budget)
 
@@ -917,22 +920,21 @@ user-facing control — it is fixed at 13:00.
 Schools pick a **plain-language level**, never a raw number. Presets: `UI_REF=20.0` ×
 `WEIGHT_LEVELS` → low=5.0, medium=10.0, high=20.0 (uniform across all dials).
 
-| UI control | `Config` field(s) | low / medium / high |
-|---|---|---|
-| Maxrun | `w_maxrun` (§5.3) | 5.0 / 10.0 / 20.0 |
-| Instructor days¹ | `w_instr_days` / `w_parttime_days` (§5.1) | 5.0 / 10.0 / 20.0 |
-| Consecutive teaching days | `w_nonadjacent` (§5.4) | 5.0 / 10.0 / 20.0 |
-| Room stability | `w_room_stable` (§5.8) | 5.0 / 10.0 / 20.0 |
+Every dial uses `_optional_preset`, so each has an explicit **off** state (0.0). All default to
+**medium** (10.0) except **Instructor days**, which defaults to **No target** (off — see footnote ¹):
 
-These dials use the same numeric scale and include an explicit **off** state; all default to **medium** (10.0):
-
-| UI control | `Config` field | off / low / medium / high |
+| UI control | `Config` field(s) | off / low / medium / high |
 |---|---|---|
+| Maxrun | `w_maxrun` (§5.3) | 0.0 / 5.0 / 10.0 / 20.0 |
+| Instructor days¹ | `w_instr_days` / `w_parttime_days` (§5.1) | 0.0 / 5.0 / 10.0 / 20.0 |
+| Compact teaching days | `w_nonadjacent` (§5.4) | 0.0 / 5.0 / 10.0 / 20.0 |
+| Room stability | `w_room_stable` (§5.8) | 0.0 / 5.0 / 10.0 / 20.0 |
 | Late-hour load | `w_evening` (§5.5) | 0.0 / 5.0 / 10.0 / 20.0 |
 | Instructor idle gaps | `w_instr_idle` (§5.6) | 0.0 / 5.0 / 10.0 / 20.0 |
 | Bad-load fairness | `w_fairness` (§5.7) | 0.0 / 5.0 / 10.0 / 20.0 |
 | Department building compactness | `w_dept_compact` (§5.9d) | 0.0 / 5.0 / 10.0 / 20.0 |
 | Department prime-time fairness | `w_dept_fairness` (§5.9e) | 0.0 / 5.0 / 10.0 / 20.0 |
+| Spread session days | `w_session_gap` (§2) | 0.0 / 5.0 / 10.0 / 20.0 |
 
 `free_day` (§5.9) has a fixed `Config` weight of 10.0 and is not exposed as a dial — only its
 year scope (multiselect) is configurable. With no selected years it is inert. `w_cohort_gap=10.0`
@@ -997,7 +999,7 @@ when the upload path validates the schema defensively.
   cohort / part-time / lab / pinned-slot defaults or add a per-row soft day-spread target
   (§0, §3).
 - **Fixed at `config.py` defaults — deliberately not exposed:** the cohort-conflict weight
-  (`w_cohort_conflict=50`, §5.12), the always-on idle weight (`w_idle=15.0`, §5.2),
+  (`w_cohort_conflict=50`, §5.15), the always-on idle weight (`w_idle=15.0`, §5.2),
   cohort-compactness (`w_cohort_gap=10.0`, §5.2), level-ordering (`w_order`, §5.10),
   Engineering-lab preference (`w_englab`, §5.11), and the repair soft-shaping toggle (§6b).
   These are calibrated globals, not per-school policy.

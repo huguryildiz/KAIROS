@@ -44,10 +44,9 @@ It runs two ways: a **web app** for non-technical users and a **command-line sol
   - keeps each section in a stable room across its blocks
   - honors per-section minimum spread targets and coordinates parallel sections
   - penalizes user-defined avoid-conflict course pairs
-  - spreads multi-session courses across the week (opt-in)
-  - balances prime-time access across departments (opt-in)
-  - clusters department classes into fewer buildings (opt-in)
-  - reduces same-day building switches for instructors (opt-in)
+  - spreads multi-session courses across the week
+  - balances prime-time access across departments
+  - clusters department classes into fewer buildings
   - prefers right-sized rooms over large under-used ones
 - **Minimum perturbation.** Upload a previous `schedule_*.json` export as a reference. Assignments that differ in day, start time, or room from the reference receive a soft penalty, steering the new schedule to stay as close as possible to the existing one — useful for incremental updates and rescheduling scenarios.
 - **Graded instructor time preferences.** The availability editor supports four tiers per instructor: **unavailable** (hard — never placed in that slot), **avoid** (soft penalty per overlapping hour), **preferred** (soft miss-penalty when a block misses all preferred hours), and **neutral** (default, no cost). Active in both the CP-SAT monolith and the repair soft polish.
@@ -80,7 +79,7 @@ Requires Python 3.11+.
 PYTHONPATH=src .venv/bin/python -m streamlit run app.py      # http://localhost:8501
 ```
 
-The web app works without any private data — a PII-free sample course list ships in `assets/` and classroom data is uploaded by the user.
+The web app works without any private data — PII-free sample course and classroom lists ship in `assets/` (loadable from the UI via "Try sample dataset"), or upload your own.
 
 ```bash
 .venv/bin/python -m pytest -q      # run the test suite

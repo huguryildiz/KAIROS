@@ -160,7 +160,8 @@ def render(lang: str) -> None:
             st.download_button(
                 t(label_key, lang), pdf_data,
                 file_name=pdf_name, mime=pdf_mime,
-                key=f"dl_pdf_{dim_field}"
+                key=f"dl_pdf_{dim_field}",
+                icon=":material/picture_as_pdf:",
             )
 
     _render_archive_log(lang)

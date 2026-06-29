@@ -11,7 +11,7 @@ from timetabling.ui_style import eyebrow_html
 from timetabling.i18n import t, DAY_LABELS, DAY_LABELS_FULL
 from timetabling.settings import (profile_to_json, profile_from_json, _LEGACY_LEVEL,
                                   QUALITY_MODES)
-from timetabling.ui_input import normalize_name, grad_dept_codes
+from timetabling.ui_input import normalize_name, grad_dept_codes, grad_dept_labels
 from timetabling.config import PARALLEL_POLICIES
 
 _LEVELS = ("low", "medium", "high")
@@ -138,14 +138,21 @@ def _policy(lang: str, s: dict) -> None:
     # Cap the hour dropdowns to the stepper width; responsive (shrinks on
     # narrow viewports, never overflows — see CLAUDE.md mobile-portrait rule).
     st.markdown(
-        "<style>.st-key-set_day_start,.st-key-set_day_end,"
-        ".st-key-set_grad_start{max-width:260px;}</style>",
+        """
+        <style>
+        .st-key-set_day_start,.st-key-set_day_end,.st-key-set_grad_start{max-width:260px;}
+        :is(.st-key-set_day_start,.st-key-set_day_end,.st-key-set_grad_start,[class*="st-key-grad_dept_"])
+          [data-testid="stWidgetLabel"]{min-height:3.35rem;align-items:flex-start;}
+        :is(.st-key-set_day_start,.st-key-set_day_end,.st-key-set_grad_start,[class*="st-key-grad_dept_"])
+          [data-testid="stWidgetLabel"] p{line-height:1.25;}
+        </style>
+        """,
         unsafe_allow_html=True,
     )
     # Graduate courses are always scheduled; grad_start sits beside the undergrad
     # end-time as a third time-window control (no toggle).
     s["include_grad"] = True
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3, c4 = st.columns([1, 1, 1, 2])
     s["day_start"] = _hour_select(c1, t("set_day_start", lang), 6, 12,
                                   s["day_start"], "set_day_start",
                                   help=t("set_day_start_help", lang))
@@ -155,6 +162,7 @@ def _policy(lang: str, s: dict) -> None:
     s["grad_start"] = _hour_select(c3, t("set_grad_start", lang), 6, 20,
                                    s.get("grad_start", 18), "set_grad_start",
                                    help=t("set_grad_start_help", lang))
+    _grad_by_dept(lang, s, c4)
     c4, c5, _ = st.columns(3)
     s["max_theory_session"] = c4.number_input(t("set_max_theory", lang), min_value=1,
                                               max_value=6, value=int(s["max_theory_session"]),
@@ -165,7 +173,6 @@ def _policy(lang: str, s: dict) -> None:
                                          help=t("set_max_block_help", lang), key="set_maxblock")
     s["saturday"] = st.toggle(t("set_saturday", lang), value=bool(s["saturday"]),
                               help=t("set_saturday_help", lang), key="set_sat")
-    _grad_by_dept(lang, s)
 
     # blackouts are a hard constraint -> keep them contiguous with the time-window/grad
     # block, above the preference-weights divider.
@@ -270,22 +277,26 @@ def _policy(lang: str, s: dict) -> None:
     s["free_day_years"] = list(picked)
 
 
-def _grad_by_dept(lang: str, s: dict) -> None:
+def _grad_by_dept(lang: str, s: dict, col=None) -> None:
     """Per-department graduate earliest-start overrides. Lists the graduate dept codes from
     the uploaded course list; for each picked dept, an hour select sets its floor. Writes
     s['grad_start_by_dept'] = {dept: hour} (build_config validates + upper-cases)."""
     courses = st.session_state.get("courses", []) or []
     depts = grad_dept_codes(courses)
-    if not depts:
-        return
+    labels = grad_dept_labels(courses)
     cur = dict(s.get("grad_start_by_dept", {}) or {})
     rev = st.session_state.get("set_rev", 0)
-    picked = st.multiselect(t("set_grad_dept_pick", lang), depts,
-                            default=[d for d in depts if d in cur],
-                            help=t("set_grad_dept_help", lang), key=f"grad_dept_{rev}")
+    help_text = t("set_grad_dept_help", lang) if depts else t("set_grad_dept_empty", lang)
+    target = col or st
+    picked = target.multiselect(t("set_grad_dept_pick", lang), depts,
+                                default=[d for d in depts if d in cur],
+                                format_func=lambda d: labels.get(d, d),
+                                placeholder=t("set_grad_dept_placeholder", lang),
+                                help=help_text, disabled=not depts,
+                                key=f"grad_dept_{rev}")
     new: dict = {}
     if picked:
-        gcols = st.columns(min(len(picked), 3))
+        gcols = target.columns(min(len(picked), 3))
         for i, d in enumerate(picked):
             h = _hour_select(gcols[i % len(gcols)], d, 6, 20,
                              int(cur.get(d, s.get("grad_start", 18))),

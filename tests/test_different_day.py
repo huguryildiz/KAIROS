@@ -12,14 +12,15 @@ def _theory_section(t1=2, t2=1):
     return s
 
 
-def test_theory_sessions_solved_on_different_days():
-    cfg = Config(solve_time_limit_s=5)
+def test_theory_sessions_prefer_different_days_when_weighted():
+    cfg = Config(solve_time_limit_s=5, w_cohort_gap=0, w_instr_days=0,
+                 w_parttime_days=0, w_order=0, w_englab=0, w_nonadjacent=10)
     rooms = [Room("R1", 50, False, True)]
     instr = {"i1": Instructor("i1", "n", False, "D")}
     s = _theory_section()
     assigns, stats = build_and_solve([s], rooms, instr, cfg)
     assert len(assigns) == 2
-    assert len({a.day for a in assigns}) == 2                     # forced apart
+    assert len({a.day for a in assigns}) == 2                     # preferred apart
     assert validate(assigns, [s], {"R1": rooms[0]}, instr, cfg) == []
 
 

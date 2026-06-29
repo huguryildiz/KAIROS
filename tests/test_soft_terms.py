@@ -31,7 +31,7 @@ def test_global_terms_keys_and_room_stable():
                       "min_working_days", "parallel_coord", "conf",
                       "instr_avoid_viol", "instr_prefer_miss", "avoid_pairs_viol",
                       "building_change", "perturbation", "dept_compactness",
-                      "dept_fairness", "session_gap"}
+                      "dept_fairness", "session_gap", "same_day_theory"}
     assert t["room_stable"] == 0          # one section, one room
     assert t["instr_days"] == 1           # i1 teaches 1 day, excess over 0 = 1
     assert t["evening"] == 0
@@ -187,7 +187,7 @@ def test_norm_obj_weights_and_normalization():
             "conf": 0,
             "instr_avoid_viol": 0, "instr_prefer_miss": 0, "avoid_pairs_viol": 0,
             "building_change": 0, "perturbation": 0, "dept_compactness": 2,
-            "dept_fairness": 2, "session_gap": 2}
+            "dept_fairness": 2, "session_gap": 2, "same_day_theory": 0}
     cfg = Config(w_idle=15, w_maxrun=10, w_instr_days=10, w_nonadjacent=10,
                  w_evening=10, w_instr_idle=10, w_fairness=10,
                  w_room_stable=10, w_free_day=10, w_room_util=1,

@@ -404,7 +404,7 @@ def test_global_terms_raw_terms_plus_conf():
                  "min_working_days": 0, "parallel_coord": 0, "conf": 2,
                  "instr_avoid_viol": 0, "instr_prefer_miss": 0, "avoid_pairs_viol": 0,
                  "building_change": 0, "perturbation": 0, "dept_compactness": 0,
-                 "dept_fairness": 0, "session_gap": 0}
+                 "dept_fairness": 0, "session_gap": 0, "same_day_theory": 0}
 
 
 def test_local_terms_match_global_over_all_entities():
@@ -454,6 +454,31 @@ def test_relocate_lowers_parallel_coord_without_conf_regress():
     assert dobj < 0
     assert len(st.placed) == 2
     revert()
+
+
+def test_soft_search_allows_same_day_theory_as_penalized_move():
+    from timetabling.soft_search import (
+        _feasible_ignoring_room, _global_terms, _local_terms)
+    s = Section("S_01", "001", "S 201", "x", 2, "S", "F", "S-2", ["i1"], 30,
+                3, 0, 0, 3, "")
+    s.blocks = [Block("S_01#T1", "S_01", "theory", 2, False),
+                Block("S_01#T2", "S_01", "theory", 1, False)]
+    st = _state(s)
+    st.occupy("S_01#T1", Candidate("S_01#T1", "R1", "Mo", 9, 2))
+    st.occupy("S_01#T2", Candidate("S_01#T2", "R2", "Tu", 9, 1))
+
+    same_day = Candidate("S_01#T2", "R2", "Mo", 11, 1)
+    st.release("S_01#T2")
+
+    assert _feasible_ignoring_room(st, same_day, "S_01", ["i1"]) is True
+    before = _global_terms(st, Config())
+    st.occupy("S_01#T2", same_day)
+    after = _global_terms(st, Config())
+    local = _local_terms(st, {s.cohort_key}, {"i1"}, {"R1", "R2"},
+                         {"S_01#T1", "S_01#T2"}, Config())
+    assert before["same_day_theory"] == 0
+    assert after["same_day_theory"] == 1
+    assert local["same_day_theory"] == after["same_day_theory"]
 
 
 def test_lahc_initializes_history_and_cursor():

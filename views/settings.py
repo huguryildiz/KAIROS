@@ -245,7 +245,7 @@ def _policy(lang: str, s: dict) -> None:
     except (TypeError, ValueError):
         cur_sg = 2
     cur_sg = cur_sg if cur_sg in _sg_opts else 2
-    chosen_sg = wc[1].radio(
+    chosen_sg = wc[0].radio(
         t("set_min_session_gap_days", lang), list(_sg_opts),
         index=list(_sg_opts).index(cur_sg),
         format_func=lambda v: t("set_gap_days", lang, n=v),

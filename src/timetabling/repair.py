@@ -679,6 +679,7 @@ def solve_repair(sections, rooms, instructors, cfg, progress_cb=None):
 
     # SOFT-POLISH: move-based local search (soft_search.anneal_soft). Replaces the
     # CP-SAT frozen-LNS passes, which were a measured no-op at scale.
+    post_repair_placed = dict(state.placed)
     soft_polish_rounds = 0
     soft_pre = soft_post = None
     if cfg.soft_polish_in_repair:
@@ -714,6 +715,16 @@ def solve_repair(sections, rooms, instructors, cfg, progress_cb=None):
         "soft_polish_rounds": soft_polish_rounds,
         "soft_pre": soft_pre,
         "soft_post": soft_post,
+        "post_repair_assignments": [
+            {
+                "block_id": bid,
+                "room": c.room,
+                "day": c.day,
+                "start": c.start,
+                "end": c.start + c.length,
+            }
+            for bid, c in sorted(post_repair_placed.items())
+        ],
         "placed": len(state.placed),
         "total": total,
     }

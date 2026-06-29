@@ -28,7 +28,7 @@ It runs two ways: a **web app** for non-technical users and a **command-line sol
 
 ---
 
-## What it does
+## ✅ What it does
 
 - **Conflict-free by construction.** Placement-legality rules are enforced during candidate generation; cross-block resource conflicts are enforced in the solver. Violations cannot appear in the output:
   - room capacity respected for every block
@@ -55,21 +55,21 @@ It runs two ways: a **web app** for non-technical users and a **command-line sol
 
 ---
 
-## The app
+## 🖥️ The app
 
 A single-page flow, bilingual (Turkish / English), usable on a phone in portrait.
 
-**1 · Data** — Upload a course-list CSV or try the bundled PII-free sample. Review a KPI summary and data-quality warnings. Load a classroom inventory or use the bundled classroom sample.
+**1 · Data** 📥 — Upload a course-list CSV or try the bundled PII-free sample. Review a KPI summary and data-quality warnings. Load a classroom inventory or use the bundled classroom sample.
 
-**2 · Settings** — Configure day window, blackout slots, Saturday toggle, graduate-hour controls, soft-preference presets, and per-instructor availability. Everything is optional — untouched settings fall back to defaults.
+**2 · Settings** ⚙️ — Configure day window, blackout slots, Saturday toggle, graduate-hour controls, soft-preference presets, and per-instructor availability. Everything is optional — untouched settings fall back to defaults.
 
-**3 · Solve** — One click. A five-phase progress display (candidates → construct → repair → soft polish → validate) runs under a fixed 50-minute budget.
+**3 · Solve** 🧮 — One click. A five-phase progress display (candidates → construct → repair → soft polish → validate) runs under a fixed 50-minute budget.
 
-**4 · Results** — Weekly grid, conflict and unschedulable lists, and JSON / CSV / PDF download.
+**4 · Results** 📊 — Weekly grid, conflict and unschedulable lists, and JSON / CSV / PDF download.
 
 ---
 
-## Quick start
+## ⚡ Quick start
 
 Requires Python 3.11+.
 
@@ -98,7 +98,7 @@ CLI flags: `--courses` is the course-list CSV to optimize. `--rooms` is the clas
 
 ---
 
-## Deployment
+## 🚀 Deployment
 
 KAIROS ships as a single Docker image on **Google Cloud Run**, in the institution's own GCP project, `europe-west1`, scale-to-zero. Access is locked to named Google accounts via IAM; the live service is mapped to `kairos.huguryildiz.com`. No PII enters the image — course and classroom data are supplied at runtime.
 
@@ -128,7 +128,7 @@ JSON/CSV schedule outputs to `gs://<bucket>/<prefix>/`.
 
 ---
 
-## Reference
+## 📚 Reference
 
 [`MODEL.md`](MODEL.md) — time grid, hard constraints, soft objective, block derivation, design decisions, and benchmarks.
 

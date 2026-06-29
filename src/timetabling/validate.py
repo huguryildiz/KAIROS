@@ -99,14 +99,4 @@ def validate(assignments: List[Assignment], sections: List[Section],
         if len(set(bids)) > 1:
             viol.append(Violation("self", f"section {sid} self-overlap {day} {hh}:00 by {bids}"))
 
-    # split-day: a section's theory sessions must each be on a different day
-    theory_day = defaultdict(set)
-    for a in assignments:
-        if a.kind == "theory":
-            theory_day[(a.section_id, a.day)].add(a.block_id)
-    for (sid, day), bids in theory_day.items():
-        if len(bids) > 1:
-            viol.append(Violation("split_day",
-                        f"section {sid}: {len(bids)} theory sessions on {day} {sorted(bids)}"))
-
     return viol

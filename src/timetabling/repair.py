@@ -43,10 +43,6 @@ class State:
                     return False
             if self.sect_slot.get((sid, c.day, hh)):
                 return False
-        # a section's theory sessions must each be on a different day
-        if "#L" not in c.block_id and any(b != c.block_id
-                for b in self.sect_theory_day.get((sid, c.day), ())):
-            return False
         return True
 
     def occupy(self, bid, c):
@@ -96,6 +92,9 @@ class State:
                 del cnt[s.code]
 
 
+_W_SAME_DAY = 50  # penalty for placing a theory block on a day already used by a sibling
+
+
 def _soft_score(state: State, c, s, cfg: Config) -> int:
     """Weighted soft penalty for placing candidate c. Lower is better. cohort conflict
     is gated by cfg.soft_shaping_in_repair. A unit instr_days tie-break (strictly below one
@@ -104,6 +103,10 @@ def _soft_score(state: State, c, s, cfg: Config) -> int:
     construction-stage analog of the CP-SAT instr_days objective; inert when the dial is off
     (max_instr_days >= week length)."""
     score = 0
+    if "#L" not in c.block_id:
+        siblings = state.sect_theory_day.get((s.section_id, c.day), ())
+        if siblings and c.block_id not in siblings:
+            score += _W_SAME_DAY
     if cfg.soft_shaping_in_repair:
         for h in range(c.start, c.start + c.length):
             slot = state.cohort_slot_courses.get((s.cohort_key, c.day, h))
@@ -521,6 +524,7 @@ def repair_round(state: State, batch, cand_by_block, cfg=None,
     x = {}
     room_occ = defaultdict(list); instr_occ = defaultdict(list); sect_occ = defaultdict(list)
     theory_day = defaultdict(list)
+    same_day_terms = []
     unpl = {}
     cur = {}
     for bid in free:
@@ -528,8 +532,7 @@ def repair_round(state: State, batch, cand_by_block, cfg=None,
         is_theory = "#L" not in bid
         fdays = frozen_theory_day.get(s.section_id, set())
         cands = [c for c in cand_by_block[bid]
-                 if not (is_theory and c.day in fdays)
-                 and not any(((c.room not in state.virtual and (c.room, c.day, hh) in reserved_room)
+                 if not any(((c.room not in state.virtual and (c.room, c.day, hh) in reserved_room)
                              or any((iid, c.day, hh) in reserved_instr for iid in iids))
                             for hh in range(c.start, c.start + c.length))]
         u = m.NewBoolVar(f"u|{bid}")
@@ -541,6 +544,8 @@ def repair_round(state: State, batch, cand_by_block, cfg=None,
             bvars.append(v)
             if is_theory:
                 theory_day[(s.section_id, c.day)].append(v)
+                if c.day in fdays:
+                    same_day_terms.append(v)
             for hh in range(c.start, c.start + c.length):
                 if c.room not in state.virtual:
                     room_occ[(c.room, c.day, hh)].append(v)
@@ -554,9 +559,13 @@ def repair_round(state: State, batch, cand_by_block, cfg=None,
         for vs in occ.values():
             if len(vs) > 1:
                 m.Add(sum(vs) <= 1)
-    for vs in theory_day.values():           # <=1 theory session per (section, day)
-        if len(vs) > 1:
-            m.Add(sum(vs) <= 1)
+    # same-day theory: soft penalty instead of hard constraint
+    # excess = number of extra theory siblings beyond 1 on the same (section, day)
+    for (sid, day), vs in theory_day.items():
+        if len(vs) >= 2:
+            excess = m.NewIntVar(0, len(vs) - 1, f"sde|{sid}|{day}")
+            m.Add(excess >= sum(vs) - 1)
+            same_day_terms.append(excess)
 
     # objective: lexicographic — placement dominates, soft only breaks ties.
     penalty, penalty_ub = [], 0
@@ -564,7 +573,8 @@ def repair_round(state: State, batch, cand_by_block, cfg=None,
         penalty, penalty_ub = add_soft_objective(
             m, x, free, cand_by_block, state, free_set, cfg, staff_ids)
     big = max(BIG, penalty_ub + 1)
-    m.Minimize(big * sum(unpl.values()) + sum(penalty))
+    w_sd = max(1, big // 4)
+    m.Minimize(big * sum(unpl.values()) + sum(penalty) + w_sd * sum(same_day_terms))
 
     for bid in free:
         if bid in cur:

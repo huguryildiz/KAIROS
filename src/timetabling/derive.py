@@ -47,6 +47,17 @@ def blocks_from_tpl(section_id: str, T: int, P: int, L: int, Cr: int,
     return blocks
 
 
+def theory_session_cap_for_level(T: int, P: int, Cr: int, level: int, cfg: Config) -> int:
+    if level <= 4:
+        return cfg.max_theory_session
+    theory_len = (T or 0) + (P or 0)
+    if theory_len > 0:
+        # Graduate: split at 3 h max so 4-h/6-h blocks fit in the evening window.
+        # Courses with T+P ≤ 3 keep a single session unchanged.
+        return min(3, theory_len)
+    return Cr if (Cr and Cr > 0) else 3
+
+
 def _students(row) -> int:
     for key in ("enroll_students", "plan_sect_cap", "grades_students"):
         v = parse_int(row.get(key, ""), default=None)
@@ -91,7 +102,10 @@ def build_sections(frame, cfg: Config) -> Tuple[List[Section], Dict]:
             department=r.get("department", "").strip(), cohort_key=cohort,
             instructor_ids=normalize_staff_ids(r.get("staff_id", "")), students=_students(r),
             T=T, P=P, L=L, Cr=Cr, category=category,
-            blocks=blocks_from_tpl(sid, T, P, L, Cr, cfg.max_block_len, cfg.max_theory_session),
+            blocks=blocks_from_tpl(
+                sid, T, P, L, Cr, cfg.max_block_len,
+                theory_session_cap_for_level(T, P, Cr, level, cfg),
+            ),
             plan_room=r.get("plan_room", "").strip(),
         )
         sections.append(s)

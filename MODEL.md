@@ -24,9 +24,10 @@ and where it lives (pruning, model relation, or objective).
 
 - **Fixed inputs:** each section's instructor(s), Section Capacity (quota), and T/P/L hours.
 - **Decided:** for every block of every section, a `(room, day, start-hour)`.
-- A section is split into **blocks**: theory hours `T+P` into sessions of at most `max_theory_session` h
-  (default 2; e.g. `T=3 → 2+1`), plus one lab block of `L` hours (split when `L > max_block_len`,
-  default 4). Each block is placed once. Both thresholds are tunable via School Settings.
+- A section is split into **blocks**: undergraduate theory hours `T+P` into sessions of at most
+  `max_theory_session` h (default 2; e.g. `T=3 → 2+1`), plus one lab block of `L` hours
+  (split when `L > max_block_len`, default 4). Graduate theory is not split by
+  `max_theory_session`. Each block is placed once. Both thresholds are tunable via School Settings.
 
 ### Hard constraints — enforced by candidate pruning (per block)
 
@@ -76,11 +77,12 @@ A placement that breaks one of these is never even generated, so it cannot occur
 - **Instructor no-overlap** — no instructor is double-booked in any hour; every co-instructor
   of a team-taught section counts.
 - **Section self no-overlap** — two blocks of the same section never overlap in time.
-- **Theory different-day** — a section's theory sessions each fall on a **different day**.
-  The number of sessions (and thus days) depends on `max_theory_session` (default 2 h,
-  tunable via School Settings "Teori oturumu üst sınırı"); e.g. with default 2 h, `T=3 →
-  2+1` across two days; with `max_theory_session=3`, `T=3` fits in one session (one day).
-  Lab blocks are exempt.
+- **Theory different-day** — a section's theory sessions each fall on a **different day** in
+  CP-SAT (hard). In the repair solver this is a **soft penalty** (`_W_SAME_DAY = 50`): same-day
+  siblings are penalised in greedy construction and mini CP-SAT but not blocked.
+  For undergraduate sections the number of sessions depends on `max_theory_session`
+  (default 2 h); e.g. `T=3 → 2+1` across two days. Graduate theory is split at ≤ 3 h per
+  session regardless. Lab blocks are exempt.
 
 ### Soft preferences — penalized in the objective (never block a schedule)
 
@@ -221,8 +223,10 @@ disabled in the UI (§8.5).
 
 **Blocks** are derived from a section's T/P/L hours:
 
-- Theory hours $T+P$ split into sessions of at most `max_theory_session` h (default 2 h; e.g.
-  $T{=}3 \to 2+1$), each forced onto a different day.
+- Undergraduate theory hours $T+P$ split into sessions of at most `max_theory_session` h
+  (default 2 h; e.g. $T{=}3 \to 2+1$), each forced onto a different day. Graduate
+  theory splits at **3 h** max per session: $T{+}P \le 3$ → single block unchanged;
+  $T{+}P = 4$ → 2+2; $T{+}P = 6$ → 3+3 (fits the 18:00–21:00 evening window).
 - One lab block of $L$ hours, split at `max_block_len` h (default 4 h), pinned to the
   section's real lab room.
 - Block ids: single `#T` / `#L`; split `#T1..#Tk` / `#L1..#Lk`. Kind detected by
@@ -346,14 +350,17 @@ $$
 
 - A section's theory sessions each fall on a **different day** (e.g. a $2+1$ split occupies
   two days, not one).
-- Hard in **both** `model_cpsat` and `repair`; re-checked as `split_day` in `validate`.
+- Hard in `model_cpsat`; **soft penalty** in `repair` (`_W_SAME_DAY = 50` in both greedy
+  construction `_soft_score` and mini CP-SAT `repair_round` excess var). NOT a `Violation`;
+  do not add to `validate.py`.
 - Lab blocks are excluded (the rule keys on $b\in B_s^{\text{theory}}$).
 
-> **Cohort overlap is deliberately not a hard constraint.** A hard course-level cohort
-> rule was proven infeasible at scale, so it is a *soft* term (§5.12). "0 resource conflicts"
-> therefore means H2, H3, H_self, H_day plus the pruned rules (capacity, lab-room, window,
-> blackout) all hold for placed blocks; unplaced tails are tracked separately as placement
-> violations.
+> **Cohort overlap and theory different-day in repair are deliberately not hard constraints.**
+> A hard cohort rule was proven infeasible at scale (soft term §5.12). Different-day in repair
+> was softened to allow last-resort same-day packing when capacity is tight. "0 resource conflicts"
+> therefore means H2, H3, H_self plus the pruned rules (capacity, lab-room, window, blackout)
+> all hold for placed blocks; H_day holds in CP-SAT but is a soft preference in repair.
+> Unplaced tails are tracked separately as placement violations.
 
 ---
 
@@ -796,8 +803,8 @@ repair_round(state, batch, cand_by_block, tl=12s):
       # filter candidates that would clash with frozen blocks
       cands = [c for c in cand_by_block[bid]
                IF ¬reserved_room_conflict(c)
-               AND ¬reserved_instr_conflict(c)
-               AND ¬(theory AND c.day ∈ frozen_theory_day[section])]
+               AND ¬reserved_instr_conflict(c)]
+               # theory same-day is now a soft penalty, not filtered here
 
       u[bid] = BoolVar()            # 1 ↔ left unplaced (soft H1)
       FOR c in cands:
@@ -809,12 +816,15 @@ repair_round(state, batch, cand_by_block, tl=12s):
   FOR (room, day, h): m.Add( Σ x[bid,c] ≤ 1 )   where c covers h, c.room=room, bid ∈ free
   FOR (iid,  day, h): m.Add( Σ x[bid,c] ≤ 1 )   where iid ∈ instructors(bid)
   FOR (sect, day, h): m.Add( Σ x[bid,c] ≤ 1 )   where bid.section = sect
-  FOR (sect, day):   m.Add( Σ x[bid,c] ≤ 1 )   theory only — one theory session per (sect, day)
+  # theory same-day: soft excess penalty instead of hard ≤1
+  FOR (sect, day) where ≥2 theory bvars:
+      excess = IntVar(0, n-1)
+      m.Add( excess ≥ Σ x[bid,c] - 1 )   # 0 when ≤1 session, positive otherwise
+      same_day_terms.append(excess)
 
-  # objective: minimize unplaced count only (pure placement; no soft terms)
-  # soft shaping is done in greedy construction, not here
-  BIG = 10 000
-  m.Minimize( BIG × Σ u[bid] )
+  BIG = max(10_000, penalty_ub + 1)
+  w_sd = max(1, BIG // 4)
+  m.Minimize( BIG × Σ u[bid] + Σ penalty + w_sd × Σ same_day_terms )
 
   # ── 4. Warm-start hints ───────────────────────────────────────────────────
   FOR bid in free:
@@ -852,9 +862,8 @@ importing no solver internals, so model/encoding bugs in those checked rules can
 silently. It checks: room,
 instructor, capacity, **lab_room**, **room_type** (categorical room demand), **fixed** (pinned
 first block), window ($h + \ell_b \le \texttt{cfg.undergrad\_end}$, default 18:00), blackout, **instructor_unavailable** (per-instructor
-availability), H_self, and **split_day** (theory different-day). Cohort conflict is a **soft
-metric**, not a `Violation` — reported in `mode_b_<period>.json` / `unmet_soft`, never failing
-validation.
+availability), H_self. Cohort conflict and theory different-day (repair) are **soft metrics**,
+not `Violation`s — never failing validation.
 
 ### 7.1 Independent verification run (2026-06-23)
 
@@ -885,7 +894,7 @@ every bad field falls back to its default and the solve proceeds.
 |---|---|---|---|
 | Day start | 6–12 | `horizon_start` | earliest start hour (default 09:00) |
 | Day end | 13–21 | `undergrad_end` | undergrad end-of-day window (default 18:00) |
-| Max theory session | 1–6 | `max_theory_session` | longest single theory session before splitting (default 2 h) |
+| Max theory session | 1–6 | `max_theory_session` | longest single undergraduate theory session before splitting (default 2 h); graduate theory is capped at 3 h per session regardless of this setting (T+P ≤ 3 → single block; T+P > 3 → split at 3 h max) |
 | Max block length | 1–8 | `max_block_len` | longest lab block before splitting (default 4 h) |
 | Instructor-days target | No target / ≤4 / ≤3 / ≤2 | `max_instr_days` + `w_instr_days` | No target → term off (weight forced 0); ≤4/≤3/≤2 sets target and activates the instr_days soft term; **≤3 is the default**. See §5.1. |
 | Saturday | checkbox | `saturday_enabled` | add Sa to the teaching week |

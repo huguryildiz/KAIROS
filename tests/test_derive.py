@@ -56,3 +56,64 @@ def test_section_carries_plan_room():
     }])
     secs, _ = build_sections(frame, Config())
     assert secs[0].plan_room == "Online"
+
+
+def test_build_sections_applies_max_theory_session_only_to_undergrad():
+    import pandas as pd
+    from timetabling.derive import build_sections
+    from timetabling.config import Config
+    frame = pd.DataFrame([
+        {
+            "section_id": "PSY 303_01", "period": "001", "code": "PSY 303",
+            "name": "Undergrad", "department": "Psychology", "T": "3", "P": "0",
+            "L": "0", "Cr": "3", "category": "", "staff_id": "00000001",
+            "grades_students": "30", "dept_code": "PSY", "year_level": "3",
+        },
+        {
+            "section_id": "PSY 503_01", "period": "001", "code": "PSY 503",
+            "name": "Graduate", "department": "Psychology", "T": "3", "P": "0",
+            "L": "0", "Cr": "3", "category": "", "staff_id": "00000002",
+            "grades_students": "15", "dept_code": "PSY", "year_level": "5",
+        },
+    ])
+    secs, _ = build_sections(frame, Config(max_theory_session=2))
+    by_id = {s.section_id: s for s in secs}
+
+    assert sorted(b.length for b in by_id["PSY 303_01"].blocks) == [1, 2]
+    assert [b.length for b in by_id["PSY 503_01"].blocks] == [3]
+
+
+def test_grad_theory_split_at_3h():
+    """Graduate courses with T+P > 3 must be split into sessions of at most 3 h."""
+    import pandas as pd
+    from timetabling.derive import build_sections
+    from timetabling.config import Config
+    rows = [
+        {   # 4-h grad block (ME 599 pattern) -> 2+2
+            "section_id": "ME 599_01", "period": "002", "code": "ME 599",
+            "name": "G", "department": "ME", "T": "2", "P": "2",
+            "L": "0", "Cr": "4", "category": "", "staff_id": "a",
+            "grades_students": "5", "dept_code": "ME", "year_level": "5",
+        },
+        {   # 6-h grad block (PSY pattern) -> 3+3
+            "section_id": "PSY 540_01", "period": "002", "code": "PSY 540",
+            "name": "G", "department": "PSY", "T": "3", "P": "3",
+            "L": "0", "Cr": "6", "category": "", "staff_id": "b",
+            "grades_students": "5", "dept_code": "PSY", "year_level": "5",
+        },
+        {   # 3-h grad block -> stays single (no split)
+            "section_id": "ARCH 502_01", "period": "002", "code": "ARCH 502",
+            "name": "G", "department": "ARCH", "T": "3", "P": "0",
+            "L": "0", "Cr": "3", "category": "", "staff_id": "c",
+            "grades_students": "5", "dept_code": "ARCH", "year_level": "5",
+        },
+    ]
+    secs, _ = build_sections(pd.DataFrame(rows), Config())
+    by_id = {s.section_id: s for s in secs}
+
+    # 4h -> two 2h blocks, both fit in 18:00-21:00
+    assert sorted(b.length for b in by_id["ME 599_01"].blocks) == [2, 2]
+    # 6h -> two 3h blocks, both fit in 18:00-21:00
+    assert sorted(b.length for b in by_id["PSY 540_01"].blocks) == [3, 3]
+    # 3h -> single 3h block (unchanged)
+    assert [b.length for b in by_id["ARCH 502_01"].blocks] == [3]

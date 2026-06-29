@@ -35,7 +35,7 @@ It runs two ways: a **web app** for non-technical users and a **command-line sol
   - lab blocks pinned to lab/pc/studio rooms; theory blocks excluded from them
   - day window and blackout slots observed
   - no room double-booking, no instructor double-booking, no section self-overlap
-  - theory sessions of the same course placed on different days
+  - theory sessions of the same course placed on different days (hard in CP-SAT; soft penalty in repair)
   - instructor unavailability slots strictly blocked
 - **Optimized, not just valid.** The soft polish phase steers the schedule toward comfort after placement — never at the cost of hard constraints:
   - minimizes cohort idle gaps, compacts instructor weeks, reduces late-hour load

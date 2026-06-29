@@ -181,11 +181,11 @@ time. The CP-SAT monolith (§6a) and the repair soft polish (§6b) use separate 
 ### What "0 resource conflicts" means
 
 `validate.py` independently re-checks: placement, capacity, lab-room, daytime window,
-blackouts, room/instructor/self no-overlap, theory different-day, and the School-Settings
-hard rules — **room-type** (lab requirement), **fixed** (pinned first block), and
+blackouts, room/instructor/self no-overlap, and the School-Settings hard rules —
+**room-type** (lab requirement), **fixed** (pinned first block), and
 **instructor-unavailable**. In benchmark summaries, "0 resource conflicts" excludes
 `placement` violations caused by an unplaced tail; those are reported separately. Cohort
-conflict is a **soft metric**, never a hard violation.
+conflict and theory different-day in repair are **soft metrics**, never hard violations.
 
 ### Per-school configuration (School Settings)
 
@@ -224,9 +224,10 @@ disabled in the UI (§8.5).
 **Blocks** are derived from a section's T/P/L hours:
 
 - Undergraduate theory hours $T+P$ split into sessions of at most `max_theory_session` h
-  (default 2 h; e.g. $T{=}3 \to 2+1$), each forced onto a different day. Graduate
-  theory splits at **3 h** max per session: $T{+}P \le 3$ → single block unchanged;
-  $T{+}P = 4$ → 2+2; $T{+}P = 6$ → 3+3 (fits the 18:00–21:00 evening window).
+  (default 2 h; e.g. $T{=}3 \to 2+1$), placed on different days (hard in CP-SAT,
+  soft penalty `_W_SAME_DAY=50` in repair). Graduate theory splits at **3 h** max per
+  session: $T{+}P \le 3$ → single block unchanged; $T{+}P = 4$ → 2+2; $T{+}P = 6$ → 3+3
+  (fits the 18:00–21:00 evening window).
 - One lab block of $L$ hours, split at `max_block_len` h (default 4 h), pinned to the
   section's real lab room.
 - Block ids: single `#T` / `#L`; split `#T1..#Tk` / `#L1..#Lk`. Kind detected by
@@ -645,7 +646,8 @@ $$
 
 - In the CP-SAT monolith (≤50 sections path) `w_nonadjacent` penalizes a section's split
   blocks sharing the same day — a narrower, block-level meaning distinct from §5.4.
-  Superseded for theory by the hard different-day rule (H_day); effectively 0 there.
+  Superseded for theory in CP-SAT by H_day (hard); in repair, H_day is a soft penalty so
+  this term has marginal effect on theory blocks there.
 
 ### 5.17 S-AvoidPairs — $w_{\text{avoid\_pairs}}=1.0$ (both paths)
 
@@ -736,7 +738,7 @@ solve_repair(sections, rooms, cfg, progress_cb=None):
   FOR bid in order:
       best, best_score = None, ∞
       FOR c in cand_by_block[bid]:
-          IF state.free_to_place(c):      # O(ℓ·ι) — room/instr/sect/theory-day
+          IF state.free_to_place(c):      # O(ℓ·ι) — room/instr/sect
               score = _soft_score(state, c, s, cfg)
               # = w_cohort_conflict × new_cohort_conflicts
               #   + 1 if opening a new instr-day beyond target (tie-break, < 1 conflict unit)

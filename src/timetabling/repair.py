@@ -180,10 +180,6 @@ MAX_FREE = 240
 # Repair needs maneuvering room: small neighborhoods place far better with a wide
 # best-fit room set. Measured: 12 rooms -> ~82% placed, 24 rooms -> ~95%.
 REPAIR_MAX_ROOMS = 24
-# soft-polish: after placement converges, re-seat already-placed blocks into lower-soft
-# slots. Accept-guarded -> never lowers placement. Budget shared under the deadline.
-SOFT_POLISH_TL = 6.0
-SOFT_POLISH_BUDGET_S = 600.0
 
 
 def competitors(state: State, batch, cand_by_block) -> set:
@@ -697,7 +693,7 @@ def solve_repair(sections, rooms, instructors, cfg, progress_cb=None):
         # Scale cap by problem size (~0.75 s/block); prevents tiny inputs from burning
         # the full 600 s budget (e.g. 100 blocks → ≈75 s, 841 blocks → 600 s).
         size_cap = max(30.0, len(state.placed) * 0.75)
-        polish_cap = getattr(cfg, "soft_polish_budget_s", SOFT_POLISH_BUDGET_S)
+        polish_cap = cfg.soft_polish_budget_s
         budget = min(min(float(polish_cap), size_cap), max(0.0, deadline - (perf_counter() - t0)))
         if budget > 0:
             _pb(("soft_polish", None))

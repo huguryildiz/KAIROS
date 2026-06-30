@@ -894,7 +894,7 @@ touching code*: the step writes a plain **Settings** dict (plus an availability 
 session state, and `settings.build_config(settings, availability, solve_seconds)` maps it into
 a `Config` at solve time. The mapping is **backward-compatible by construction** —
 `DEFAULT_SETTINGS` defines the UI's starting point; an untouched step reproduces the exact
-UI-default behavior documented above. Note: several optional dials (`w_evening`, `w_instr_idle`,
+UI-default behavior documented above. Note: several optional dials (`w_nonadjacent`, `w_evening`, `w_instr_idle`,
 `w_fairness`, `w_dept_compact`, `w_dept_fairness`, `w_session_gap`) have `Config()` default 0.0
 (off) but `DEFAULT_SETTINGS` sets them to medium/10.0 — the two defaults deliberately differ. `build_config` **never raises**:
 every bad field falls back to its default and the solve proceeds.

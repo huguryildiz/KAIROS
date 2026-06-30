@@ -82,7 +82,7 @@ Both tables speak one controlled vocabulary: **`normal / lab / pc / studio`**.
 ## Derivations & semantics
 
 **Cohort** = `(program code, year level)` — a **soft proxy**, never a hard rule
-(see MODEL.md §5.8).
+(see MODEL.md §5.15).
 - Program code = the **letter prefix of `COURSE_CODE`** (`ADA 403` → `ADA`) — *not*
   `DEPT`. `DEPT` is faculty-level (it groups many programs), too coarse for a
   cohort; using it would manufacture false conflicts.

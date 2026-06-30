@@ -43,6 +43,44 @@ def _fmt_size(n: int) -> str:
     return f"{n / 1024 ** 2:.1f} MB"
 
 
+def _label_with_detail(value: str, detail: str) -> str:
+    value = str(value or "").strip()
+    detail = str(detail or "").strip()
+    if detail and detail != value:
+        return f"{value} · {detail}"
+    return value
+
+
+def _entity_label_func(sched: dict, view_field: str):
+    """Return a stable selectbox label function without changing filter values."""
+    by_cohort = {}
+    by_course = {}
+    name_to_email = {}
+    for a in sched.get("assignments", []):
+        cohort = str(a.get("cohort", "")).strip()
+        department = str(a.get("department", "")).strip()
+        if cohort and department and cohort not in by_cohort:
+            by_cohort[cohort] = department
+
+        course = str(a.get("course_code", "")).strip()
+        course_name = str(a.get("course_name", "")).strip()
+        if course and course_name and course not in by_course:
+            by_course[course] = course_name
+
+        name = str(a.get("instructor_name", "")).strip()
+        email = str(a.get("instructor_id", "")).strip()
+        if name and email and name not in name_to_email:
+            name_to_email[name] = email
+
+    if view_field == "cohort":
+        return lambda v: _label_with_detail(v, by_cohort.get(str(v), ""))
+    if view_field == "course_code":
+        return lambda v: _label_with_detail(v, by_course.get(str(v), ""))
+    if view_field == "instructor_name":
+        return lambda n: f"{n} ({name_to_email[n]})" if n in name_to_email and "@" in name_to_email[n] else n
+    return str
+
+
 def _render_archive_log(lang: str) -> None:
     bucket = os.environ.get("KAIROS_GCS_BUCKET", "").strip()
     if not bucket:
@@ -111,17 +149,8 @@ def render(lang: str) -> None:
     if not entities:
         st.info(t("res_no_assign", lang))
         return
-    # For the instructor view build a name→email map so the dropdown shows "Name (email)".
-    name_to_email = {}
-    if view_field == "instructor_name":
-        for a in sched.get("assignments", []):
-            name = str(a.get("instructor_name", ""))
-            email = str(a.get("instructor_id", ""))
-            if name and email and name not in name_to_email:
-                name_to_email[name] = email
-    fmt = (lambda n: f"{n} ({name_to_email[n]})" if n in name_to_email and "@" in name_to_email[n] else n) \
-          if view_field == "instructor_name" else None
-    entity = c2.selectbox(t(VIEW_KEY[view_field], lang), entities, format_func=fmt or str)
+    fmt = _entity_label_func(sched, view_field)
+    entity = c2.selectbox(t(VIEW_KEY[view_field], lang), entities, format_func=fmt)
     view = filter_assignments(sched, view_field, entity)
     st.markdown(week_grid_html(view, lang=lang), unsafe_allow_html=True)
 

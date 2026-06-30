@@ -6,7 +6,6 @@ import time as _time
 from pathlib import Path
 
 import streamlit as st
-import streamlit.components.v1 as _cmp
 
 import json as _json
 
@@ -40,13 +39,14 @@ def render(lang: str) -> None:
                  r=len(st.session_state["classrooms"])))
 
     # Client-side watcher: arms window.onbeforeunload while .solve-running is present so
-    # navigating away shows the browser's "Leave site?" dialog. The 0-height iframe runs
-    # actual JS (inline <script> in st.markdown is inert under React). The wrapping
-    # container is display:none (ui_style .st-key-solve_watch) so it adds no vertical gap.
+    # navigating away shows the browser's "Leave site?" dialog. st.html runs the
+    # script in Streamlit's event container; inline <script> in st.markdown is inert
+    # under React. The wrapping container is display:none (ui_style .st-key-solve_watch)
+    # so it adds no vertical gap.
     _warn_text = ("⚠ Çözüm devam ediyor — lütfen sayfadan ayrılmayın" if lang == "tr"
                   else "⚠ Solving in progress — please don't leave the page")
     with st.container(key="solve_watch"):
-        _cmp.html(
+        st.html(
             '<script>(function(){'
             'var D=window.parent.document,W=window.parent;'
             'function ensureBanner(){'
@@ -63,7 +63,7 @@ def render(lang: str) -> None:
             'setTimeout(tick,800);}'
             'tick();'
             '})();</script>',
-            height=0,
+            unsafe_allow_javascript=True,
         )
 
     # Gate solving on both a validated courselist and an explicitly loaded classroom

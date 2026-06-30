@@ -32,7 +32,7 @@ It runs two ways: a **web app** for non-technical users and a **command-line sol
 
 - **Conflict-free by construction.** Placement-legality rules are enforced during candidate generation; cross-block resource conflicts are enforced in the solver. Violations cannot appear in the output:
   - room capacity respected for every block
-  - every block can use any room large enough for it, so small classes are never crowded out of the scarce smallest rooms (the room pool scales to the inventory)
+  - within its eligible room type, any room of sufficient capacity can be assigned — small classes are not crowded out of the scarce smallest rooms; the room pool scales to the inventory
   - lab blocks pinned to lab/pc/studio rooms; theory blocks excluded from them
   - day window and blackout slots observed
   - no room double-booking, no instructor double-booking, no section self-overlap
@@ -101,15 +101,16 @@ CLI flags: `--courses` is the course-list CSV to optimize. `--rooms` is the clas
 
 ## 🚀 Deployment
 
-KAIROS ships as a single Docker image on **Google Cloud Run**, in the institution's own GCP project, `europe-west1`, scale-to-zero. Access is locked to named Google accounts via IAM; the live service is mapped to `kairos.huguryildiz.com`. No PII enters the image — course and classroom data are supplied at runtime.
+KAIROS ships as a single Docker image on **Google Cloud Run**, in the institution's own GCP project, `europe-west1`. The CI deploy keeps **one instance always warm** (`min-instances=1`, `max-instances=1`, session affinity) and is publicly accessible; the live service is mapped to `kairos.huguryildiz.com`. No PII enters the image — course and classroom data are supplied at runtime.
 
-Every push to `main` triggers [`cloudbuild.yaml`](cloudbuild.yaml). To deploy by hand:
+Every push to `main` triggers [`cloudbuild.yaml`](cloudbuild.yaml). To deploy by hand (mirrors CI):
 
 ```bash
 gcloud run deploy kairos --source . --region europe-west1 \
-  --no-allow-unauthenticated \
+  --allow-unauthenticated \
   --memory 8Gi --cpu 4 --cpu-boost \
-  --timeout 3600 --min-instances 0 --max-instances 5
+  --timeout 3600 --min-instances 1 --max-instances 1 \
+  --concurrency 80 --session-affinity
 ```
 
 > Keep `--memory 8Gi`. A CP-SAT solve needs at least 4 GiB; the Cloud Run default of 512 MiB kills the container mid-solve.

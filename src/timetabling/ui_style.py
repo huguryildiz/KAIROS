@@ -413,10 +413,9 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
 .st-key-solve_btn button.wand-casting::before{animation:wandCast 0.5s ease-in-out;}
 @keyframes wandShimmer{0%{left:-80%}100%{left:140%}}
 @keyframes wandCast{0%{transform:rotate(0deg)}20%{transform:rotate(-22deg)}55%{transform:rotate(15deg)}80%{transform:rotate(-5deg)}100%{transform:rotate(0deg)}}
-/* Solve watcher iframe (views/solve.py) — a height:0 components.html iframe whose JS
-   arms the "Leave site?" guard + live ETA countdown. Collapse its container so the
-   0-height iframe leaves no flex-gap row between the caption and the button. A
-   display:none iframe still loads and runs its script, so the watcher keeps polling. */
+/* Solve watcher (views/solve.py) — st.html injects JS that arms the "Leave site?"
+   guard + live ETA countdown. Collapse its container so the script host leaves no
+   flex-gap row between the caption and the button. */
 .st-key-solve_watch{display:none!important;}
 
 /* Expander — default Streamlit expander renders a white card in dark mode;
@@ -1399,14 +1398,14 @@ def dropzone_drag_js() -> str:
     title to "release to upload" and tints the background (the visuals live in the
     ``.dz-drag-active`` CSS rules; this only toggles the class).
 
-    Must be delivered via ``components.html`` (an iframe), NOT ``st.markdown``:
-    Streamlit's DOMPurify strips inline ``<script>`` from markdown, so it would
-    never run. From the iframe it reaches the app through ``window.parent`` and
-    binds capture-phase listeners on the parent document; they re-query the cards
-    on every event, so they keep working across reruns. The iframe is recreated on
-    each rerun, so we first detach the previous run's now-stale handlers (stashed
-    on ``window.parent.__dzHandlers``). Only cards that actually contain an active
-    file-uploader dropzone light up — the post-upload success card is skipped."""
+    Must be delivered via ``st.html(..., unsafe_allow_javascript=True)``, NOT
+    ``st.markdown``: Streamlit's DOMPurify strips inline ``<script>`` from
+    markdown, so it would never run. The script binds capture-phase listeners on
+    the document; they re-query the cards on every event, so they keep working
+    across reruns. On each rerun, we first detach the previous run's now-stale
+    handlers (stashed on ``window.parent.__dzHandlers``). Only cards that actually
+    contain an active file-uploader dropzone light up — the post-upload success
+    card is skipped."""
     return (
         '<script>(function(){'
         'var P=window.parent,D=P.document;'

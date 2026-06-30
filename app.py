@@ -52,18 +52,21 @@ _PAGE_TITLES = {
     "tr": "KAIROS | Ders Programı Optimizasyonu",
     "en": "KAIROS | Timetable Optimization",
 }
-import streamlit.components.v1 as _cmp  # noqa: E402
-_cmp.html(
+
+
+def _run_js(script_html: str) -> None:
+    st.html(script_html, unsafe_allow_javascript=True)
+
+
+_run_js(
     f"<script>window.parent.document.title={_PAGE_TITLES[lang]!r};</script>",
-    height=0,
 )
 
 # Streamlit's file-uploader widget hardcodes English strings in its React bundle.
 # When the UI language is TR, inject a tiny MutationObserver that rewrites those
 # strings in the parent DOM as soon as they appear (and whenever Streamlit re-renders).
 if lang == "tr":
-    import streamlit.components.v1 as _cmp
-    _cmp.html(
+    _run_js(
         """<script>
 (function(){
   var TR={
@@ -90,14 +93,12 @@ if lang == "tr":
     .observe(window.parent.document.body,{childList:true,subtree:true});
 })();
 </script>""",
-        height=0,
     )
 
 # Drag-over highlight for the upload cards (Step 1 + Classrooms). Delivered via an
-# iframe component so the JS actually runs — inline <script> in st.markdown is
+# HTML event container so the JS actually runs; inline <script> in st.markdown is
 # stripped by Streamlit's sanitizer. See ui_style.dropzone_drag_js for details.
-import streamlit.components.v1 as _cmp
-_cmp.html(dropzone_drag_js(), height=0)
+_run_js(dropzone_drag_js())
 
 with st.container(key="topbar"):
     bar = st.columns([7, 2], vertical_alignment="center")
@@ -162,14 +163,12 @@ st.markdown(footer_html(lang), unsafe_allow_html=True)
 
 _scroll_target = st.session_state.pop("scroll_to", None)
 if _scroll_target:
-    import streamlit.components.v1 as components
-    components.html(
+    _run_js(
         f"""
         <script>
           const doc = window.parent.document;
           const el = doc.getElementById("s-{_scroll_target}");
           if (el) el.scrollIntoView({{behavior: "smooth", block: "start"}});
         </script>
-        """,
-        height=0,
+        """
     )

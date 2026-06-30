@@ -38,7 +38,7 @@ fallback order.
 | `Part-time` | optional | Boolean. Overrides the `(S)` name marker; empty/`false` ⇒ full-time. |
 | `T` | ✓ | Theory hours → theory blocks. |
 | `P` | ✓ | Practice/application hours (`U` = Uygulama) → blocks. |
-| `L` | ✓ | Lab hours → lab block. If the legacy Plan path pins a specific lab room, the lab block uses that room; in the UI upload path `L > 0` alone does **not** force a lab-family room. |
+| `L` | ✓ | Lab hours → lab block. `L > 0` always produces a block with `needs_lab=True`, which the candidate generator routes to lab-family rooms (`lab` / `pc` / `studio`). If the legacy Plan path pins a specific room, that exact room is used; otherwise any lab-family room of sufficient capacity is eligible. |
 | `Section Capacity` | ✓ | **Quota.** The **hard** room-sizing input (`room.Capacity ≥ Section Capacity`). |
 | `~Students` | optional | Legacy/estimated enrolment field. Current solver stores one section size: `Section Capacity` wins; `~Students` is only a fallback in importer paths that permit it. There is no separate soft right-sizing signal yet. |
 | `Room Type` | optional | **Required room category** (demand): `lab / pc / studio`. Empty or `normal` ⇒ no categorical restriction; explicit `lab`, `pc`, or `studio` restricts the section to exactly that room type. Shares Table 2's vocabulary. |

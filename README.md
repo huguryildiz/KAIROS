@@ -51,7 +51,7 @@ It runs two ways: a **web app** for non-technical users and a **command-line sol
 - **Minimum perturbation.** Upload a previous `schedule_*.json` export as a reference. Assignments that differ in day, start time, or room from the reference receive a soft penalty, steering the new schedule to stay as close as possible to the existing one — useful for incremental updates and rescheduling scenarios.
 - **Graded instructor time preferences.** The availability editor supports four tiers per instructor: **unavailable** (hard — never placed in that slot), **avoid** (soft penalty per overlapping hour), **preferred** (soft miss-penalty when a block misses all preferred hours), and **neutral** (default, no cost). Active in both the CP-SAT monolith and the repair soft polish.
 - **Works with what you have.** A course list and a classroom inventory are the only required inputs. Cohorts, teaching blocks, and instructor identities are derived automatically.
-- **Verified independently.** A validator re-checks every core constraint from the raw assignment list, decoupled from the solver, so an encoding bug cannot pass silently.
+- **Verified independently.** A validator re-checks placed-block constraints from the raw assignment list — placement count, capacity, lab/room-type legality, fixed first slots, time-window end caps, blackouts, instructor unavailability, and room/instructor/section no-overlap — decoupled from the solver, so encoding bugs in those checked rules cannot pass silently.
 - **Exports a ready-to-use result.** A Mon–Fri grid viewable by cohort, room, instructor, or department; `schedule.json` / `schedule.csv` for downstream use; a multi-page PDF.
 
 ---
@@ -106,11 +106,19 @@ KAIROS ships as a single Docker image on **Google Cloud Run**, in the institutio
 Every push to `main` triggers [`cloudbuild.yaml`](cloudbuild.yaml). To deploy by hand (mirrors CI):
 
 ```bash
-gcloud run deploy kairos --source . --region europe-west1 \
+gcloud run deploy kairos \
+  --source=. \
+  --region=europe-west1 \
   --allow-unauthenticated \
-  --memory 8Gi --cpu 4 --cpu-boost \
-  --timeout 3600 --min-instances 1 --max-instances 1 \
-  --concurrency 80 --session-affinity
+  --memory=8Gi \
+  --cpu=4 \
+  --cpu-boost \
+  --timeout=3600 \
+  --min-instances=1 \
+  --max-instances=1 \
+  --concurrency=80 \
+  --session-affinity \
+  --project=$PROJECT_ID
 ```
 
 > Keep `--memory 8Gi`. A CP-SAT solve needs at least 4 GiB; the Cloud Run default of 512 MiB kills the container mid-solve.

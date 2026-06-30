@@ -38,10 +38,10 @@ fallback order.
 | `Part-time` | optional | Boolean. Overrides the `(S)` name marker; empty/`false` ⇒ full-time. |
 | `T` | ✓ | Theory hours → theory blocks. |
 | `P` | ✓ | Practice/application hours (`U` = Uygulama) → blocks. |
-| `L` | ✓ | Lab hours → lab block. `L > 0` always produces a block with `needs_lab=True`, which the candidate generator routes to lab-family rooms (`lab` / `pc` / `studio`). If the legacy Plan path pins a specific room, that exact room is used; otherwise any lab-family room of sufficient capacity is eligible. |
+| `L` | ✓ | Lab hours → lab block. `L > 0` always produces a block with `needs_lab=True`. If the legacy Plan path pins a specific lab-family room, that exact room is used. Otherwise, an explicit `Room Type` demand (`lab` / `pc` / `studio`) restricts the lab block to that exact room type; with no explicit demand, any lab-family room of sufficient capacity is eligible. |
 | `Section Capacity` | ✓ | **Quota.** The **hard** room-sizing input (`room.Capacity ≥ Section Capacity`). |
 | `~Students` | optional | Legacy/estimated enrolment field. Current solver stores one section size: `Section Capacity` wins; `~Students` is only a fallback in importer paths that permit it. There is no separate soft right-sizing signal yet. |
-| `Room Type` | optional | **Required room category** (demand): `lab / pc / studio`. Empty or `normal` ⇒ no categorical restriction; explicit `lab`, `pc`, or `studio` restricts the section to exactly that room type. Shares Table 2's vocabulary. |
+| `Room Type` | optional | **Required room category** (demand): `lab / pc / studio`. Empty or `normal` ⇒ no explicit categorical demand. If the section has lab blocks (`L > 0`), the explicit demand applies to those lab blocks while non-lab blocks still use `normal` rooms. If the section has no lab blocks, the explicit demand applies to its theory/practice blocks. Shares Table 2's vocabulary. |
 | `Fixed` | optional | Fixed slot for the section's first block (e.g. `"Mo 9"`). |
 | `Year` | optional | Overrides the cohort year level. |
 | `Min Working Days` | optional | Soft target for how many distinct days this section should occupy. Empty/invalid means no target; unmet days are reported in `unmet_soft` and penalized, never treated as a hard violation. |
@@ -68,9 +68,11 @@ The user must upload a classroom CSV or load the built-in sample in the Classroo
 Both tables speak one controlled vocabulary: **`normal / lab / pc / studio`**.
 
 - **Supply** = a room's `Type`. **Demand** = a section's `Room Type`.
-- **Matching:** when a section names an explicit `Room Type`, its blocks are
-  restricted to that exact category (`lab`, `pc`, or `studio`). With no demand
-  (`Room Type` empty or `normal`), any fitting physical room is eligible after
+- **Matching:** when a section names an explicit `Room Type`, `feasible_rooms_for()`
+  restricts lab blocks to that exact category (`lab`, `pc`, or `studio`); if the
+  section has no lab blocks, the same demand applies to its theory/practice
+  blocks. With no explicit demand (`Room Type` empty or `normal`), lab blocks use
+  any fitting lab-family room and non-lab blocks use fitting `normal` rooms, after
   capacity and ownership checks. A lab block is pinned only when the legacy Plan
   route found a specific lab room.
 - A single boolean `is_lab` is insufficient: `lab ≠ pc ≠ studio` (a programming

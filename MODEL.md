@@ -7,7 +7,7 @@ A formal description of the University Course Timetabling (UCTP) model implement
 School Settings step). When the code and this document disagree, the code wins — update
 this file.
 
-The solver decides, for each undergraduate course **block**, a **(room, day, start-hour)**.
+The solver decides, for each course **block**, a **(room, day, start-hour)**.
 Section / instructor / size / T-P-L are fixed inputs; the only decisions are **time** and
 **room**.
 
@@ -25,9 +25,11 @@ and where it lives (pruning, model relation, or objective).
 - **Fixed inputs:** each section's instructor(s), Section Capacity (quota), and T/P/L hours.
 - **Decided:** for every block of every section, a `(room, day, start-hour)`.
 - A section is split into **blocks**: undergraduate theory hours `T+P` into sessions of at most
-  `max_theory_session` h (default 2; e.g. `T=3 → 2+1`), plus one lab block of `L` hours
-  (split when `L > max_block_len`, default 4). Graduate theory is not split by
-  `max_theory_session`. Each block is placed once. Both thresholds are tunable via School Settings.
+  `max_theory_session` h (default 2; e.g. `T=3 → 2+1`), plus lab blocks from `L` hours
+  (split when `L > max_block_len`, default 4). Graduate theory ignores
+  `max_theory_session`; `theory_session_cap_for_level()` keeps `T+P ≤ 3` as one block and
+  splits longer graduate theory at a 3 h cap so it can fit the 18:00-21:00 window. Each block
+  is placed once. Both user-facing thresholds are tunable via School Settings.
 
 ### Hard constraints — enforced by candidate pruning (per block)
 
@@ -36,9 +38,12 @@ A placement that breaks one of these is never even generated, so it cannot occur
 - **Capacity** — a block goes only in a room whose capacity ≥ the section's size. The virtual
   `Online` room is exempt (unlimited).
 - **Lab-room pinning / room segregation** — a lab block with a designated real lab room is
-  pinned to that room only. A lab block without a pinned room goes to any specialised room
-  (`is_lab`, i.e. type = `lab`, `pc`, or `studio`). Theory/practice blocks are **excluded from
-  all specialised rooms** (`lab`, `pc`, `studio`) — they can only go in `normal` classrooms.
+  pinned to that room only. Without an explicit `Room Type` demand, a lab block goes to any
+  specialised room (`is_lab`, i.e. type = `lab`, `pc`, or `studio`) and a non-lab
+  theory/practice block goes only to `normal` classrooms. When a section declares an explicit
+  `Room Type` demand, that exact category applies to lab blocks; if the section has no lab
+  blocks, it applies to the theory/practice blocks instead. In a mixed `T/P + L` section,
+  non-lab blocks still use `normal` classrooms.
 - **Daytime window** — an undergraduate block must end by the **Day end** hour (default
   **18:00**; tunable 13–21 in School Settings) and start no earlier than the **Day start**
   hour (default **09:00**; tunable 6–12). Graduate blocks (if enabled) end by **21:00**
@@ -61,12 +66,12 @@ A placement that breaks one of these is never even generated, so it cannot occur
   per such instructor. Applied in both paths.
 - **Fixed session** — if a section declares a fixed slot, its **first block** is pinned to
   exactly that `(day, start-hour)` (its remaining blocks schedule freely).
-- **Room type** — rooms carry a categorical type (`normal / lab / pc / studio`). When a section
-  declares a `Room Type` demand, its blocks go only in rooms of that **exact** category
+- **Room type** — rooms carry a categorical type (`normal / lab / pc / studio`). `feasible_rooms_for()`
+  applies an explicit `Room Type` demand only where it is relevant: to lab blocks in a section
+  that has lab blocks, or to all blocks in a section with no lab blocks. The demand is exact
   (`pc`→`pc`, `studio`→`studio`, `lab`→`lab`); a generic lab demand falls back to any lab-family
-  room (`is_lab`). With no explicit demand: lab blocks go to specialised rooms (`lab`/`pc`/`studio`)
-  only; theory blocks go to `normal` classrooms only (`lab`/`pc`/`studio` rooms are never eligible
-  for theory).
+  room (`is_lab`). With no explicit demand, lab blocks go to specialised rooms
+  (`lab`/`pc`/`studio`) and non-lab blocks go to `normal` classrooms.
 
 ### Hard constraints — enforced as model relations (across blocks)
 
@@ -175,12 +180,13 @@ time. The CP-SAT monolith (§6a) and the repair soft polish (§6b) use separate 
 
 ### What "0 resource conflicts" means
 
-`validate.py` independently re-checks: placement, capacity, lab-room, daytime end-cap,
-blackouts, room/instructor/self no-overlap, and the School-Settings hard rules —
-**room-type** (lab requirement), **fixed** (pinned first block), and
-**instructor-unavailable**. In benchmark summaries, "0 resource conflicts" excludes
-`placement` violations caused by an unplaced tail; those are reported separately. Cohort
-conflict and theory different-day are **soft metrics**, never hard violations.
+`validate.py` independently re-checks: placement, capacity, lab-room pins, categorical
+room-type legality, fixed first-block pins, end-cap only for the time window (`a.end > end_cap`;
+start lower bounds remain candidate-pruning rules), blackouts, per-instructor hard
+unavailability, and room/instructor/self no-overlap. In benchmark summaries, "0 resource
+conflicts" excludes `placement` violations caused by an unplaced tail; those are reported
+separately. Cohort conflict and theory different-day are **soft metrics**, never hard
+violations.
 
 ### Per-school configuration (School Settings)
 
@@ -189,7 +195,7 @@ lets another school override them without touching code. A session **Settings** 
 instructor-availability map are turned into a `Config` by `settings.build_config` at solve
 time: the day window, blackout slots, Saturday toggle, graduate earliest-start controls,
 block-split policy, the instructor-days target, free-day year scope, and the soft-preference
-weights (as low / medium / high presets, with explicit off for the newer advanced dials) are
+weights (as low / medium / high presets, with explicit off for the listed weight dials) are
 configurable. Graduate courses are always
 included in the UI; there is no graduate on/off checkbox. Optional course-list columns
 (`Year`, `Part-time`, `Room Type`, `Fixed`, `Min Working Days`) override the string-derived
@@ -280,8 +286,9 @@ $(r,d,h)$ only when it already satisfies:
 - per-instructor availability (`Config.instr_unavailable`) — a candidate is dropped if any of
   the section's instructors is marked unavailable over its span;
 - fixed-slot pin — a section's first block is restricted to its declared `(day, start)`;
-- room-type — when a section declares a `Room Type`, only rooms of that category are emitted
-  (`pc`/`studio`/`lab` exactly, or any lab-family room for a generic lab demand).
+- room-type — an explicit `Room Type` emits only rooms of that exact category
+  (`pc`/`studio`/`lab`) for lab blocks, or for non-lab blocks only when the section has no lab
+  blocks; a generic lab demand falls back to any lab-family room.
 
 Best-fit additionally caps each block to the `max_rooms_per_block` smallest fitting rooms.
 The CP-SAT monolith uses the default cap (12). The repair path widens it to **every physical
@@ -363,8 +370,9 @@ $$
 > **Cohort overlap and theory different-day are deliberately not hard constraints.**
 > A hard cohort rule was proven infeasible at scale (soft term §5.15). Different-day was
 > softened to allow last-resort same-day packing when capacity is tight. "0 resource conflicts"
-> therefore means H2, H3, H_self plus the pruned rules (capacity, lab-room, window, blackout)
-> all hold for placed blocks; theory day-spread is a soft preference in both solver paths.
+> therefore means H2, H3, H_self plus the pruned rules (capacity, lab-room, candidate time
+> window, blackout) all hold for placed blocks; `validate.py` re-checks the window end-cap but
+> not the start lower bound. Theory day-spread is a soft preference in both solver paths.
 > Unplaced tails are tracked separately as placement violations.
 
 ---
@@ -372,15 +380,16 @@ $$
 ## 5. Soft objective
 
 The CP-SAT monolith (§6a) and the repair soft polish (§6b) minimize different weighted-sum
-objectives. Weights live in `config.py`. The two paths share the weight fields
-`w_instr_days` / `w_parttime_days` (but with different semantics — see §5.1). The repair
-polish has terms absent from the monolith (`w_idle`, `w_maxrun`, `w_room_stable`,
-`w_free_day`, `w_nonadjacent`, `w_evening`, `w_instr_idle`, `w_fairness`,
-`w_dept_compact`, `w_session_gap`). Both paths share `w_dept_fairness`, `w_building_change`, `w_room_util`,
-`w_avoid_pairs`, and the per-section `w_min_working_days` target when a row supplies it. The
-monolith has terms not in the polish objective (`w_cohort_gap`, `w_order`, `w_englab`).
-`w_cohort_conflict` appears in both but as an objective term in the monolith and as a
-no-regress guard in the polish.
+objectives. Weights live in `config.py`. The repair polish objective (`soft_search._norm_obj`)
+normalizes these non-guard terms: `w_idle`, `w_maxrun`, `w_instr_days`, `w_nonadjacent`
+(instructor day-span meaning), `w_evening`, `w_instr_idle`, `w_fairness`, `w_room_stable`,
+`w_free_day`, `w_room_util`, `w_min_working_days`, `w_parallel_coord`, `w_instr_avoid`,
+`w_instr_prefer`, `w_avoid_pairs`, `w_building_change`, `w_dept_compact`, `w_dept_fairness`,
+`w_perturbation`, `w_session_gap`, and `_W_SAME_DAY`/`same_day_theory`. The monolith has
+terms not in the polish objective (`w_cohort_gap`, `w_order`, `w_englab`) and also uses
+`w_nonadjacent` with a different split-block same-day meaning (§5.16). `w_cohort_conflict`
+appears in both but as an objective term in the monolith and as a no-regress guard in the
+polish.
 
 $$
 \min \;\; \sum_{t} w_t \cdot \mathrm{pen}_t
@@ -440,16 +449,17 @@ $$
 - UI default 10.0/medium (`Config()` default 0.0); `settings.build_config` maps low/medium/high → 5.0/10.0/20.0.
 - Repair soft polish term only. UI dial: off / low / medium / high (default medium).
 
-### 5.5 Late-hour load — $w_{\text{evening}}=10.0$ (repair polish)
+### 5.5 Late-hour load — $w_{\text{evening}}$ (repair polish)
 
 - Counts occupied hour-slots at or after `evening_from_hour` (default 17:00), once for the
   affected cohort load and once for the affected instructor load. A 17:00-18:00 block taught
   by one instructor therefore contributes 2 raw units: one cohort unit and one instructor unit.
-- Default weight is 10.0 (medium); `settings.build_config` maps low / medium / high to
-  5.0 / 10.0 / 20.0.
+- Raw `Config()` default is 0.0 (off). The UI's `DEFAULT_SETTINGS` starts at medium, so
+  `settings.build_config` maps the untouched UI to 10.0; low / medium / high map to
+  5.0 / 10.0 / 20.0 and explicit off maps to 0.0.
 - Repair soft polish term only. UI dial: off / low / medium / high (default medium).
 
-### 5.6 Instructor idle gaps — $w_{\text{instr\_idle}}=10.0$ (repair polish)
+### 5.6 Instructor idle gaps — $w_{\text{instr\_idle}}$ (repair polish)
 
 $$
 \mathrm{idle}_{i,d} = \max(H_{i,d}) + 1 - \min(H_{i,d}) - |H_{i,d}|
@@ -457,11 +467,12 @@ $$
 
 - Penalizes holes inside an instructor's same-day teaching span, mirroring the cohort idle
   gap definition but scoped to instructors only.
-- Default weight is 10.0 (medium); `settings.build_config` maps low / medium / high to
-  5.0 / 10.0 / 20.0.
+- Raw `Config()` default is 0.0 (off). The UI's `DEFAULT_SETTINGS` starts at medium, so
+  `settings.build_config` maps the untouched UI to 10.0; low / medium / high map to
+  5.0 / 10.0 / 20.0 and explicit off maps to 0.0.
 - Repair soft polish term only. UI dial: off / low / medium / high (default medium).
 
-### 5.7 Bad-load fairness — $w_{\text{fairness}}=10.0$ (repair polish)
+### 5.7 Bad-load fairness — $w_{\text{fairness}}$ (repair polish)
 
 $$
 \mathrm{pain}_e = \sum_d
@@ -474,8 +485,9 @@ $$
   concentration: two entities with pain 2+2 cost 8, while one entity with pain 4 costs 16.
 - Uses the same ingredients as the student idle, maxrun, and late-hour terms, but changes the
   distribution preference rather than adding a new hard rule.
-- Default weight is 10.0 (medium); `settings.build_config` maps low / medium / high to
-  5.0 / 10.0 / 20.0.
+- Raw `Config()` default is 0.0 (off). The UI's `DEFAULT_SETTINGS` starts at medium, so
+  `settings.build_config` maps the untouched UI to 10.0; low / medium / high map to
+  5.0 / 10.0 / 20.0 and explicit off maps to 0.0.
 - Repair soft polish term only. UI dial: off / low / medium / high (default medium).
 
 ### 5.8 Room stability — $w_{\text{room\_stable}}=10.0$ (repair polish)
@@ -530,7 +542,7 @@ $$
   the objective. Integer weight: `int(round(w_building_change)) or 1`.
 - Default weight is 0.0 (off); no UI dial yet — activate via `Config(w_building_change=…)`.
 
-### 5.9d Department building compactness — $w_{\text{dept\_compact}}=10.0$ (repair polish)
+### 5.9d Department building compactness — $w_{\text{dept\_compact}}$ (repair polish)
 
 $$
 \mathrm{pen}_{\text{dept\_compact}} =
@@ -544,10 +556,11 @@ $$
   `XB…` resolving to `X`. `Online` and unknown rooms return `None` and are ignored.
 - **Repair polish only:** tracked as `dept_compactness` in `_global_terms` / `_local_terms` /
   `_norm_obj`. It is not modeled in the CP-SAT monolith.
-- Default weight is 10.0 (medium); `settings.build_config` maps the Settings dial
-  low / medium / high to 5.0 / 10.0 / 20.0.
+- Raw `Config()` default is 0.0 (off). The UI's `DEFAULT_SETTINGS` starts at medium, so
+  `settings.build_config` maps the untouched UI to 10.0; low / medium / high map to
+  5.0 / 10.0 / 20.0 and explicit off maps to 0.0.
 
-### 5.9e Department prime-time fairness — $w_{\text{dept\_fairness}}=10.0$
+### 5.9e Department prime-time fairness — $w_{\text{dept\_fairness}}$
 
 For each department $d$, let $p_d$ be scheduled teaching hours inside
 `[cfg.primetime_start, cfg.primetime_end)` and $t_d$ be total scheduled teaching hours. The
@@ -563,9 +576,10 @@ $$
   ignored, and schedules with fewer than two departments cost 0.
 - The cross-multiplied form keeps CP-SAT integer-linear while comparing ratios instead of raw
   prime-time counts, so larger departments are not punished for having more total hours.
-- Active in the CP-SAT monolith and repair soft polish. Default weight is 10.0 (medium);
-  `settings.build_config` maps the Settings dial low / medium / high to
-  5.0 / 10.0 / 20.0.
+- Active in the CP-SAT monolith and repair soft polish when the weight is nonzero. Raw
+  `Config()` default is 0.0 (off). The UI's `DEFAULT_SETTINGS` starts at medium, so
+  `settings.build_config` maps the untouched UI to 10.0; low / medium / high map to
+  5.0 / 10.0 / 20.0 and explicit off maps to 0.0.
 
 ### 5.10 S-Order — $w_{\text{order}}=1$ (monolith)
 
@@ -693,9 +707,11 @@ Both solvers share the same candidate generation and constraints.
 **(b) Repair — `repair.solve_repair` (`--repair`, production).**
 
 1. **Greedy construction (soft-shaping)** — place each block in its **lowest soft-score**
-   feasible candidate (ties broken by candidate order = best-fit room). The soft score is
-   `w_cohort_conflict·new_cohort_conflicts` (with an `instr_days` tie-break of 1 per new
-   instructor-day beyond target, when the target is active). Cohort-conflict shaping is **on
+   feasible candidate (ties broken by candidate order = best-fit room). `_soft_score` always
+   includes `_W_SAME_DAY = 50` when a theory block would share a day with a sibling theory
+   block; when `soft_shaping_in_repair=True` it also adds
+   `w_cohort_conflict·new_cohort_conflicts`; and when an instructor-days target is active it
+   adds a tie-break of 1 per new instructor-day beyond target. Cohort-conflict shaping is **on
    by default** (`soft_shaping_in_repair=True`, `--no-soft-shaping` to disable).
    `new_cohort_conflicts` is myopic (sees only already-placed blocks), so the reduction is
    partial but cheap and placement-safe.
@@ -745,7 +761,8 @@ solve_repair(sections, rooms, cfg, progress_cb=None):
       FOR c in cand_by_block[bid]:
           IF state.free_to_place(c):      # O(ℓ·ι) — room/instr/sect
               score = _soft_score(state, c, s, cfg)
-              # = w_cohort_conflict × new_cohort_conflicts
+              # = _W_SAME_DAY if a theory sibling already uses that day
+              #   + w_cohort_conflict × new_cohort_conflicts when soft shaping is on
               #   + 1 if opening a new instr-day beyond target (tie-break, < 1 conflict unit)
               IF score < best_score:
                   best, best_score = c, score
@@ -760,6 +777,8 @@ solve_repair(sections, rooms, cfg, progress_cb=None):
 
       sort unplaced by (|cand_by_block[bid]| ASC, students DESC)
       gained = 0
+      # production solve_repair passes cfg=None into repair_round here: the neighbourhood
+      # objective is placement-first plus same-day-theory penalty, not the full soft objective.
       FOR batch in sliding_window(unplaced, BATCH=30):
           IF now() − t0 ≥ deadline: BREAK
           batch = [bid for bid in batch if bid ∉ state.placed]   # recheck after prior rounds
@@ -831,6 +850,8 @@ repair_round(state, batch, cand_by_block, tl=12s):
       m.Add( excess ≥ Σ x[bid,c] - 1 )   # 0 when ≤1 session, positive otherwise
       same_day_terms.append(excess)
 
+  # In production repair sweeps cfg=None, so Σ penalty is empty. If repair_round is called
+  # with cfg, add_soft_objective may populate it for experimental soft-aware neighbourhoods.
   BIG = max(10_000, penalty_ub + 1)
   w_sd = max(1, BIG // 4)
   m.Minimize( BIG × Σ u[bid] + Σ penalty + w_sd × Σ same_day_terms )
@@ -870,7 +891,7 @@ repair_round(state, batch, cand_by_block, tl=12s):
 importing no solver internals, so model/encoding bugs in those checked rules cannot pass
 silently. It checks: room,
 instructor, capacity, **lab_room**, **room_type** (categorical room demand), **fixed** (pinned
-first block), window ($h + \ell_b \le \texttt{end\_cap}$, where $\texttt{end\_cap} = \texttt{cfg.undergrad\_end}$ (default 18:00) for level ≤ 4, $\texttt{cfg.grad\_end}$ (default 21:00) for graduate sections), blackout, **instructor_unavailable** (per-instructor
+first block), window end-cap only ($h + \ell_b \le \texttt{end\_cap}$; `validate.py` does not check the start lower bound), where $\texttt{end\_cap} = \texttt{cfg.undergrad\_end}$ (default 18:00) for level ≤ 4 and $\texttt{cfg.grad\_end}$ (default 21:00) for graduate sections, blackout, **instructor_unavailable** (per-instructor
 availability), H_self. Cohort conflict and theory different-day are **soft metrics**,
 not `Violation`s — never failing validation.
 
@@ -937,7 +958,7 @@ All default to **medium** (10.0) except **Instructor days**, which defaults to *
 | Bad-load fairness | `w_fairness` (§5.7) | 0.0 / 5.0 / 10.0 / 20.0 |
 | Department building compactness | `w_dept_compact` (§5.9d) | 0.0 / 5.0 / 10.0 / 20.0 |
 | Department prime-time fairness | `w_dept_fairness` (§5.9e) | 0.0 / 5.0 / 10.0 / 20.0 |
-| Spread session days | `w_session_gap` (§2) | 0.0 / 5.0 / 10.0 / 20.0 |
+| Spread session days | `w_session_gap` (§0 soft-preference summary) | 0.0 / 5.0 / 10.0 / 20.0 |
 
 `free_day` (§5.9) has a fixed `Config` weight of 10.0 and is not exposed as a dial — only its
 year scope (multiselect) is configurable. With no selected years it is inert. `w_cohort_gap=10.0`
@@ -962,7 +983,7 @@ placement converges. Stored as `"quality_mode"` in the Settings dict;
 | Balanced | 300 s **(default)** | Recommended for most schools. |
 | Best | 600 s | Longest polish; best room-stability and anti-fatigue results. |
 
-The actual polish time is `min(soft_polish_budget_s, max(30, 0.75 × placed_count), remaining_deadline)` — see §6b pseudocode. Hard constraints are never affected; only soft-objective metrics (idle, maxrun, consecutive teaching days, late-hour load, instructor idle gaps, fairness, room_stable, free_day, min_working_days, dept_compactness, dept_fairness) can improve.
+The actual polish time is `min(soft_polish_budget_s, max(30, 0.75 × placed_count), remaining_deadline)` — see §6b pseudocode. Hard constraints are never affected; only the non-guard soft-objective terms in `soft_search._norm_obj` can improve: idle, maxrun, instr_days, nonadjacent, evening, instr_idle, fairness, room_stable, free_day, room_util, min_working_days, parallel_coord, instr_avoid_viol, instr_prefer_miss, avoid_pairs_viol, building_change, dept_compactness, dept_fairness, perturbation, session_gap, and same_day_theory.
 
 ### 8.4 Blackouts (add/remove list)
 

@@ -360,6 +360,19 @@ td.tt-td-empty{color:var(--faint);text-align:center;padding:20px;}
 .st-pill.duplicate{background:var(--warn-bg);border-color:var(--warn-bd);color:var(--warn);}
 .st-pill.error{background:var(--error-bg);border-color:var(--error-bd);color:var(--error);}
 
+/* Soft-polish budget — premium readout badge below the quality-mode radio */
+.qb-badge{display:inline-flex;align-items:center;gap:9px;margin:7px 0 2px;padding:5px 14px 5px 6px;
+  border-radius:999px;border:1px solid var(--primary-100);
+  background:linear-gradient(180deg,var(--surface) 0%,var(--surface-2) 100%);
+  box-shadow:var(--sh-1);white-space:nowrap;}
+.qb-badge .qb-ic{display:grid;place-items:center;width:26px;height:26px;flex:none;border-radius:50%;
+  background:var(--primary-50);border:1px solid var(--primary-100);color:var(--primary);}
+.qb-badge .qb-ic svg{width:14px;height:14px;display:block;}
+.qb-badge .qb-lbl{font:600 .62rem/1 var(--mono);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);}
+.qb-badge .qb-val{font:600 .98rem/1 var(--serif);letter-spacing:-.01em;font-variant-numeric:tabular-nums;
+  background:linear-gradient(95deg,var(--head-1) 0%,var(--head-2) 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;}
+
 /* Solve card — replaces the button while the solver runs; shows animated grid + progress */
 .solve-running{display:flex;flex-direction:column;gap:14px;padding:20px 22px;max-width:480px;margin:0 auto;
   border-radius:14px;cursor:wait;color:#fff;

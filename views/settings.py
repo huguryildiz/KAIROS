@@ -192,8 +192,16 @@ def _policy(lang: str, s: dict) -> None:
         horizontal=True,
     )
     s["quality_mode"] = chosen_q
-    st.caption(t("set_quality_budget", lang,
-                 n=int(QUALITY_MODES.get(s.get("quality_mode", "balanced"), 300))))
+    _q_n = int(QUALITY_MODES.get(s.get("quality_mode", "balanced"), 300))
+    st.markdown(
+        '<div class="qb-badge"><span class="qb-ic">'
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+        'stroke-linecap="round" stroke-linejoin="round">'
+        '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>'
+        f'<span class="qb-lbl">{escape(t("set_quality_budget", lang))}</span>'
+        f'<span class="qb-val">{escape(t("set_quality_budget_unit", lang, n=_q_n))}</span>'
+        '</div>',
+        unsafe_allow_html=True)
 
     st.divider()
     st.markdown(f"**{t('set_weights_header', lang)}**")

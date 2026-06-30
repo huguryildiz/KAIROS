@@ -615,8 +615,8 @@ def _avoid_pairs(lang: str, s: dict) -> None:
                 chip_label = f"{pair[0]} ⚡ {pair[1]}"
                 if st.button(chip_label, key=f"ap_rm_{i}_{rev}", icon=":material/close:"):
                     pairs.pop(i)
-                _bump()
-                st.rerun()
+                    _bump()
+                    st.rerun()
 
 
 def _parallel_policies(lang: str, s: dict) -> None:

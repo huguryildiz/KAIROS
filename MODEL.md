@@ -361,8 +361,10 @@ $$
 
 - A section's split sessions prefer different days (e.g. a $2+1$ split prefers two days, not
   one), but the solver may use same-day placement when capacity is tight.
-- Soft in both paths: `model_cpsat` uses `w_nonadjacent`; `repair` uses `_W_SAME_DAY = 50`
-  in greedy construction `_soft_score`, mini CP-SAT `repair_round`, and soft polish. NOT a
+- Soft in both paths: `model_cpsat` uses `w_nonadjacent`; `repair` penalises same-day theory
+  siblings with `_W_SAME_DAY = 50` in greedy construction (`_soft_score`) and soft polish
+  (`_norm_obj`). The mini CP-SAT `repair_round` instead weights its same-day terms at
+  `max(1, big // 4)` (proportional to the placement cost, typically ≈2500). NOT a
   `Violation`; do not add to `validate.py`.
 - Lab blocks may also contribute to the generic CP-SAT split-day soft term; the repair
   `_W_SAME_DAY` term applies to theory siblings.

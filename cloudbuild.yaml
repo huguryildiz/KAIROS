@@ -23,7 +23,8 @@ steps:
       - --cpu-boost
       - --timeout=3600
       - --min-instances=1
-      - --max-instances=5
+      - --max-instances=1
+      - --session-affinity
       - --project=$PROJECT_ID
 
 options:

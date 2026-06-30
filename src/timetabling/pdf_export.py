@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 import struct
+from datetime import datetime
 from pathlib import Path
 from typing import List, Tuple
 
@@ -418,7 +419,8 @@ def build_pdf_bundle(schedule: dict, view_field: str, entities: List[str],
     per entity, naturally sorted by name (so EE-1, EE-2, …, EE-10 read in order).
 
     Returns (pdf_bytes, filename, mime).  For a single entity the filename is
-    '<entity>.pdf'; for multiples it is 'schedule_<view_field>_<period>.pdf'."""
+    '<entity>.pdf'; for multiples it is
+    'schedule_<view_field>_<YYYYMMDD>_<HHMMSS>.pdf' (download timestamp)."""
     ents = sorted({str(e) for e in entities}, key=_natsort_key)
     # For the instructor view, enrich the page title with the email so it reads
     # "Öğretim elemanı: Ahmet Güneş (agunes@uni.edu)" — mirrors the UI dropdown.
@@ -438,10 +440,9 @@ def build_pdf_bundle(schedule: dict, view_field: str, entities: List[str],
             suffix = f" ({idx}/{len(pages)})" if len(pages) > 1 else ""
             _draw_grid_page(pdf, page, f"{dim_label}: {ent_label}{suffix}", lang, True)
     data = bytes(pdf.output())
-    raw_period = str(schedule.get("period", "") or "").strip()
-    period = _sanitize_filename(raw_period) if raw_period else ""
     if len(ents) == 1:
         fname = _sanitize_filename(ents[0])
     else:
-        fname = f"schedule_{view_field}_{period}" if period else f"schedule_{view_field}"
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        fname = f"schedule_{view_field}_{stamp}"
     return data, f"{fname}.pdf", "application/pdf"

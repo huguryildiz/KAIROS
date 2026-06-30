@@ -1,5 +1,6 @@
 """Tests for the pure PDF export helpers (Streamlit-free)."""
 from pathlib import Path
+import re
 import subprocess
 
 import pytest
@@ -68,7 +69,7 @@ def test_build_pdf_bundle_multi_entity_returns_single_merged_pdf():
         _sample_schedule(), "instructor_name",
         ["Şükrü Çağ", "Ayşe Yılmaz"], "Öğretim elemanı", "tr")
     assert mime == "application/pdf"
-    assert fname == "schedule_instructor_name.pdf"
+    assert re.fullmatch(r"schedule_instructor_name_\d{8}_\d{6}\.pdf", fname)
     assert bytes(data[:4]) == b"%PDF"
     # Two entities → two pages in the merged PDF.
     assert data.count(b"/Type /Page\n") + data.count(b"/Type/Page\n") + \

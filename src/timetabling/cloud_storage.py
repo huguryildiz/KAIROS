@@ -128,13 +128,15 @@ def list_outputs_if_configured(
         name = str(item.get("name", ""))
         if not name:
             continue
+        filename = Path(name).name
+        disposition = quote(f'attachment; filename="{filename}"', safe="")
         download_url = (
-            f"https://storage.googleapis.com/download/storage/v1/b/"
-            f"{quote(bucket, safe='')}/o/{quote(name, safe='')}?alt=media&access_token={token}"
+            f"https://storage.googleapis.com/{quote(bucket, safe='')}/{quote(name, safe='')}"
+            f"?access_token={token}&response-content-disposition={disposition}"
         )
         rows.append({
             "updated": item.get("updated", ""),
-            "file": Path(name).name,
+            "file": filename,
             "size_bytes": int(item.get("size") or 0),
             "download_url": download_url,
         })

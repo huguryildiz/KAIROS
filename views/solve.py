@@ -10,6 +10,7 @@ import streamlit as st
 import json as _json
 
 from timetabling.settings import build_config
+from timetabling.ui_app import track_event
 from timetabling.ui_input import (build_sections_from_courselist,
                                   build_instructors_from_courselist, build_rooms_from_ui,
                                   classrooms_is_valid, courselist_is_valid)
@@ -33,6 +34,8 @@ _PERIOD = "001"
 def render(lang: str) -> None:
     st.markdown(eyebrow_html(3, t("step_solve", lang), "solve"),
                 unsafe_allow_html=True)
+    if st.session_state.get("result") is not None:
+        track_event("solve_completed")
 
     courses = st.session_state.get("courses", [])
     st.caption(t("solve_ready", lang, c=len(courses),
@@ -118,6 +121,7 @@ def render(lang: str) -> None:
     ph = st.empty()
     if ph.button(t("solve_button", lang), type="primary", key="solve_btn",
                  disabled=not valid):
+        track_event("solve_clicked")
         cfg = build_config(st.session_state["settings"],
                            st.session_state["availability"], _SOLVE_SECONDS,
                            availability_avoid=st.session_state.get("availability_avoid", {}),

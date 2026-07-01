@@ -4,6 +4,7 @@ import os
 import streamlit as st
 
 from timetabling.csv_import import ok_rooms, parse_classrooms, read_raw
+from timetabling.ui_app import track_event
 from timetabling.ui_style import (
     data_table_html, detected_columns_html, eyebrow_html, import_stats_html,
     kpi_chips_html, success_banner_html, upload_cta_html, upload_error_html,
@@ -15,6 +16,7 @@ _SAMPLE = os.path.join(os.path.dirname(__file__), "..", "assets", "sample_classr
 
 
 def render(lang: str) -> None:
+    track_event("classrooms_viewed")
     st.markdown(eyebrow_html(None, t("step_classrooms", lang), "classrooms", sub=True),
                 unsafe_allow_html=True)
     st.caption(t("cr_caption", lang))

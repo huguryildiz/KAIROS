@@ -8,6 +8,23 @@ from .ui_input import cohort_from_code, parse_emails
 _LANG_LABELS = {"tr": "🇹🇷", "en": "🇬🇧"}
 
 
+def track_event(name: str) -> None:
+    """Fire a deduped GA4 custom event once per browser session.
+
+    No-ops locally: the gtag() function only exists on window.parent when
+    the Docker-built index.html has been patched (see scripts/patch_ga_snippet.py),
+    which never happens in a local `streamlit run`.
+    """
+    seen = st.session_state.setdefault("_ga_seen", set())
+    if name in seen:
+        return
+    seen.add(name)
+    st.html(
+        f"<script>if (window.parent.gtag) {{ window.parent.gtag('event', {name!r}, {{}}); }}</script>",
+        unsafe_allow_javascript=True,
+    )
+
+
 def _fmt_duration(secs, lang: str) -> str:
     """Compact solve-time label: '47s' under 90s, else whole minutes ('5 dk')."""
     s = int(round(secs or 0))

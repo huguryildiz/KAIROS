@@ -5,6 +5,7 @@ import streamlit as st
 
 from timetabling.csv_import import ok_rows, parse_courselist, read_raw
 from timetabling.i18n import t
+from timetabling.ui_app import track_event
 from timetabling.ui_style import eyebrow_html, upload_cta_html, upload_error_html, upload_success_html
 
 _SAMPLE = os.path.join(os.path.dirname(__file__), "..", "assets", "sample_courses.csv")
@@ -19,6 +20,7 @@ def _ingest(file_or_path) -> dict:
     (for the Review preview) as ``import_report``."""
     report = parse_courselist(read_raw(file_or_path))
     st.session_state["courses"] = ok_rows(report)
+    track_event("courses_uploaded")
     st.session_state["import_report"] = report
     st.session_state["scroll_to"] = "review"
     # Store display name so success state persists across reruns

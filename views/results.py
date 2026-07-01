@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 from datetime import timezone as _tz
 
+from timetabling.ui_app import track_event
 from timetabling.ui_grid import filter_assignments, distinct_values
 from timetabling.ui_style import metric_cards_html, week_grid_html, eyebrow_html, unschedulable_html
 from timetabling.pdf_export import build_pdf_bundle
@@ -126,6 +127,8 @@ def render(lang: str) -> None:
     if res is None:
         _render_archive_log(lang)
         return
+
+    track_event("results_viewed")
 
     sched = res.schedule
     total_blocks = len(res.assignments) + sum(s.get("n_blocks", len(s.get("issues", []))) for s in res.unschedulable)

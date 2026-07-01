@@ -2,6 +2,7 @@
 import pandas as pd
 import streamlit as st
 
+from timetabling.ui_app import track_event
 from timetabling.ui_input import (validate_courselist, cohort_from_code,
                                   parse_emails, COURSELIST_ERROR_CODES)
 from timetabling.ui_style import (kpi_chips_html, eyebrow_html, data_table_html,
@@ -14,6 +15,7 @@ _NUMERIC_COLS = ("T", "P", "L", "~Students")
 
 def render(lang: str) -> None:
     rows = st.session_state.get("courses", [])
+    track_event("review_viewed")
     st.markdown(eyebrow_html(None, t("step_review", lang), "review", sub=True),
                 unsafe_allow_html=True)
     st.caption(t("review_caption", lang))

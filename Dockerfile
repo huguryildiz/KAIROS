@@ -13,12 +13,12 @@ ENV PYTHONUNBUFFERED=1 \
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY patch_ga_snippet.py ./patch_ga_snippet.py
-RUN python patch_ga_snippet.py
+COPY assets/ ./assets/
+COPY patch_index_html.py ./patch_index_html.py
+RUN python patch_index_html.py
 
 COPY src/ ./src/
 COPY views/ ./views/
-COPY assets/ ./assets/
 COPY .streamlit/ ./.streamlit/
 COPY app.py ./
 

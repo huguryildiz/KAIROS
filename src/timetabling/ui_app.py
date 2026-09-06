@@ -12,7 +12,7 @@ def track_event(name: str) -> None:
     """Fire a deduped GA4 custom event once per browser session.
 
     No-ops locally: the gtag() function only exists on window.parent when
-    the Docker-built index.html has been patched (see scripts/patch_ga_snippet.py),
+    the Docker-built index.html has been patched (see patch_index_html.py),
     which never happens in a local `streamlit run`.
     """
     seen = st.session_state.setdefault("_ga_seen", set())

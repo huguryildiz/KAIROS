@@ -31,7 +31,7 @@ It runs two ways: a **web app** for non-technical users and a **command-line sol
 ## 🎬 Demo
 
 <p align="center">
-  <a href="https://github.com/huguryildiz/KAIROS/releases/download/v1.0.0/KAIROS-promo.mp4">
+  <a href="https://github.com/huguryildiz/KAIROS/releases/download/v1.0.1/KAIROS-promo.mp4">
     <img src="assets/promo-thumb.jpg" alt="KAIROS — 60-second walkthrough" width="760">
   </a>
 </p>
@@ -39,8 +39,8 @@ It runs two ways: a **web app** for non-technical users and a **command-line sol
 <p align="center">
   <sub>60-second walkthrough — upload, review, set the rules, solve, export.<br>
   Download:
-  <a href="https://github.com/huguryildiz/KAIROS/releases/download/v1.0.0/KAIROS-promo.mp4">4K</a>
-  · <a href="https://github.com/huguryildiz/KAIROS/releases/download/v1.0.0/KAIROS-promo-1080p.mp4">1080p</a>
+  <a href="https://github.com/huguryildiz/KAIROS/releases/download/v1.0.1/KAIROS-promo.mp4">4K</a>
+  · <a href="https://github.com/huguryildiz/KAIROS/releases/download/v1.0.1/KAIROS-promo-1080p.mp4">1080p</a>
   — or <a href="https://kairos.huguryildiz.com">try it live</a>.</sub>
 </p>
 

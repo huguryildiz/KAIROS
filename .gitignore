@@ -63,5 +63,10 @@ graphify-out/
 # ITC-2007 benchmark instance files (downloaded, not tracked)
 benchmarks/itc2007/
 
-# Promo/demo video — large binary, not tracked
+# Promo/demo videos — large binaries, not tracked
 assets/kairos-demo.mp4
+assets/KAIROS.mp4
+assets/KAIROS-promo-60s.mp4
+
+# Promo build scripts and rendered cards — local only
+tools/promo/

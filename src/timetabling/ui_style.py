@@ -1406,6 +1406,39 @@ def upload_cta_html(lang: str = DEFAULT_LANG) -> str:
     )
 
 
+def idle_guard_js(minutes: float, lang: str) -> str:
+    """JS that sends an idle tab to the static ``/idle.html`` page, which closes
+    Streamlit's websocket so Cloud Run stops billing for a forgotten tab.
+
+    Idle = no pointer, key, wheel, scroll or touch event for ``minutes``. The timer
+    is held while a solve or any script run is active. Installed once per page
+    load (``window.parent.__kIdle``); reruns only refresh the language."""
+    limit_ms = int(minutes * 60_000)
+    # Check often enough for short test limits, at most every 15 s
+    check_ms = max(1000, min(15_000, limit_ms // 4))
+    return (
+        '<script>(function(){'
+        'var P=window.parent,D=P.document;'
+        # Language for the idle page, refreshed on every rerun
+        f'P.__kIdleLang={lang!r};'
+        'if(P.__kIdle)return;P.__kIdle=true;'
+        'var last=Date.now();function poke(){last=Date.now();}'
+        # Any user input resets the idle clock
+        '["pointerdown","pointermove","keydown","wheel","scroll","touchstart"]'
+        '.forEach(function(t){D.addEventListener(t,poke,{capture:true,passive:true});});'
+        # A running solve or script run is never idle
+        'function busy(){return !!D.querySelector('
+        '\'.solve-running,[data-testid="stStatusWidget"] [data-testid="stStatusWidgetRunningIcon"]\');}'
+        'setInterval(function(){'
+        'if(busy()){last=Date.now();return;}'
+        f'if(Date.now()-last>={limit_ms}){{'
+        'P.onbeforeunload=null;'
+        'P.location.replace("/idle.html?lang="+encodeURIComponent(P.__kIdleLang));}'
+        f'}},{check_ms});'
+        '})();</script>'
+    )
+
+
 def dropzone_drag_js() -> str:
     """JS that lights up an upload card while a file is dragged over it — swaps the
     title to "release to upload" and tints the background (the visuals live in the

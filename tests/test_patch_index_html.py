@@ -77,3 +77,14 @@ def test_main_patches_index_and_writes_static_files(tmp_path):
     assert "Sitemap:" in (static_dir / "robots.txt").read_text(encoding="utf-8")
     assert "<urlset" in (static_dir / "sitemap.xml").read_text(encoding="utf-8")
     assert (static_dir / "favicon.png").exists()  # copied from repo assets/
+
+
+def test_main_installs_idle_page(tmp_path):
+    static_dir = tmp_path / "static"
+    static_dir.mkdir()
+    (static_dir / "index.html").write_text("<html><head></head><body></body></html>", encoding="utf-8")
+
+    main(str(static_dir))
+
+    # The idle guard redirects here; it must ship with the patched image
+    assert "Session paused" in (static_dir / "idle.html").read_text(encoding="utf-8")

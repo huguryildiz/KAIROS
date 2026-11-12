@@ -10,7 +10,7 @@ import streamlit as st
 from timetabling.settings import default_settings
 from timetabling.ui_style import (brand_css, appbar_html, stepper_html,
                                   hero_html, footer_html, dropzone_drag_js,
-                                  eyebrow_html)
+                                  eyebrow_html, idle_guard_js)
 from timetabling.ui_app import (get_lang, get_theme, theme_toggle,
                                 lang_selector_bar, hero_chips)
 from timetabling.i18n import t
@@ -99,6 +99,10 @@ if lang == "tr":
 # HTML event container so the JS actually runs; inline <script> in st.markdown is
 # stripped by Streamlit's sanitizer. See ui_style.dropzone_drag_js for details.
 _run_js(dropzone_drag_js())
+
+# Idle guard: an untouched tab keeps the websocket (and the Cloud Run instance)
+# alive for hours; after the idle limit, redirect to a static page to release it.
+_run_js(idle_guard_js(float(os.environ.get("KAIROS_IDLE_MINUTES", "15")), lang))
 
 with st.container(key="topbar"):
     bar = st.columns([7, 2], vertical_alignment="center")

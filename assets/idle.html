@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>KAIROS — Session paused</title>
+<link rel="icon" href="/favicon.png">
+<style>
+  /* Brand tokens (light), mirrored from ui_style._LIGHT_TOKENS */
+  :root { --canvas:#F4F6FA; --card:#FFFFFF; --bd:#E5E9F1; --ink:#131722;
+          --muted:#5B6472; --cta:#5C64C7; --cta-ink:#FFFFFF; }
+  /* Dark tokens, mirrored from ui_style._DARK_TOKENS */
+  @media (prefers-color-scheme: dark) {
+    :root { --canvas:#0E1220; --card:#1F2740; --bd:#33405E; --ink:#EAEEF7;
+            --muted:#8A93A8; --cta:#7E90EE; --cta-ink:#0E1220; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center;
+         justify-content:center; padding:16px; background:var(--canvas);
+         color:var(--ink); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .card { max-width:420px; width:100%; background:var(--card); border:1px solid var(--bd);
+          border-radius:16px; padding:32px 24px; text-align:center; }
+  img { width:56px; height:56px; }
+  h1 { font-size:1.25rem; margin:16px 0 8px; }
+  p { color:var(--muted); line-height:1.5; margin:0 0 24px; }
+  a.btn { display:inline-flex; align-items:center; min-height:44px; padding:0 20px;
+          border-radius:10px; background:var(--cta); color:var(--cta-ink);
+          font-weight:600; text-decoration:none; }
+</style>
+</head>
+<body>
+<main class="card">
+  <img src="/favicon.png" alt="" onerror="this.remove()">
+  <h1 id="t">Session paused</h1>
+  <p id="m">KAIROS was idle for a while, so the session was closed to save server resources. Unsaved inputs and results were cleared.</p>
+  <a class="btn" id="b" href="/">Reopen KAIROS</a>
+</main>
+<script>
+  // Switch the copy to Turkish when the app passed ?lang=tr
+  if (new URLSearchParams(location.search).get("lang") === "tr") {
+    document.documentElement.lang = "tr";
+    document.title = "KAIROS — Oturum duraklatıldı";
+    document.getElementById("t").textContent = "Oturum duraklatıldı";
+    document.getElementById("m").textContent = "KAIROS bir süre kullanılmadığı için sunucu kaynaklarını korumak amacıyla oturum kapatıldı. Kaydedilmemiş girdiler ve sonuçlar silindi.";
+    document.getElementById("b").textContent = "KAIROS'u yeniden aç";
+  }
+</script>
+</body>
+</html>

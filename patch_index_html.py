@@ -128,13 +128,17 @@ def default_static_dir() -> str:
 
 
 def install_static_files(static_dir: str, assets_dir: str) -> None:
-    """Overwrite Streamlit's favicon and drop robots.txt / sitemap.xml at root."""
+    """Overwrite Streamlit's favicon and drop robots.txt / sitemap.xml / idle.html at root."""
     favicon = os.path.join(assets_dir, "favicon.png")
     if os.path.exists(favicon):
         shutil.copyfile(favicon, os.path.join(static_dir, "favicon.png"))
     for name, body in (("robots.txt", ROBOTS_TXT), ("sitemap.xml", SITEMAP_XML)):
         with open(os.path.join(static_dir, name), "w", encoding="utf-8") as f:
             f.write(body)
+    # Static landing page the idle guard redirects to (closes the websocket)
+    idle = os.path.join(assets_dir, "idle.html")
+    if os.path.exists(idle):
+        shutil.copyfile(idle, os.path.join(static_dir, "idle.html"))
 
 
 def main(static_dir=None, measurement_id=MEASUREMENT_ID) -> None:

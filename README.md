@@ -119,7 +119,7 @@ CLI flags: `--courses` is the course-list CSV to optimize. `--rooms` is the clas
 
 ## 🚀 Deployment
 
-KAIROS ships as a single Docker image on **Google Cloud Run**, in the institution's own GCP project, `europe-west1`. The CI deploy keeps **one instance always warm** (`min-instances=1`, `max-instances=1`, session affinity) and is publicly accessible; the live service is mapped to `kairos.huguryildiz.com`. No PII enters the image — course and classroom data are supplied at runtime.
+KAIROS ships as a single Docker image on **Google Cloud Run**, in the institution's own GCP project, `europe-west1`. The CI deploy scales to zero when idle (`min-instances=0`, `max-instances=1`, session affinity) and is publicly accessible; the live service is mapped to `kairos.huguryildiz.com`. No PII enters the image — course and classroom data are supplied at runtime.
 
 Every push to `main` triggers [`cloudbuild.yaml`](cloudbuild.yaml). To deploy by hand (mirrors CI):
 
@@ -132,7 +132,7 @@ gcloud run deploy kairos \
   --cpu=4 \
   --cpu-boost \
   --timeout=3600 \
-  --min-instances=1 \
+  --min-instances=0 \
   --max-instances=1 \
   --concurrency=80 \
   --session-affinity \
@@ -140,6 +140,8 @@ gcloud run deploy kairos \
 ```
 
 > Keep `--memory 8Gi`. A CP-SAT solve needs at least 4 GiB; the Cloud Run default of 512 MiB kills the container mid-solve.
+
+> An open browser tab holds a Streamlit websocket, and Cloud Run bills the full instance for as long as it stays open. The app therefore redirects a tab to a static `/idle.html` page after 15 minutes without input, which closes the websocket. A running solve holds the timer. Set `KAIROS_IDLE_MINUTES` on the service to change the limit.
 
 Optional result archiving can be enabled with Cloud Storage. Create a regional bucket in
 `europe-west1`, grant the Cloud Run service account permission to create and list objects
